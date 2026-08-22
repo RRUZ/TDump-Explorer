@@ -4,6 +4,8 @@
 // unit for TDump Explorer project
 // https://github.com/RRUZ/TDump-Explorer
 //
+// Derived cross-reference layer for TDump Explorer.
+//
 // The Initial Developer of the Original Code is Rodrigo Ruz V.
 // Portions created by Rodrigo Ruz V. are Copyright (C) 2026 Rodrigo Ruz V.
 // All Rights Reserved.
@@ -12,8 +14,7 @@
 unit TDump.Explorer.Relations;
 
 
-// Derived cross-reference layer for TDump Explorer.
-//
+
 // TDump.Explorer.Parser deliberately preserves TDUMP's output as independent
 // projections: PE headers, section table, source modules, aligned symbols,
 // global symbols, types, exports and resources.  A TDUMP file seldom states

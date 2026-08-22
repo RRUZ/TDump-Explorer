@@ -1,0 +1,122 @@
+program TDumpRunnerConsole;
+
+{$APPTYPE CONSOLE}
+
+uses
+  System.SysUtils,
+  TDump.Explorer.Finder in '..\source\common\TDump.Explorer.Finder.pas',
+  TDump.Explorer.Parser in '..\source\parser\TDump.Explorer.Parser.pas',
+  TDump.Explorer.Runner in '..\source\common\TDump.Explorer.Runner.pas';
+
+const
+  CDefaultInputFile = 'C:\dev\TDump-Explorer\binaries\Package.Win64.bpl';
+
+procedure WriteUsage;
+begin
+  Writeln('Usage: TDumpRunnerConsole [input-file] [32|64] [tdump-options]');
+  Writeln('Example: TDumpRunnerConsole C:\dev\TDump-Explorer\binaries\VCL.Win64.exe 64 -e -ed');
+end;
+
+procedure WriteDocumentSummary(const ADocument: TDumpDocument);
+begin
+  Writeln('Parsed lines: ', ADocument.Lines.Count);
+  Writeln('Headers: ', ADocument.Headers.Count);
+  Writeln('Sections: ', ADocument.Sections.Count);
+  Writeln('Import modules: ', ADocument.Imports.Count);
+  Writeln('Exports: ', ADocument.ExportList.Count);
+  Writeln('Resources: ', ADocument.Resources.Count);
+  Writeln('Diagnostics: ', ADocument.Diagnostics.Count);
+  Writeln('Unsupported structures: ', ADocument.UnsupportedStructures.Count);
+end;
+
+begin
+  ReportMemoryLeaksOnShutdown := True;
+  try
+    var LInputFileName := CDefaultInputFile;
+    if ParamCount >= 1 then
+      LInputFileName := ParamStr(1);
+
+    var LToolRequested := ParamCount >= 2;
+    var LToolKind := tkUnknown;
+    if LToolRequested then
+    begin
+      if SameText(ParamStr(2), '32') then
+        LToolKind := tkTDump32
+      else if SameText(ParamStr(2), '64') then
+        LToolKind := tkTDump64
+      else
+      begin
+        WriteUsage;
+        ExitCode := 1;
+        Exit;
+      end;
+    end;
+
+    var LOptions := '-e -ed';
+    if ParamCount >= 3 then
+      LOptions := ParamStr(3);
+
+    var LFinder := TDumpFinder.Create;
+    try
+      var LInstallations := LFinder.Find;
+      try
+        var LInstallation: TDumpInstallation;
+        if LToolRequested then
+        begin
+          if LToolKind = tkTDump64 then
+            LInstallation := LFinder.FindNewest(LInstallations, tekTDump64)
+          else
+            LInstallation := LFinder.FindNewest(LInstallations, tekTDump);
+        end
+        else
+        begin
+          LInstallation := LFinder.FindDefault(LInstallations);
+          if (LInstallation <> nil) and LInstallation.HasTDump64 then
+            LToolKind := tkTDump64
+          else
+            LToolKind := tkTDump32;
+        end;
+
+        var LToolName := 'TDUMP';
+        if LToolKind = tkTDump64 then
+          LToolName := 'TDUMP64';
+        if LInstallation = nil then
+          raise Exception.CreateFmt('No installed %s executable was found.',
+            [LToolName]);
+        var LToolPath := LInstallation.TDumpPath;
+        if LToolKind = tkTDump64 then
+          LToolPath := LInstallation.TDump64Path;
+        Writeln('Selected Studio ', LInstallation.StudioVersion, ' as the newest ',
+          LToolName, ' installation.');
+
+        var LRunner := TDumpRunner.Create;
+        try
+          var LRun := LRunner.RunAndParse(LInputFileName, LToolPath, LToolKind,
+            LOptions);
+          try
+            Writeln('Input: ', LRun.InputFileName);
+            Writeln('Tool: ', LRun.ToolPath);
+            Writeln('Exit code: ', LRun.ExitCode);
+            Writeln('Captured characters: ', Length(LRun.OutputText));
+            WriteDocumentSummary(LRun.Document);
+          finally
+            LRun.Free;
+          end;
+        finally
+          LRunner.Free;
+        end;
+      finally
+        LInstallations.Free;
+      end;
+    finally
+      LFinder.Free;
+    end;
+    Readln;
+  except
+    on LException: Exception do
+    begin
+      Writeln(ErrOutput, LException.ClassName, ': ', LException.Message);
+      ExitCode := 1;
+    end;
+  end;
+end.

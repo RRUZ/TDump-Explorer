@@ -1,7 +1,9 @@
 //**************************************************************************************************
 //
 // Unit TDump.Explorer.Parser
-// unit for TDump Explorer project
+//
+// TDUMP Parser.
+//
 // https://github.com/RRUZ/TDump-Explorer
 //
 // The Initial Developer of the Original Code is Rodrigo Ruz V.

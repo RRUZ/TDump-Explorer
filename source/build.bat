@@ -9,6 +9,8 @@ set "CONSOLE_SOURCE=%PROJECT_ROOT%\tests\TDumpParserConsole.dpr"
 set "CONSOLE_EXE=%PROJECT_ROOT%\tests\TDumpParserConsole.exe"
 set "RUNNER_SOURCE=%PROJECT_ROOT%\tests\TDumpRunnerConsole.dpr"
 set "RUNNER_EXE=%PROJECT_ROOT%\tests\TDumpRunnerConsole.exe"
+set "FINDER_SOURCE=%PROJECT_ROOT%\tests\TDumpFinderConsole.dpr"
+set "FINDER_EXE=%PROJECT_ROOT%\tests\TDumpFinderConsole.exe"
 set "PROFILER_SOURCE=%PROJECT_ROOT%\tests\TDumpParserProfiler.dpr"
 set "PROFILER_EXE=%PROJECT_ROOT%\tests\TDumpParserProfiler.exe"
 set "RELATIONS_SOURCE=%PROJECT_ROOT%\tests\TDumpRelationsConsole.dpr"
@@ -20,6 +22,7 @@ if /I "%~1"=="" goto BUILD
 if /I "%~1"=="build" goto BUILD
 if /I "%~1"=="run" goto RUN
 if /I "%~1"=="runner" goto RUNNER
+if /I "%~1"=="finder" goto FINDER
 if /I "%~1"=="test" goto TEST
 if /I "%~1"=="profile" goto PROFILE
 if /I "%~1"=="relations" goto RELATIONS
@@ -107,6 +110,40 @@ if not exist "%RUNNER_EXE%" (
 )
 
 echo Build succeeded: %RUNNER_EXE%
+exit /b 0
+
+:BUILD_FINDER
+call :INIT_RAD_STUDIO
+if errorlevel 1 exit /b 1
+
+if not exist "%FINDER_SOURCE%" (
+  echo Finder-console source file was not found:
+  echo   %FINDER_SOURCE%
+  exit /b 1
+)
+
+echo Building TDumpFinderConsole ^(Win32 Debug^)...
+set "INTERMEDIATE_DIR=%INTERMEDIATE_ROOT%\%RANDOM%%RANDOM%"
+if not exist "%INTERMEDIATE_DIR%" mkdir "%INTERMEDIATE_DIR%"
+if not exist "%INTERMEDIATE_DIR%" (
+  echo Unable to create the intermediate output directory:
+  echo   %INTERMEDIATE_DIR%
+  exit /b 1
+)
+pushd "%PROJECT_ROOT%\tests"
+if errorlevel 1 exit /b 1
+dcc32.exe -B -Q -N"%INTERMEDIATE_DIR%" "TDumpFinderConsole.dpr"
+set "BUILD_RESULT=%ERRORLEVEL%"
+popd
+if not "%BUILD_RESULT%"=="0" exit /b %BUILD_RESULT%
+
+if not exist "%FINDER_EXE%" (
+  echo Build completed, but the expected finder-console executable was not found:
+  echo   %FINDER_EXE%
+  exit /b 1
+)
+
+echo Build succeeded: %FINDER_EXE%
 exit /b 0
 
 :BUILD_RELATIONS
@@ -202,6 +239,12 @@ if errorlevel 1 exit /b 1
 "%RUNNER_EXE%" "%~2" "%~3" "%~4"
 exit /b %ERRORLEVEL%
 
+:FINDER
+call :BUILD_FINDER
+if errorlevel 1 exit /b 1
+"%FINDER_EXE%"
+exit /b %ERRORLEVEL%
+
 :TEST
 call :BUILD_CONSOLE
 if errorlevel 1 exit /b 1
@@ -249,11 +292,12 @@ if not exist "%FIXTURE%" (
 exit /b %ERRORLEVEL%
 
 :USAGE
-echo Usage: build.bat [build^|run [fixture]^|runner [input-file] [32^|64] [tdump-options]^|test^|profile [fixture-directory] [iterations]^|relations [fixture]]
+echo Usage: build.bat [build^|run [fixture]^|runner [input-file] [32^|64] [tdump-options]^|finder^|test^|profile [fixture-directory] [iterations]^|relations [fixture]]
 echo.
 echo   build  Build the Win32 Debug console harness ^(default^).
 echo   run    Build, then run the console harness with an optional fixture.
-echo   runner Build, run, capture, and parse one binary with the fixed TDUMP paths.
+echo   runner Build, run, capture, and parse one binary using the newest installed TDUMP.
+echo   finder Enumerate installed TDUMP tools and print the recommended default.
 echo   test   Build, then run non-interactive smoke tests for registered fixtures.
 echo   profile Build and profile every *.tdump under fixtures, optionally using a
 echo           fixture directory and positive iteration count.
