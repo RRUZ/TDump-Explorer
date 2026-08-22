@@ -1,0 +1,5 @@
+   Display of File c:\dev\tdump-explorer\binaries\dll.win32.dll
+
+EXPORT ord:0002='__dbk_fcall_wrapper'
+EXPORT ord:0001='dbkFCallWrapperAddr'
+

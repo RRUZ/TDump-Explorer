@@ -126,7 +126,7 @@ begin
   ReportMemoryLeaksOnShutdown := True;
   try
     var LFixtureDirectory := TPath.Combine(ExtractFilePath(ParamStr(0)),
-      '..\fixtures');
+      '..\fixtures\generated');
     if ParamCount >= 1 then
       LFixtureDirectory := ExpandFileName(ParamStr(1));
     var LIterations := 1;

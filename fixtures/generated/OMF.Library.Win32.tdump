@@ -1,0 +1,157 @@
+ Display of File c:\dev\tdump-explorer\binaries\omf.library.win32.lib
+
+000000 MSLIBR Index begins at file offset a00. Index is 2 blocks.
+    Library Page size is 512 bytes.
+
+000200 THEADR  mswsock
+00020C COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: AcceptEx
+      Module Name: MSWSOCK.dll
+00022A COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: EnumProtocolsA
+      Module Name: MSWSOCK.dll
+00024E COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: EnumProtocolsW
+      Module Name: MSWSOCK.dll
+000272 COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: GetAcceptExSockaddrs
+      Module Name: MSWSOCK.dll
+00029C COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: GetAddressByNameA
+      Module Name: MSWSOCK.dll
+0002C3 COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: GetAddressByNameW
+      Module Name: MSWSOCK.dll
+0002EA COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: GetNameByTypeA
+      Module Name: MSWSOCK.dll
+00030E COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: GetNameByTypeW
+      Module Name: MSWSOCK.dll
+000332 COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: GetServiceA
+      Module Name: MSWSOCK.dll
+000353 COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: GetServiceW
+      Module Name: MSWSOCK.dll
+000374 COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: GetSocketErrorMessageW
+      Module Name: MSWSOCK.dll
+0003A0 COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: GetTypeByNameA
+      Module Name: MSWSOCK.dll
+0003C4 COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: GetTypeByNameW
+      Module Name: MSWSOCK.dll
+0003E8 COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: MigrateWinsockConfiguration
+      Module Name: MSWSOCK.dll
+000419 COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: MigrateWinsockConfigurationEx
+      Module Name: MSWSOCK.dll
+00044C COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: NPLoadNameSpaces
+      Module Name: MSWSOCK.dll
+000472 COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: ProcessSocketNotifications
+      Module Name: MSWSOCK.dll
+0004A2 COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: SetServiceA
+      Module Name: MSWSOCK.dll
+0004C3 COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: SetServiceW
+      Module Name: MSWSOCK.dll
+0004E4 COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: TransmitFile
+      Module Name: MSWSOCK.dll
+000506 COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: WSARecvEx
+      Module Name: MSWSOCK.dll
+000525 COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: dn_expand
+      Module Name: MSWSOCK.dll
+000544 COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: getnetbyname
+      Module Name: MSWSOCK.dll
+000566 COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: inet_network
+      Module Name: MSWSOCK.dll
+000588 COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: rcmd
+      Module Name: MSWSOCK.dll
+0005A2 COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: rexec
+      Module Name: MSWSOCK.dll
+0005BD COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: rresvport
+      Module Name: MSWSOCK.dll
+0005DC COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: s_perror
+      Module Name: MSWSOCK.dll
+0005FA COMENT  Purge: Yes, List: Yes, Class: 160 (0A0h), SubClass: 1 (01h)
+    Dynamic link import (IMPDEF)
+      Imported by: name
+      Internal Name: sethostname
+      Module Name: MSWSOCK.dll
+00061B MODEND
+
+===============
+
+000800 MSLEND
+

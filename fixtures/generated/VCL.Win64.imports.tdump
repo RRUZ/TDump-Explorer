@@ -1,0 +1,664 @@
+   Display of File c:\dev\tdump-explorer\binaries\vcl.win64.exe
+
+IMPORT:     winspool.drv='DocumentPropertiesW'
+IMPORT:     winspool.drv='ClosePrinter'
+IMPORT:     winspool.drv='OpenPrinterW'
+IMPORT:     winspool.drv='GetDefaultPrinterW'
+IMPORT:     winspool.drv='EnumPrintersW'
+IMPORT:     comdlg32.dll='FindTextW'
+IMPORT:     comctl32.dll='ImageList_GetImageInfo'
+IMPORT:     comctl32.dll='FlatSB_SetScrollInfo'
+IMPORT:     comctl32.dll='ImageList_DragMove'
+IMPORT:     comctl32.dll='ImageList_Destroy'
+IMPORT:     comctl32.dll='_TrackMouseEvent'
+IMPORT:     comctl32.dll='ImageList_DragShowNolock'
+IMPORT:     comctl32.dll='ImageList_Add'
+IMPORT:     comctl32.dll='FlatSB_SetScrollProp'
+IMPORT:     comctl32.dll='ImageList_GetDragImage'
+IMPORT:     comctl32.dll='ImageList_Create'
+IMPORT:     comctl32.dll='ImageList_EndDrag'
+IMPORT:     comctl32.dll='ImageList_DrawEx'
+IMPORT:     comctl32.dll='ImageList_SetImageCount'
+IMPORT:     comctl32.dll='FlatSB_GetScrollPos'
+IMPORT:     comctl32.dll='FlatSB_SetScrollPos'
+IMPORT:     comctl32.dll='InitializeFlatSB'
+IMPORT:     comctl32.dll='ImageList_Copy'
+IMPORT:     comctl32.dll='FlatSB_GetScrollInfo'
+IMPORT:     comctl32.dll='ImageList_Write'
+IMPORT:     comctl32.dll='ImageList_DrawIndirect'
+IMPORT:     comctl32.dll='ImageList_SetBkColor'
+IMPORT:     comctl32.dll='ImageList_GetBkColor'
+IMPORT:     comctl32.dll='ImageList_BeginDrag'
+IMPORT:     comctl32.dll='ImageList_GetIcon'
+IMPORT:     comctl32.dll='ImageList_Replace'
+IMPORT:     comctl32.dll='ImageList_GetImageCount'
+IMPORT:     comctl32.dll='ImageList_DragEnter'
+IMPORT:     comctl32.dll='ImageList_GetIconSize'
+IMPORT:     comctl32.dll='ImageList_SetIconSize'
+IMPORT:     comctl32.dll='ImageList_Read'
+IMPORT:     comctl32.dll='ImageList_DragLeave'
+IMPORT:     comctl32.dll='ImageList_LoadImageW'
+IMPORT:     comctl32.dll='ImageList_Draw'
+IMPORT:     comctl32.dll='ImageList_Remove'
+IMPORT:     comctl32.dll='ImageList_ReplaceIcon'
+IMPORT:     comctl32.dll='ImageList_SetOverlayImage'
+IMPORT:      shell32.dll='Shell_NotifyIconW'
+IMPORT:      shell32.dll='SHAppBarMessage'
+IMPORT:       user32.dll='CopyImage'
+IMPORT:       user32.dll='CreateWindowExW'
+IMPORT:       user32.dll='GetMenuItemInfoW'
+IMPORT:       user32.dll='SetMenuItemInfoW'
+IMPORT:       user32.dll='DefFrameProcW'
+IMPORT:       user32.dll='GetDCEx'
+IMPORT:       user32.dll='PeekMessageW'
+IMPORT:       user32.dll='MonitorFromWindow'
+IMPORT:       user32.dll='GetDlgCtrlID'
+IMPORT:       user32.dll='GetUpdateRect'
+IMPORT:       user32.dll='SetTimer'
+IMPORT:       user32.dll='WindowFromPoint'
+IMPORT:       user32.dll='BeginPaint'
+IMPORT:       user32.dll='RegisterClipboardFormatW'
+IMPORT:       user32.dll='FrameRect'
+IMPORT:       user32.dll='MapVirtualKeyW'
+IMPORT:       user32.dll='IsWindowUnicode'
+IMPORT:       user32.dll='RegisterWindowMessageW'
+IMPORT:       user32.dll='FillRect'
+IMPORT:       user32.dll='GetMenuStringW'
+IMPORT:       user32.dll='DispatchMessageW'
+IMPORT:       user32.dll='CreateAcceleratorTableW'
+IMPORT:       user32.dll='SendMessageA'
+IMPORT:       user32.dll='DefMDIChildProcW'
+IMPORT:       user32.dll='EnumWindows'
+IMPORT:       user32.dll='GetClassInfoW'
+IMPORT:       user32.dll='ShowOwnedPopups'
+IMPORT:       user32.dll='GetSystemMenu'
+IMPORT:       user32.dll='GetScrollRange'
+IMPORT:       user32.dll='GetScrollPos'
+IMPORT:       user32.dll='SetScrollPos'
+IMPORT:       user32.dll='GetActiveWindow'
+IMPORT:       user32.dll='SetActiveWindow'
+IMPORT:       user32.dll='DrawEdge'
+IMPORT:       user32.dll='GetKeyboardLayoutList'
+IMPORT:       user32.dll='LoadBitmapW'
+IMPORT:       user32.dll='DrawFocusRect'
+IMPORT:       user32.dll='EnumChildWindows'
+IMPORT:       user32.dll='GetScrollBarInfo'
+IMPORT:       user32.dll='ReleaseCapture'
+IMPORT:       user32.dll='UnhookWindowsHookEx'
+IMPORT:       user32.dll='LoadCursorW'
+IMPORT:       user32.dll='GetCapture'
+IMPORT:       user32.dll='SetCapture'
+IMPORT:       user32.dll='CreatePopupMenu'
+IMPORT:       user32.dll='ScrollWindow'
+IMPORT:       user32.dll='ShowCaret'
+IMPORT:       user32.dll='GetMenuItemID'
+IMPORT:       user32.dll='GetLastActivePopup'
+IMPORT:       user32.dll='CharLowerBuffW'
+IMPORT:       user32.dll='GetSystemMetrics'
+IMPORT:       user32.dll='PostMessageW'
+IMPORT:       user32.dll='DrawMenuBar'
+IMPORT:       user32.dll='SetParent'
+IMPORT:       user32.dll='IsZoomed'
+IMPORT:       user32.dll='CharUpperBuffW'
+IMPORT:       user32.dll='GetClientRect'
+IMPORT:       user32.dll='IsChild'
+IMPORT:       user32.dll='GetClassLongPtrW'
+IMPORT:       user32.dll='SetClassLongPtrW'
+IMPORT:       user32.dll='ClientToScreen'
+IMPORT:       user32.dll='GetClipboardData'
+IMPORT:       user32.dll='SetClipboardData'
+IMPORT:       user32.dll='SetWindowPlacement'
+IMPORT:       user32.dll='IsIconic'
+IMPORT:       user32.dll='CallNextHookEx'
+IMPORT:       user32.dll='GetMonitorInfoW'
+IMPORT:       user32.dll='ShowWindow'
+IMPORT:       user32.dll='CheckMenuItem'
+IMPORT:       user32.dll='CharUpperW'
+IMPORT:       user32.dll='DefWindowProcW'
+IMPORT:       user32.dll='GetForegroundWindow'
+IMPORT:       user32.dll='SetForegroundWindow'
+IMPORT:       user32.dll='GetWindowTextW'
+IMPORT:       user32.dll='EnableWindow'
+IMPORT:       user32.dll='DestroyWindow'
+IMPORT:       user32.dll='IsDialogMessageW'
+IMPORT:       user32.dll='EndMenu'
+IMPORT:       user32.dll='RegisterClassW'
+IMPORT:       user32.dll='CharNextW'
+IMPORT:       user32.dll='GetWindowThreadProcessId'
+IMPORT:       user32.dll='RedrawWindow'
+IMPORT:       user32.dll='GetDC'
+IMPORT:       user32.dll='GetFocus'
+IMPORT:       user32.dll='SetFocus'
+IMPORT:       user32.dll='EndPaint'
+IMPORT:       user32.dll='ReleaseDC'
+IMPORT:       user32.dll='MsgWaitForMultipleObjectsEx'
+IMPORT:       user32.dll='LoadKeyboardLayoutW'
+IMPORT:       user32.dll='ActivateKeyboardLayout'
+IMPORT:       user32.dll='GetParent'
+IMPORT:       user32.dll='DrawTextW'
+IMPORT:       user32.dll='SetScrollRange'
+IMPORT:       user32.dll='MonitorFromRect'
+IMPORT:       user32.dll='InsertMenuItemW'
+IMPORT:       user32.dll='PeekMessageA'
+IMPORT:       user32.dll='GetPropW'
+IMPORT:       user32.dll='MessageBoxW'
+IMPORT:       user32.dll='MessageBeep'
+IMPORT:       user32.dll='SetPropW'
+IMPORT:       user32.dll='RemovePropW'
+IMPORT:       user32.dll='UpdateWindow'
+IMPORT:       user32.dll='GetSubMenu'
+IMPORT:       user32.dll='MsgWaitForMultipleObjects'
+IMPORT:       user32.dll='DestroyMenu'
+IMPORT:       user32.dll='DestroyIcon'
+IMPORT:       user32.dll='SetWindowsHookExW'
+IMPORT:       user32.dll='EmptyClipboard'
+IMPORT:       user32.dll='IsWindowVisible'
+IMPORT:       user32.dll='DispatchMessageA'
+IMPORT:       user32.dll='UnregisterClassW'
+IMPORT:       user32.dll='GetTopWindow'
+IMPORT:       user32.dll='SendMessageW'
+IMPORT:       user32.dll='AdjustWindowRectEx'
+IMPORT:       user32.dll='DrawIcon'
+IMPORT:       user32.dll='IsWindow'
+IMPORT:       user32.dll='EnumThreadWindows'
+IMPORT:       user32.dll='InvalidateRect'
+IMPORT:       user32.dll='GetKeyboardState'
+IMPORT:       user32.dll='DrawFrameControl'
+IMPORT:       user32.dll='ScreenToClient'
+IMPORT:       user32.dll='GetWindowLongPtrW'
+IMPORT:       user32.dll='SetWindowLongPtrW'
+IMPORT:       user32.dll='BringWindowToTop'
+IMPORT:       user32.dll='SetCursor'
+IMPORT:       user32.dll='CreateIcon'
+IMPORT:       user32.dll='CreateMenu'
+IMPORT:       user32.dll='LoadStringW'
+IMPORT:       user32.dll='CharLowerW'
+IMPORT:       user32.dll='SetWindowPos'
+IMPORT:       user32.dll='SetWindowRgn'
+IMPORT:       user32.dll='GetMenuItemCount'
+IMPORT:       user32.dll='RemoveMenu'
+IMPORT:       user32.dll='GetSysColorBrush'
+IMPORT:       user32.dll='GetKeyboardLayoutNameW'
+IMPORT:       user32.dll='GetWindowDC'
+IMPORT:       user32.dll='TranslateMessage'
+IMPORT:       user32.dll='OpenClipboard'
+IMPORT:       user32.dll='DrawTextExW'
+IMPORT:       user32.dll='MapWindowPoints'
+IMPORT:       user32.dll='EnumDisplayMonitors'
+IMPORT:       user32.dll='CallWindowProcW'
+IMPORT:       user32.dll='CloseClipboard'
+IMPORT:       user32.dll='DestroyCursor'
+IMPORT:       user32.dll='GetScrollInfo'
+IMPORT:       user32.dll='SetWindowTextW'
+IMPORT:       user32.dll='GetMessageExtraInfo'
+IMPORT:       user32.dll='EnableScrollBar'
+IMPORT:       user32.dll='GetSysColor'
+IMPORT:       user32.dll='TrackPopupMenu'
+IMPORT:       user32.dll='CopyIcon'
+IMPORT:       user32.dll='DrawIconEx'
+IMPORT:       user32.dll='PostQuitMessage'
+IMPORT:       user32.dll='GetClassNameW'
+IMPORT:       user32.dll='ShowScrollBar'
+IMPORT:       user32.dll='EnableMenuItem'
+IMPORT:       user32.dll='GetIconInfo'
+IMPORT:       user32.dll='GetMessagePos'
+IMPORT:       user32.dll='SetScrollInfo'
+IMPORT:       user32.dll='GetKeyNameTextW'
+IMPORT:       user32.dll='GetDesktopWindow'
+IMPORT:       user32.dll='GetCursorPos'
+IMPORT:       user32.dll='SetCursorPos'
+IMPORT:       user32.dll='HideCaret'
+IMPORT:       user32.dll='GetMenu'
+IMPORT:       user32.dll='GetMenuState'
+IMPORT:       user32.dll='SetMenu'
+IMPORT:       user32.dll='SetRect'
+IMPORT:       user32.dll='GetKeyState'
+IMPORT:       user32.dll='FindWindowExW'
+IMPORT:       user32.dll='MonitorFromPoint'
+IMPORT:       user32.dll='ValidateRect'
+IMPORT:       user32.dll='SystemParametersInfoW'
+IMPORT:       user32.dll='LoadIconW'
+IMPORT:       user32.dll='GetCursor'
+IMPORT:       user32.dll='GetWindow'
+IMPORT:       user32.dll='GetWindowRect'
+IMPORT:       user32.dll='InsertMenuW'
+IMPORT:       user32.dll='KillTimer'
+IMPORT:       user32.dll='WaitMessage'
+IMPORT:       user32.dll='IsWindowEnabled'
+IMPORT:       user32.dll='IsDialogMessageA'
+IMPORT:       user32.dll='TranslateMDISysAccel'
+IMPORT:       user32.dll='GetWindowPlacement'
+IMPORT:       user32.dll='CreateIconIndirect'
+IMPORT:       user32.dll='DeleteMenu'
+IMPORT:       user32.dll='GetKeyboardLayout'
+IMPORT:      version.dll='GetFileVersionInfoSizeW'
+IMPORT:      version.dll='VerQueryValueW'
+IMPORT:      version.dll='GetFileVersionInfoW'
+IMPORT: UIAutomationCore.dll='UiaReturnRawElementProvider'
+IMPORT:     oleaut32.dll='SafeArrayPutElement'
+IMPORT:     oleaut32.dll='GetErrorInfo'
+IMPORT:     oleaut32.dll='VariantInit'
+IMPORT:     oleaut32.dll='VariantClear'
+IMPORT:     oleaut32.dll='SysFreeString'
+IMPORT:     oleaut32.dll='SafeArrayAccessData'
+IMPORT:     oleaut32.dll='SysReAllocStringLen'
+IMPORT:     oleaut32.dll='SafeArrayCreate'
+IMPORT:     oleaut32.dll='SafeArrayGetElement'
+IMPORT:     oleaut32.dll='SysAllocStringLen'
+IMPORT:     oleaut32.dll='SafeArrayUnaccessData'
+IMPORT:     oleaut32.dll='SafeArrayPtrOfIndex'
+IMPORT:     oleaut32.dll='VariantCopy'
+IMPORT:     oleaut32.dll='SafeArrayGetUBound'
+IMPORT:     oleaut32.dll='SafeArrayGetLBound'
+IMPORT:     oleaut32.dll='VariantChangeType'
+IMPORT:     WTSAPI32.DLL='WTSUnRegisterSessionNotification'
+IMPORT:     WTSAPI32.DLL='WTSRegisterSessionNotification'
+IMPORT:     advapi32.dll='RegSetValueExW'
+IMPORT:     advapi32.dll='RegConnectRegistryW'
+IMPORT:     advapi32.dll='RegEnumKeyExW'
+IMPORT:     advapi32.dll='RegLoadKeyW'
+IMPORT:     advapi32.dll='RegDeleteKeyW'
+IMPORT:     advapi32.dll='RegOpenKeyExW'
+IMPORT:     advapi32.dll='RegQueryInfoKeyW'
+IMPORT:     advapi32.dll='RegUnLoadKeyW'
+IMPORT:     advapi32.dll='RegSaveKeyW'
+IMPORT:     advapi32.dll='RegDeleteValueW'
+IMPORT:     advapi32.dll='RegReplaceKeyW'
+IMPORT:     advapi32.dll='RegFlushKey'
+IMPORT:     advapi32.dll='RegQueryValueExW'
+IMPORT:     advapi32.dll='RegEnumValueW'
+IMPORT:     advapi32.dll='RegCloseKey'
+IMPORT:     advapi32.dll='RegCreateKeyExW'
+IMPORT:     advapi32.dll='RegRestoreKeyW'
+IMPORT:     kernel32.dll='GetFileType'
+IMPORT:     kernel32.dll='RtlUnwindEx'
+IMPORT:     kernel32.dll='GetACP'
+IMPORT:     kernel32.dll='CloseHandle'
+IMPORT:     kernel32.dll='LocalFree'
+IMPORT:     kernel32.dll='GetCurrentProcessId'
+IMPORT:     kernel32.dll='SizeofResource'
+IMPORT:     kernel32.dll='QueryPerformanceFrequency'
+IMPORT:     kernel32.dll='IsDebuggerPresent'
+IMPORT:     kernel32.dll='VirtualFree'
+IMPORT:     kernel32.dll='GetFullPathNameW'
+IMPORT:     kernel32.dll='GetProcessHeap'
+IMPORT:     kernel32.dll='ExitProcess'
+IMPORT:     kernel32.dll='HeapAlloc'
+IMPORT:     kernel32.dll='GetCPInfoExW'
+IMPORT:     kernel32.dll='RtlUnwind'
+IMPORT:     kernel32.dll='GetCPInfo'
+IMPORT:     kernel32.dll='EnumSystemLocalesW'
+IMPORT:     kernel32.dll='GetStdHandle'
+IMPORT:     kernel32.dll='GetModuleHandleW'
+IMPORT:     kernel32.dll='FreeLibrary'
+IMPORT:     kernel32.dll='TryEnterCriticalSection'
+IMPORT:     kernel32.dll='HeapDestroy'
+IMPORT:     kernel32.dll='ReadFile'
+IMPORT:     kernel32.dll='GetLastError'
+IMPORT:     kernel32.dll='GetModuleFileNameW'
+IMPORT:     kernel32.dll='SetLastError'
+IMPORT:     kernel32.dll='GlobalAlloc'
+IMPORT:     kernel32.dll='GlobalUnlock'
+IMPORT:     kernel32.dll='FindResourceW'
+IMPORT:     kernel32.dll='CreateThread'
+IMPORT:     kernel32.dll='CompareStringW'
+IMPORT:     kernel32.dll='LoadLibraryA'
+IMPORT:     kernel32.dll='ResetEvent'
+IMPORT:     kernel32.dll='MulDiv'
+IMPORT:     kernel32.dll='FreeResource'
+IMPORT:     kernel32.dll='GetVersion'
+IMPORT:     kernel32.dll='RaiseException'
+IMPORT:     kernel32.dll='GlobalAddAtomW'
+IMPORT:     kernel32.dll='FormatMessageW'
+IMPORT:     kernel32.dll='SwitchToThread'
+IMPORT:     kernel32.dll='GetExitCodeThread'
+IMPORT:     kernel32.dll='GetCurrentThread'
+IMPORT:     kernel32.dll='LoadLibraryExW'
+IMPORT:     kernel32.dll='LockResource'
+IMPORT:     kernel32.dll='GetCurrentThreadId'
+IMPORT:     kernel32.dll='UnhandledExceptionFilter'
+IMPORT:     kernel32.dll='VirtualQuery'
+IMPORT:     kernel32.dll='GlobalFindAtomW'
+IMPORT:     kernel32.dll='VirtualQueryEx'
+IMPORT:     kernel32.dll='GlobalFree'
+IMPORT:     kernel32.dll='Sleep'
+IMPORT:     kernel32.dll='EnterCriticalSection'
+IMPORT:     kernel32.dll='SetFilePointer'
+IMPORT:     kernel32.dll='LoadResource'
+IMPORT:     kernel32.dll='SuspendThread'
+IMPORT:     kernel32.dll='GetTickCount'
+IMPORT:     kernel32.dll='GetFileSize'
+IMPORT:     kernel32.dll='GetStartupInfoW'
+IMPORT:     kernel32.dll='GlobalDeleteAtom'
+IMPORT:     kernel32.dll='GetFileAttributesW'
+IMPORT:     kernel32.dll='InitializeCriticalSection'
+IMPORT:     kernel32.dll='GetThreadPriority'
+IMPORT:     kernel32.dll='GetCurrentProcess'
+IMPORT:     kernel32.dll='SetThreadPriority'
+IMPORT:     kernel32.dll='GlobalLock'
+IMPORT:     kernel32.dll='VirtualAlloc'
+IMPORT:     kernel32.dll='GetCommandLineW'
+IMPORT:     kernel32.dll='GetSystemInfo'
+IMPORT:     kernel32.dll='LeaveCriticalSection'
+IMPORT:     kernel32.dll='GetProcAddress'
+IMPORT:     kernel32.dll='ResumeThread'
+IMPORT:     kernel32.dll='GetVersionExW'
+IMPORT:     kernel32.dll='VerifyVersionInfoW'
+IMPORT:     kernel32.dll='HeapCreate'
+IMPORT:     kernel32.dll='LCMapStringW'
+IMPORT:     kernel32.dll='GetDiskFreeSpaceW'
+IMPORT:     kernel32.dll='VerSetConditionMask'
+IMPORT:     kernel32.dll='FindFirstFileW'
+IMPORT:     kernel32.dll='GetUserDefaultUILanguage'
+IMPORT:     kernel32.dll='GetConsoleOutputCP'
+IMPORT:     kernel32.dll='GetConsoleCP'
+IMPORT:     kernel32.dll='lstrlenW'
+IMPORT:     kernel32.dll='QueryPerformanceCounter'
+IMPORT:     kernel32.dll='SetEndOfFile'
+IMPORT:     kernel32.dll='HeapFree'
+IMPORT:     kernel32.dll='WideCharToMultiByte'
+IMPORT:     kernel32.dll='FindClose'
+IMPORT:     kernel32.dll='MultiByteToWideChar'
+IMPORT:     kernel32.dll='LoadLibraryW'
+IMPORT:     kernel32.dll='SetEvent'
+IMPORT:     kernel32.dll='GetLocaleInfoW'
+IMPORT:     kernel32.dll='CreateFileW'
+IMPORT:     kernel32.dll='EnumResourceNamesW'
+IMPORT:     kernel32.dll='GetLocalTime'
+IMPORT:     kernel32.dll='WaitForSingleObject'
+IMPORT:     kernel32.dll='WriteFile'
+IMPORT:     kernel32.dll='ExitThread'
+IMPORT:     kernel32.dll='DeleteCriticalSection'
+IMPORT:     kernel32.dll='GetDateFormatW'
+IMPORT:     kernel32.dll='TlsGetValue'
+IMPORT:     kernel32.dll='SetErrorMode'
+IMPORT:     kernel32.dll='IsValidLocale'
+IMPORT:     kernel32.dll='TlsSetValue'
+IMPORT:     kernel32.dll='GetSystemDefaultUILanguage'
+IMPORT:     kernel32.dll='EnumCalendarInfoW'
+IMPORT:     kernel32.dll='LocalAlloc'
+IMPORT:     kernel32.dll='CreateEventW'
+IMPORT:     kernel32.dll='WaitForMultipleObjectsEx'
+IMPORT:     kernel32.dll='SetThreadLocale'
+IMPORT:     kernel32.dll='GetThreadLocale'
+IMPORT:        ole32.dll='IsEqualGUID'
+IMPORT:        ole32.dll='OleInitialize'
+IMPORT:        ole32.dll='OleUninitialize'
+IMPORT:        ole32.dll='CoInitialize'
+IMPORT:        ole32.dll='CoCreateInstance'
+IMPORT:        ole32.dll='CoUninitialize'
+IMPORT:        ole32.dll='CoTaskMemFree'
+IMPORT:        ole32.dll='CoTaskMemAlloc'
+IMPORT:        gdi32.dll='Pie'
+IMPORT:        gdi32.dll='SetBkMode'
+IMPORT:        gdi32.dll='CreateCompatibleBitmap'
+IMPORT:        gdi32.dll='GetEnhMetaFileHeader'
+IMPORT:        gdi32.dll='RectVisible'
+IMPORT:        gdi32.dll='AngleArc'
+IMPORT:        gdi32.dll='SetAbortProc'
+IMPORT:        gdi32.dll='SetTextColor'
+IMPORT:        gdi32.dll='StretchBlt'
+IMPORT:        gdi32.dll='RoundRect'
+IMPORT:        gdi32.dll='RestoreDC'
+IMPORT:        gdi32.dll='SetRectRgn'
+IMPORT:        gdi32.dll='GetTextMetricsW'
+IMPORT:        gdi32.dll='GetWindowOrgEx'
+IMPORT:        gdi32.dll='CreatePalette'
+IMPORT:        gdi32.dll='PolyBezierTo'
+IMPORT:        gdi32.dll='CreateICW'
+IMPORT:        gdi32.dll='CreateDCW'
+IMPORT:        gdi32.dll='GetStockObject'
+IMPORT:        gdi32.dll='CreateSolidBrush'
+IMPORT:        gdi32.dll='Polygon'
+IMPORT:        gdi32.dll='MoveToEx'
+IMPORT:        gdi32.dll='PlayEnhMetaFile'
+IMPORT:        gdi32.dll='Ellipse'
+IMPORT:        gdi32.dll='StartPage'
+IMPORT:        gdi32.dll='GetBitmapBits'
+IMPORT:        gdi32.dll='StartDocW'
+IMPORT:        gdi32.dll='AbortDoc'
+IMPORT:        gdi32.dll='GetSystemPaletteEntries'
+IMPORT:        gdi32.dll='GetEnhMetaFileBits'
+IMPORT:        gdi32.dll='GetEnhMetaFilePaletteEntries'
+IMPORT:        gdi32.dll='CreatePenIndirect'
+IMPORT:        gdi32.dll='CreateFontIndirectW'
+IMPORT:        gdi32.dll='PolyBezier'
+IMPORT:        gdi32.dll='EndDoc'
+IMPORT:        gdi32.dll='GetObjectW'
+IMPORT:        gdi32.dll='GetWinMetaFileBits'
+IMPORT:        gdi32.dll='SetROP2'
+IMPORT:        gdi32.dll='GetEnhMetaFileDescriptionW'
+IMPORT:        gdi32.dll='ArcTo'
+IMPORT:        gdi32.dll='Arc'
+IMPORT:        gdi32.dll='SelectPalette'
+IMPORT:        gdi32.dll='ExcludeClipRect'
+IMPORT:        gdi32.dll='MaskBlt'
+IMPORT:        gdi32.dll='SetWindowOrgEx'
+IMPORT:        gdi32.dll='EndPage'
+IMPORT:        gdi32.dll='DeleteEnhMetaFile'
+IMPORT:        gdi32.dll='Chord'
+IMPORT:        gdi32.dll='SetDIBits'
+IMPORT:        gdi32.dll='SetViewportOrgEx'
+IMPORT:        gdi32.dll='CreateRectRgn'
+IMPORT:        gdi32.dll='RealizePalette'
+IMPORT:        gdi32.dll='SetDIBColorTable'
+IMPORT:        gdi32.dll='GetDIBColorTable'
+IMPORT:        gdi32.dll='CreateBrushIndirect'
+IMPORT:        gdi32.dll='PatBlt'
+IMPORT:        gdi32.dll='SetEnhMetaFileBits'
+IMPORT:        gdi32.dll='Rectangle'
+IMPORT:        gdi32.dll='SaveDC'
+IMPORT:        gdi32.dll='DeleteDC'
+IMPORT:        gdi32.dll='FrameRgn'
+IMPORT:        gdi32.dll='BitBlt'
+IMPORT:        gdi32.dll='GetDeviceCaps'
+IMPORT:        gdi32.dll='GetTextExtentPoint32W'
+IMPORT:        gdi32.dll='GetClipBox'
+IMPORT:        gdi32.dll='IntersectClipRect'
+IMPORT:        gdi32.dll='Polyline'
+IMPORT:        gdi32.dll='CreateBitmap'
+IMPORT:        gdi32.dll='SetWinMetaFileBits'
+IMPORT:        gdi32.dll='CombineRgn'
+IMPORT:        gdi32.dll='GetStretchBltMode'
+IMPORT:        gdi32.dll='CreateDIBitmap'
+IMPORT:        gdi32.dll='SetStretchBltMode'
+IMPORT:        gdi32.dll='GetDIBits'
+IMPORT:        gdi32.dll='CreateDIBSection'
+IMPORT:        gdi32.dll='LineTo'
+IMPORT:        gdi32.dll='GetRgnBox'
+IMPORT:        gdi32.dll='EnumFontsW'
+IMPORT:        gdi32.dll='CreateHalftonePalette'
+IMPORT:        gdi32.dll='SelectObject'
+IMPORT:        gdi32.dll='DeleteObject'
+IMPORT:        gdi32.dll='ExtFloodFill'
+IMPORT:        gdi32.dll='UnrealizeObject'
+IMPORT:        gdi32.dll='CopyEnhMetaFileW'
+IMPORT:        gdi32.dll='SetBkColor'
+IMPORT:        gdi32.dll='CreateCompatibleDC'
+IMPORT:        gdi32.dll='GetBrushOrgEx'
+IMPORT:        gdi32.dll='GetCurrentPositionEx'
+IMPORT:        gdi32.dll='GetTextExtentPointW'
+IMPORT:        gdi32.dll='ExtTextOutW'
+IMPORT:        gdi32.dll='SetBrushOrgEx'
+IMPORT:        gdi32.dll='GetPixel'
+IMPORT:        gdi32.dll='GdiFlush'
+IMPORT:        gdi32.dll='SetPixel'
+IMPORT:        gdi32.dll='EnumFontFamiliesExW'
+IMPORT:        gdi32.dll='StretchDIBits'
+IMPORT:        gdi32.dll='GetPaletteEntries'
+
+
+Delayed Load Import Table
+
+Delayed Imports from kernel32.dll
+  Attributes:                 00000001
+  Address of HMODULE          403471A0
+  Import Address Table        40347208
+  Import Name Table           40347468
+  Bound Import Name Table     403476C8
+  Unload Import Name Table    403478C8
+  Time Stamp:                 00000000
+
+  (00000000)
+
+Delayed Imports from user32.dll
+  Attributes:                 00000001
+  Address of HMODULE          403471A8
+  Import Address Table        40347210
+  Import Name Table           40347478
+  Bound Import Name Table     403476D0
+  Unload Import Name Table    403478D0
+  Time Stamp:                 00000000
+
+  (00000000)
+
+Delayed Imports from user32.dll
+  Attributes:                 00000001
+  Address of HMODULE          403471B0
+  Import Address Table        40347218
+  Import Name Table           40347488
+  Bound Import Name Table     403476D8
+  Unload Import Name Table    403478D8
+  Time Stamp:                 00000000
+
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+
+Delayed Imports from msimg32.dll
+  Attributes:                 00000001
+  Address of HMODULE          403471B8
+  Import Address Table        40347280
+  Import Name Table           403474F8
+  Bound Import Name Table     40347740
+  Unload Import Name Table    40347940
+  Time Stamp:                 00000000
+
+  (00000000)
+  (00000000)
+
+Delayed Imports from kernel32.dll
+  Attributes:                 00000001
+  Address of HMODULE          403471C0
+  Import Address Table        40347290
+  Import Name Table           40347510
+  Bound Import Name Table     40347750
+  Unload Import Name Table    40347950
+  Time Stamp:                 00000000
+
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+
+Delayed Imports from advapi32.dll
+  Attributes:                 00000001
+  Address of HMODULE          403471C8
+  Import Address Table        403472B8
+  Import Name Table           40347540
+  Bound Import Name Table     40347778
+  Unload Import Name Table    40347978
+  Time Stamp:                 00000000
+
+  (00000000)
+
+Delayed Imports from windowscodecs.dll
+  Attributes:                 00000001
+  Address of HMODULE          403471D0
+  Import Address Table        403472C0
+  Import Name Table           40347550
+  Bound Import Name Table     40347780
+  Unload Import Name Table    40347980
+  Time Stamp:                 00000000
+
+  (00000000)
+
+Delayed Imports from shell32.dll
+  Attributes:                 00000001
+  Address of HMODULE          403471D8
+  Import Address Table        403472C8
+  Import Name Table           40347560
+  Bound Import Name Table     40347788
+  Unload Import Name Table    40347988
+  Time Stamp:                 00000000
+
+  (00000000)
+
+Delayed Imports from uxtheme.dll
+  Attributes:                 00000001
+  Address of HMODULE          403471E0
+  Import Address Table        403472D0
+  Import Name Table           40347570
+  Bound Import Name Table     40347790
+  Unload Import Name Table    40347990
+  Time Stamp:                 00000000
+
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+
+Delayed Imports from imm32.dll
+  Attributes:                 00000001
+  Address of HMODULE          403471E8
+  Import Address Table        40347328
+  Import Name Table           403475D0
+  Bound Import Name Table     403477E8
+  Unload Import Name Table    403479E8
+  Time Stamp:                 00000000
+
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+
+Delayed Imports from DWMAPI.DLL
+  Attributes:                 00000001
+  Address of HMODULE          403471F0
+  Import Address Table        40347360
+  Import Name Table           40347610
+  Bound Import Name Table     40347820
+  Unload Import Name Table    40347A20
+  Time Stamp:                 00000000
+
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+  (00000000)
+
+Delayed Imports from Shcore.dll
+  Attributes:                 00000001
+  Address of HMODULE          403471F8
+  Import Address Table        40347390
+  Import Name Table           40347648
+  Bound Import Name Table     40347850
+  Unload Import Name Table    40347A50
+  Time Stamp:                 00000000
+
+  (00000000)
+  (00000000)
+  (00000000)
+

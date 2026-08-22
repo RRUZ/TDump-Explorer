@@ -1,0 +1,458 @@
+   Display of File c:\dev\tdump-explorer\binaries\dll.win32.dll
+
+Old Executable Header
+
+DOS File Size                                     4ACA33h  (4901427. )
+Load Image Size                                      210h  (   528. )
+Relocation Table entry count                          0000h  (     0. )
+Relocation Table address                              0040h  (    64. )
+Size of header record      (in paragraphs)            0004h  (     4. )
+Minimum Memory Requirement (in paragraphs)            000Fh  (    15. )
+Maximum Memory Requirement (in paragraphs)            FFFFh  ( 65535. )
+File load checksum                                    0000h  (     0. )
+Overlay Number                                        001Ah  (    26. )
+
+Initial Stack Segment  (SS:SP)			  0000:00B8
+Program Entry Point    (CS:IP)			  0000:0000
+
+
+Portable Executable (PE) File
+
+Header base: 00000100
+
+CPU type                 80386
+Flags                    2102 [ executable linenumbers symbols backwards 32bit library ]
+DLL flags                0140 [ DynamicBase NXCompat ]
+Linker Version           2.19
+Time stamp               6A88FA32 : Fri Aug 21 22:24:02 2026
+O/S Version              6.0
+User Version             0.0
+Subsystem Version        6.0
+Subsystem                0002 [ Windows GUI ]
+Object count             0000000B
+Symbols offset           00000000
+Symbols count            00000000
+Optional header size     00E0
+Magic #                  10B
+Code size                000D5C00
+Init Data size           003D6A33
+Uninit Data size         00000000
+Entry RVA                000D6D68
+Image base               00400000
+Code base                00001000
+Data base                000D7000
+Object/File align        00001000/00000200
+Reserved                 00000000
+Image size               004B9000
+Header size              00000400
+Checksum                 00000000
+Stack reserve/commit     00000000/00000000
+Heap reserve/commit      00100000/00001000
+Number interesting RVAs  00000010
+Name                   RVA       Size  
+------------------  --------  --------
+Exports             000E4000  00000071
+Imports             000E2000  00000CE0
+Resources           000FA000  00003200
+Exceptions          00000000  00000000
+Security            00000000  00000000
+Fixups              000E6000  00013788
+Debug               000FE000  00000001
+Description         00000000  00000000
+Global Ptr          00000000  00000000
+TLS                 00000000  00000000
+Callbacks           00000000  00000000
+Bound Imports       00000000  00000000
+Import Addr Table   000E2258  000001F4
+Delayed Imports     000E3000  000001EA
+COM Runtime         00000000  00000000
+reserved            00000000  00000000
+
+Object table:
+#   Name              VirtSize    RVA     PhysSize  Phys off  Flags   
+--  --------          --------  --------  --------  --------  --------
+01  .text             000D4D04  00001000  000D4E00  00000400  60000020 [CER]
+02  .itext            00000D80  000D6000  00000E00  000D5200  60000020 [CER]
+03  .data             00003FCC  000D7000  00004000  000D6000  C0000040 [IRW]
+04  .bss              000068C0  000DB000  00000000  00000000  C0000000 [RW]
+05  .idata            00000CE0  000E2000  00000E00  000DA000  C0000040 [IRW]
+06  .didata           000001EA  000E3000  00000200  000DAE00  C0000040 [IRW]
+07  .edata            00000071  000E4000  00000200  000DB000  40000040 [IR]
+08  .rdata            00000045  000E5000  00000200  000DB200  40000040 [IR]
+09  .reloc            00013788  000E6000  00013800  000DB400  42000040 [DIR]
+0a  .rsrc             00003200  000FA000  00003200  000EEC00  40000040 [IR]
+0b  .debug            003BAC33  000FE000  003BAC33  000F1E00  40000040 [IR]
+
+Key to section flags:
+  C - contains code
+  D - discardable
+  E - executable
+  I - contains initialized data
+  R - readable
+  W - writeable
+
+******************************************************************************
+Section:             Import
+File Offset:         000DA000 (892928)
+  ImportLookUpTblRVA:000E2064
+  Time Stamp:        00000000
+  Forwarder Chain:   00000000 (index of first forwarder reference)
+
+Imports from kernel32.dll
+                  GetFileType
+                  EnterCriticalSection
+                  GetACP
+                  SetFilePointer
+                  LocalFree
+                  CloseHandle
+                  SuspendThread
+                  TlsAlloc
+                  GetTickCount
+                  QueryPerformanceFrequency
+                  IsDebuggerPresent
+                  GetFullPathNameW
+                  VirtualFree
+                  GetFileSize
+                  GetProcessHeap
+                  HeapAlloc
+                  GetStartupInfoW
+                  ExitProcess
+                  InitializeCriticalSection
+                  GetCPInfoExW
+                  GetThreadPriority
+                  GetCurrentProcess
+                  SetThreadPriority
+                  VirtualAlloc
+                  RtlUnwind
+                  GetCPInfo
+                  GetSystemInfo
+                  GetCommandLineW
+                  ResumeThread
+                  GetProcAddress
+                  LeaveCriticalSection
+                  EnumSystemLocalesW
+                  GetStdHandle
+                  GetVersionExW
+                  VerifyVersionInfoW
+                  GetModuleHandleW
+                  TryEnterCriticalSection
+                  FreeLibrary
+                  HeapCreate
+                  HeapDestroy
+                  ReadFile
+                  LCMapStringW
+                  GetDiskFreeSpaceW
+                  VerSetConditionMask
+                  GetUserDefaultUILanguage
+                  FindFirstFileW
+                  TlsFree
+                  GetConsoleOutputCP
+                  GetConsoleCP
+                  SetLastError
+                  GetModuleFileNameW
+                  GetLastError
+                  lstrlenW
+                  QueryPerformanceCounter
+                  SetEndOfFile
+                  CompareStringW
+                  CreateThread
+                  HeapFree
+                  WideCharToMultiByte
+                  MultiByteToWideChar
+                  FindClose
+                  LoadLibraryW
+                  LoadLibraryA
+                  ResetEvent
+                  SetEvent
+                  CreateFileW
+                  GetLocaleInfoW
+                  GetVersion
+                  RaiseException
+                  FormatMessageW
+                  SwitchToThread
+                  GetExitCodeThread
+                  GetLocalTime
+                  WaitForSingleObject
+                  GetCurrentThread
+                  WriteFile
+                  ExitThread
+                  DeleteCriticalSection
+                  GetDateFormatW
+                  TlsGetValue
+                  IsValidLocale
+                  TlsSetValue
+                  GetSystemDefaultUILanguage
+                  LoadLibraryExW
+                  EnumCalendarInfoW
+                  LocalAlloc
+                  GetCurrentThreadId
+                  UnhandledExceptionFilter
+                  VirtualQuery
+                  CreateEventW
+                  VirtualQueryEx
+                  GetThreadLocale
+                  SetThreadLocale
+                  Sleep
+
+Imports from user32.dll
+                  CharUpperBuffW
+                  CharNextW
+                  MsgWaitForMultipleObjects
+                  CharLowerBuffW
+                  LoadStringW
+                  CharUpperW
+                  PeekMessageW
+                  GetSystemMetrics
+                  MessageBoxW
+
+Imports from oleaut32.dll
+                  SafeArrayPutElement
+                  VariantInit
+                  VariantClear
+                  SysFreeString
+                  SafeArrayAccessData
+                  SysReAllocStringLen
+                  SafeArrayCreate
+                  SafeArrayGetElement
+                  SysAllocStringLen
+                  SafeArrayUnaccessData
+                  SafeArrayPtrOfIndex
+                  VariantCopy
+                  SafeArrayGetUBound
+                  SafeArrayGetLBound
+                  VariantChangeType
+
+Imports from advapi32.dll
+                  RegQueryValueExW
+                  RegCloseKey
+                  RegOpenKeyExW
+
+Delayed Load Import Table
+
+Delayed Imports from kernel32.dll
+  Attributes:                 00000001
+  Address of HMODULE          004E3080
+  Import Address Table        004E3090
+  Import Name Table           004E30BC
+  Bound Import Name Table     004E30E8
+  Unload Import Name Table    004E3108
+  Time Stamp:                 00000000
+
+              GetLogicalProcessorInformation  (00000000)
+
+Delayed Imports from user32.dll
+  Attributes:                 00000001
+  Address of HMODULE          004E3084
+  Import Address Table        004E3094
+  Import Name Table           004E30C4
+  Bound Import Name Table     004E30EC
+  Unload Import Name Table    004E310C
+  Time Stamp:                 00000000
+
+              MessageBoxA  (00000000)
+
+Delayed Imports from kernel32.dll
+  Attributes:                 00000001
+  Address of HMODULE          004E3088
+  Import Address Table        004E3098
+  Import Name Table           004E30CC
+  Bound Import Name Table     004E30F0
+  Unload Import Name Table    004E3110
+  Time Stamp:                 00000000
+
+              LocaleNameToLCID  (00000000)
+              GetNativeSystemInfo  (00000000)
+              GetSystemTimes  (00000000)
+
+******************************************************************************
+Section:             Exports
+File Offset:         000DB000 (897024)
+  Flags:             00000000
+  Time Stamp:        00000000
+  Major Version:     0000
+  Minor Version:     0000
+
+Exports from Project3.dll
+  2 exported name(s), 2 export addresse(s).  Ordinal base is 1.
+  Sorted by Name:
+    RVA      Ord. Hint Name
+    -------- ---- ---- ----
+    00011B64    2 0000 __dbk_fcall_wrapper
+    000DE648    1 0001 dbkFCallWrapperAddr
+
+******************************************************************************
+Section:             Resources
+File Offset:         000EEC00 (977920)
+  Flags:             00000000
+  Time Stamp:        5D15B302 : Fri Jun 28 03:26:10 2019
+  Major Version:     0000
+  Minor Version:     0000
+
+Resources:
+Type          Name                   Lang Id
+--------------------------------------------
+[0 named entries, 3 ID entries]
+type: String Table (6)  (next directory @00000028)
+
+              [0 named entries, 13 ID entries]
+              type: Unknown (4084)  (next directory @000000E0)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (0)  (data @00000278)
+                                         Offset:    000FA3D0
+                                         Size:      000003D0
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+              type: Unknown (4085)  (next directory @000000F8)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (0)  (data @00000288)
+                                         Offset:    000FA7A0
+                                         Size:      00000274
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+              type: Unknown (4086)  (next directory @00000110)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (0)  (data @00000298)
+                                         Offset:    000FAA14
+                                         Size:      00000458
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+              type: Unknown (4087)  (next directory @00000128)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (0)  (data @000002A8)
+                                         Offset:    000FAE6C
+                                         Size:      0000056C
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+              type: Unknown (4088)  (next directory @00000140)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (0)  (data @000002B8)
+                                         Offset:    000FB3D8
+                                         Size:      00000360
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+              type: Unknown (4089)  (next directory @00000158)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (0)  (data @000002C8)
+                                         Offset:    000FB738
+                                         Size:      0000041C
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+              type: Unknown (4090)  (next directory @00000170)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (0)  (data @000002D8)
+                                         Offset:    000FBB54
+                                         Size:      000001D0
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+              type: Unknown (4091)  (next directory @00000188)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (0)  (data @000002E8)
+                                         Offset:    000FBD24
+                                         Size:      000000CC
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+              type: Unknown (4092)  (next directory @000001A0)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (0)  (data @000002F8)
+                                         Offset:    000FBDF0
+                                         Size:      00000194
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+              type: Unknown (4093)  (next directory @000001B8)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (0)  (data @00000308)
+                                         Offset:    000FBF84
+                                         Size:      00000384
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+              type: Unknown (4094)  (next directory @000001D0)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (0)  (data @00000318)
+                                         Offset:    000FC308
+                                         Size:      000003E0
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+              type: Unknown (4095)  (next directory @000001E8)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (0)  (data @00000328)
+                                         Offset:    000FC6E8
+                                         Size:      00000368
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+              type: Unknown (4096)  (next directory @00000200)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (0)  (data @00000338)
+                                         Offset:    000FCA50
+                                         Size:      00000294
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+type: RCData (10)  (next directory @000000A0)
+
+              [3 named entries, 0 ID entries]
+              DVCLAL  (next directory @00000218)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (0)  (data @00000348)
+                                         Offset:    000FCCE4
+                                         Size:      00000010
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+              PACKAGEINFO  (next directory @00000230)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (0)  (data @00000358)
+                                         Offset:    000FCCF4
+                                         Size:      00000214
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+              PLATFORMTARGETS  (next directory @00000248)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (1033)  (data @00000368)
+                                         Offset:    000FCF08
+                                         Size:      00000004
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+type: Version (16)  (next directory @000000C8)
+
+              [0 named entries, 1 ID entries]
+              type: Cursor (1)  (next directory @00000260)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (1033)  (data @00000378)
+                                         Offset:    000FCF0C
+                                         Size:      00000200
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+
+

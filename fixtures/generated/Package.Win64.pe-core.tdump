@@ -1,0 +1,202 @@
+ Display of File c:\dev\tdump-explorer\binaries\package.win64.bpl
+
+Old Executable Header
+
+DOS File Size                                       69DEh  ( 27102. )
+Load Image Size                                      210h  (   528. )
+Relocation Table entry count                          0000h  (     0. )
+Relocation Table address                              0040h  (    64. )
+Size of header record      (in paragraphs)            0004h  (     4. )
+Minimum Memory Requirement (in paragraphs)            000Fh  (    15. )
+Maximum Memory Requirement (in paragraphs)            FFFFh  ( 65535. )
+File load checksum                                    0000h  (     0. )
+Overlay Number                                        001Ah  (    26. )
+
+Initial Stack Segment  (SS:SP)			  0000:00B8
+Program Entry Point    (CS:IP)			  0000:0000
+
+
+Portable Executable (PE) File
+
+Header base: 00000100
+
+CPU type                 AMD64
+Flags                    2022 [ executable linenumbers symbols largeaddr backwards library ]
+DLL flags                0160 [ DynamicBase NXCompat HighEntropyVA ]
+Linker Version           8.0
+Time stamp               6A88FAA7 : Fri Aug 21 22:25:59 2026
+O/S Version              6.0
+User Version             0.0
+Subsystem Version        6.0
+Subsystem                0002 [ Windows GUI ]
+Object count             0000000A
+Symbols offset           00000000
+Symbols count            00000000
+Optional header size     00F0
+Magic #                  20B
+Code size                00001C00
+Init Data size           000049DE
+Uninit Data size         00000000
+Entry RVA                00002960
+Image base               0000000140000000
+Code base                00001000
+Object/File align        00001000/00000200
+Reserved                 00000000
+Image size               0000F000
+Header size              00000400
+Checksum                 00000000
+Stack reserve/commit     0000000000000000/0000000000000000
+Heap reserve/commit      0000000000100000/0000000000002000
+Number interesting RVAs  00000010
+Name                   RVA       Size  
+------------------  --------  --------
+Exports             00006000  00000160
+Imports             00005000  00000444
+Resources           0000A000  00000600
+Exceptions          00009000  000000FC
+Security            00000000  00000000
+Fixups              00008000  00000038
+Debug               0000B000  00000001
+Description         00000000  00000000
+Global Ptr          00000000  00000000
+TLS                 00000000  00000000
+Callbacks           00000000  00000000
+Bound Imports       00000000  00000000
+Import Addr Table   000050F8  000000B8
+Delayed Imports     00000000  00000000
+COM Runtime         00000000  00000000
+reserved            00000000  00000000
+
+Object table:
+#   Name              VirtSize    RVA     PhysSize  Phys off  Flags   
+--  --------          --------  --------  --------  --------  --------
+01  .text             00001A4C  00001000  00001C00  00000400  60000020 [CER]
+02  .data             00000178  00003000  00000200  00002000  C0000040 [IRW]
+03  .bss              00000050  00004000  00000000  00000000  C0000000 [RW]
+04  .idata            00000444  00005000  00000600  00002200  C0000040 [IRW]
+05  .edata            00000160  00006000  00000200  00002800  40000040 [IR]
+06  .rdata            00000045  00007000  00000200  00002A00  40000040 [IR]
+07  .reloc            00000038  00008000  00000200  00002C00  42000040 [DIR]
+08  .pdata            000000FC  00009000  00000200  00002E00  40000040 [IR]
+09  .rsrc             00000600  0000A000  00000600  00003000  40000040 [IR]
+0a  .debug            000033DE  0000B000  000033DE  00003600  40000040 [IR]
+
+Key to section flags:
+  C - contains code
+  D - discardable
+  E - executable
+  I - contains initialized data
+  R - readable
+  W - writeable
+
+******************************************************************************
+Section:             Import
+File Offset:         00002200 (8704)
+  ImportLookUpTblRVA:00005040
+  Time Stamp:        00000000
+  Forwarder Chain:   00000000 (index of first forwarder reference)
+
+Imports from kernel32.dll
+                  GetLastError
+                  FreeLibrary
+                  LoadLibraryA
+                  LocalAlloc
+                  GetProcAddress
+                  TlsGetValue
+                  RaiseException
+                  LocalFree
+                  TlsFree
+                  TlsAlloc
+                  TlsSetValue
+
+Imports from rtl370.bpl
+                  System::UnregisterModule(System::TLibModule*)
+                  System::Finalization()
+                  System::initialization()
+                  System::_DoneExcept()
+                  System::_DestroyException(TExceptionPointers*, unsigned long long)
+                  System::RegisterModule(System::TLibModule*)
+                  System::_PackageLoad(System::PackageInfoTable*, System::TLibModule*)
+                  System::_RunError(unsigned char)
+                  System::_DelphiExceptionHandler(System::TExceptionRecord*, unsigned long long, void*, void*)
+                  System::_PackageUnload(System::PackageInfoTable*, System::TLibModule*)
+
+******************************************************************************
+Section:             Exports
+File Offset:         00002800 (10240)
+  Flags:             00000000
+  Time Stamp:        00000000
+  Major Version:     0000
+  Minor Version:     0000
+
+Exports from Package1.bpl
+  9 exported name(s), 9 export addresse(s).  Ordinal base is 1.
+  Sorted by Name:
+    RVA      Ord. Hint Name
+    -------- ---- ---- ----
+    00002A20    9 0000 @GetPackageInfoTable
+    00002A40    7 0001 Finalize
+    00002A30    8 0002 Initialize
+    00002A30    4 0003 Package1::_PackageLoad()
+    00002A40    3 0004 Package1::_PackageUnload()
+    00002960    6 0005 Package1::initialization()
+    00002A20    5 0006 Package1::_GetPackageInfoTable()
+    00001700    2 0007 __dbk_fcall_wrapper
+    00004018    1 0008 dbkFCallWrapperAddr
+
+******************************************************************************
+Section:             Resources
+File Offset:         00003000 (12288)
+  Flags:             00000000
+  Time Stamp:        5D15B340 : Fri Jun 28 03:27:12 2019
+  Major Version:     0000
+  Minor Version:     0000
+
+Resources:
+Type          Name                   Lang Id
+--------------------------------------------
+[0 named entries, 2 ID entries]
+type: RCData (10)  (next directory @00000020)
+
+              [3 named entries, 0 ID entries]
+              PACKAGEINFO  (next directory @00000060)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (0)  (data @000000C0)
+                                         Offset:    0000A158
+                                         Size:      00000038
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+              PACKAGEOPTIONS  (next directory @00000078)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (0)  (data @000000D0)
+                                         Offset:    0000A190
+                                         Size:      000000F8
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+              PLATFORMTARGETS  (next directory @00000090)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (1033)  (data @000000E0)
+                                         Offset:    0000A288
+                                         Size:      00000004
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+type: Version (16)  (next directory @00000048)
+
+              [0 named entries, 1 ID entries]
+              type: Cursor (1)  (next directory @000000A8)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (1033)  (data @000000F0)
+                                         Offset:    0000A28C
+                                         Size:      00000200
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+
+

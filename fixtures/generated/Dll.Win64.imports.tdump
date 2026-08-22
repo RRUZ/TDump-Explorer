@@ -1,0 +1,163 @@
+   Display of File c:\dev\tdump-explorer\binaries\dll.win64.dll
+
+IMPORT:     kernel32.dll='GetFileType'
+IMPORT:     kernel32.dll='EnterCriticalSection'
+IMPORT:     kernel32.dll='RtlUnwindEx'
+IMPORT:     kernel32.dll='SetFilePointer'
+IMPORT:     kernel32.dll='GetACP'
+IMPORT:     kernel32.dll='LocalFree'
+IMPORT:     kernel32.dll='CloseHandle'
+IMPORT:     kernel32.dll='SuspendThread'
+IMPORT:     kernel32.dll='TlsAlloc'
+IMPORT:     kernel32.dll='GetTickCount'
+IMPORT:     kernel32.dll='QueryPerformanceFrequency'
+IMPORT:     kernel32.dll='IsDebuggerPresent'
+IMPORT:     kernel32.dll='GetFullPathNameW'
+IMPORT:     kernel32.dll='VirtualFree'
+IMPORT:     kernel32.dll='GetFileSize'
+IMPORT:     kernel32.dll='GetProcessHeap'
+IMPORT:     kernel32.dll='HeapAlloc'
+IMPORT:     kernel32.dll='GetStartupInfoW'
+IMPORT:     kernel32.dll='ExitProcess'
+IMPORT:     kernel32.dll='InitializeCriticalSection'
+IMPORT:     kernel32.dll='GetCPInfoExW'
+IMPORT:     kernel32.dll='GetThreadPriority'
+IMPORT:     kernel32.dll='GetCurrentProcess'
+IMPORT:     kernel32.dll='SetThreadPriority'
+IMPORT:     kernel32.dll='VirtualAlloc'
+IMPORT:     kernel32.dll='RtlUnwind'
+IMPORT:     kernel32.dll='GetCPInfo'
+IMPORT:     kernel32.dll='GetSystemInfo'
+IMPORT:     kernel32.dll='GetCommandLineW'
+IMPORT:     kernel32.dll='ResumeThread'
+IMPORT:     kernel32.dll='GetProcAddress'
+IMPORT:     kernel32.dll='LeaveCriticalSection'
+IMPORT:     kernel32.dll='EnumSystemLocalesW'
+IMPORT:     kernel32.dll='GetStdHandle'
+IMPORT:     kernel32.dll='GetVersionExW'
+IMPORT:     kernel32.dll='VerifyVersionInfoW'
+IMPORT:     kernel32.dll='GetModuleHandleW'
+IMPORT:     kernel32.dll='TryEnterCriticalSection'
+IMPORT:     kernel32.dll='FreeLibrary'
+IMPORT:     kernel32.dll='HeapCreate'
+IMPORT:     kernel32.dll='HeapDestroy'
+IMPORT:     kernel32.dll='ReadFile'
+IMPORT:     kernel32.dll='LCMapStringW'
+IMPORT:     kernel32.dll='GetDiskFreeSpaceW'
+IMPORT:     kernel32.dll='VerSetConditionMask'
+IMPORT:     kernel32.dll='GetUserDefaultUILanguage'
+IMPORT:     kernel32.dll='FindFirstFileW'
+IMPORT:     kernel32.dll='TlsFree'
+IMPORT:     kernel32.dll='GetConsoleOutputCP'
+IMPORT:     kernel32.dll='GetConsoleCP'
+IMPORT:     kernel32.dll='SetLastError'
+IMPORT:     kernel32.dll='GetModuleFileNameW'
+IMPORT:     kernel32.dll='GetLastError'
+IMPORT:     kernel32.dll='lstrlenW'
+IMPORT:     kernel32.dll='QueryPerformanceCounter'
+IMPORT:     kernel32.dll='SetEndOfFile'
+IMPORT:     kernel32.dll='CompareStringW'
+IMPORT:     kernel32.dll='CreateThread'
+IMPORT:     kernel32.dll='HeapFree'
+IMPORT:     kernel32.dll='WideCharToMultiByte'
+IMPORT:     kernel32.dll='MultiByteToWideChar'
+IMPORT:     kernel32.dll='FindClose'
+IMPORT:     kernel32.dll='LoadLibraryW'
+IMPORT:     kernel32.dll='LoadLibraryA'
+IMPORT:     kernel32.dll='ResetEvent'
+IMPORT:     kernel32.dll='SetEvent'
+IMPORT:     kernel32.dll='CreateFileW'
+IMPORT:     kernel32.dll='GetLocaleInfoW'
+IMPORT:     kernel32.dll='GetVersion'
+IMPORT:     kernel32.dll='RaiseException'
+IMPORT:     kernel32.dll='FormatMessageW'
+IMPORT:     kernel32.dll='SwitchToThread'
+IMPORT:     kernel32.dll='GetExitCodeThread'
+IMPORT:     kernel32.dll='GetLocalTime'
+IMPORT:     kernel32.dll='WaitForSingleObject'
+IMPORT:     kernel32.dll='GetCurrentThread'
+IMPORT:     kernel32.dll='WriteFile'
+IMPORT:     kernel32.dll='ExitThread'
+IMPORT:     kernel32.dll='DeleteCriticalSection'
+IMPORT:     kernel32.dll='GetDateFormatW'
+IMPORT:     kernel32.dll='TlsGetValue'
+IMPORT:     kernel32.dll='IsValidLocale'
+IMPORT:     kernel32.dll='TlsSetValue'
+IMPORT:     kernel32.dll='GetSystemDefaultUILanguage'
+IMPORT:     kernel32.dll='LoadLibraryExW'
+IMPORT:     kernel32.dll='EnumCalendarInfoW'
+IMPORT:     kernel32.dll='LocalAlloc'
+IMPORT:     kernel32.dll='GetCurrentThreadId'
+IMPORT:     kernel32.dll='UnhandledExceptionFilter'
+IMPORT:     kernel32.dll='VirtualQuery'
+IMPORT:     kernel32.dll='CreateEventW'
+IMPORT:     kernel32.dll='VirtualQueryEx'
+IMPORT:     kernel32.dll='GetThreadLocale'
+IMPORT:     kernel32.dll='SetThreadLocale'
+IMPORT:     kernel32.dll='Sleep'
+IMPORT:       user32.dll='CharUpperBuffW'
+IMPORT:       user32.dll='CharNextW'
+IMPORT:       user32.dll='MsgWaitForMultipleObjects'
+IMPORT:       user32.dll='CharLowerBuffW'
+IMPORT:       user32.dll='LoadStringW'
+IMPORT:       user32.dll='CharUpperW'
+IMPORT:       user32.dll='PeekMessageW'
+IMPORT:       user32.dll='GetSystemMetrics'
+IMPORT:       user32.dll='MessageBoxW'
+IMPORT:     oleaut32.dll='SafeArrayPutElement'
+IMPORT:     oleaut32.dll='VariantInit'
+IMPORT:     oleaut32.dll='VariantClear'
+IMPORT:     oleaut32.dll='SysFreeString'
+IMPORT:     oleaut32.dll='SafeArrayAccessData'
+IMPORT:     oleaut32.dll='SysReAllocStringLen'
+IMPORT:     oleaut32.dll='SafeArrayCreate'
+IMPORT:     oleaut32.dll='SafeArrayGetElement'
+IMPORT:     oleaut32.dll='SysAllocStringLen'
+IMPORT:     oleaut32.dll='SafeArrayUnaccessData'
+IMPORT:     oleaut32.dll='SafeArrayPtrOfIndex'
+IMPORT:     oleaut32.dll='VariantCopy'
+IMPORT:     oleaut32.dll='SafeArrayGetUBound'
+IMPORT:     oleaut32.dll='SafeArrayGetLBound'
+IMPORT:     oleaut32.dll='VariantChangeType'
+IMPORT:     advapi32.dll='RegQueryValueExW'
+IMPORT:     advapi32.dll='RegCloseKey'
+IMPORT:     advapi32.dll='RegOpenKeyExW'
+
+
+Delayed Load Import Table
+
+Delayed Imports from kernel32.dll
+  Attributes:                 00000001
+  Address of HMODULE          40175080
+  Import Address Table        401750A0
+  Import Name Table           401750F8
+  Bound Import Name Table     40175150
+  Unload Import Name Table    40175190
+  Time Stamp:                 00000000
+
+  (00000000)
+
+Delayed Imports from user32.dll
+  Attributes:                 00000001
+  Address of HMODULE          40175088
+  Import Address Table        401750A8
+  Import Name Table           40175108
+  Bound Import Name Table     40175158
+  Unload Import Name Table    40175198
+  Time Stamp:                 00000000
+
+  (00000000)
+
+Delayed Imports from kernel32.dll
+  Attributes:                 00000001
+  Address of HMODULE          40175090
+  Import Address Table        401750B0
+  Import Name Table           40175118
+  Bound Import Name Table     40175160
+  Unload Import Name Table    401751A0
+  Time Stamp:                 00000000
+
+  (00000000)
+  (00000000)
+  (00000000)
+

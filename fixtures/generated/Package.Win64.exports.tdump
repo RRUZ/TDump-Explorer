@@ -1,0 +1,12 @@
+ Display of File c:\dev\tdump-explorer\binaries\package.win64.bpl
+
+EXPORT ord:0009='@GetPackageInfoTable'
+EXPORT ord:0007='Finalize'
+EXPORT ord:0008='Initialize'
+EXPORT ord:0004='Package1::_PackageLoad()'
+EXPORT ord:0003='Package1::_PackageUnload()'
+EXPORT ord:0006='Package1::initialization()'
+EXPORT ord:0005='Package1::_GetPackageInfoTable()'
+EXPORT ord:0002='__dbk_fcall_wrapper'
+EXPORT ord:0001='dbkFCallWrapperAddr'
+
