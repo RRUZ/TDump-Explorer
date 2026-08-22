@@ -7,13 +7,16 @@ set "RSVARS=%STUDIO_ROOT%\bin\rsvars.bat"
 set "PROJECT_ROOT=%~dp0.."
 set "CONSOLE_SOURCE=%PROJECT_ROOT%\tests\TDumpParserConsole.dpr"
 set "CONSOLE_EXE=%PROJECT_ROOT%\tests\TDumpParserConsole.exe"
-set "INTERMEDIATE_DIR=%PROJECT_ROOT%\build\dcu\win32-debug"
+set "PROFILER_SOURCE=%PROJECT_ROOT%\tests\TDumpParserProfiler.dpr"
+set "PROFILER_EXE=%PROJECT_ROOT%\tests\TDumpParserProfiler.exe"
+set "INTERMEDIATE_ROOT=%PROJECT_ROOT%\build\dcu\win32-debug"
 set "DEFAULT_FIXTURE=%PROJECT_ROOT%\fixtures\PlainVanilla.Delphi.Package.bpl.tdump"
 
 if /I "%~1"=="" goto BUILD
 if /I "%~1"=="build" goto BUILD
 if /I "%~1"=="run" goto RUN
 if /I "%~1"=="test" goto TEST
+if /I "%~1"=="profile" goto PROFILE
 goto USAGE
 
 :INIT_RAD_STUDIO
@@ -39,6 +42,7 @@ if not exist "%CONSOLE_SOURCE%" (
 )
 
 echo Building TDumpParserConsole ^(Win32 Debug^)...
+set "INTERMEDIATE_DIR=%INTERMEDIATE_ROOT%\%RANDOM%%RANDOM%"
 if not exist "%INTERMEDIATE_DIR%" mkdir "%INTERMEDIATE_DIR%"
 if not exist "%INTERMEDIATE_DIR%" (
   echo Unable to create the intermediate output directory:
@@ -64,6 +68,40 @@ exit /b 0
 :BUILD
 call :BUILD_CONSOLE
 exit /b %ERRORLEVEL%
+
+:BUILD_PROFILER
+call :INIT_RAD_STUDIO
+if errorlevel 1 exit /b 1
+
+if not exist "%PROFILER_SOURCE%" (
+  echo Parser profiler source file was not found:
+  echo   %PROFILER_SOURCE%
+  exit /b 1
+)
+
+echo Building TDumpParserProfiler ^(Win32 Debug^)...
+set "INTERMEDIATE_DIR=%INTERMEDIATE_ROOT%\%RANDOM%%RANDOM%"
+if not exist "%INTERMEDIATE_DIR%" mkdir "%INTERMEDIATE_DIR%"
+if not exist "%INTERMEDIATE_DIR%" (
+  echo Unable to create the intermediate output directory:
+  echo   %INTERMEDIATE_DIR%
+  exit /b 1
+)
+pushd "%PROJECT_ROOT%\tests"
+if errorlevel 1 exit /b 1
+dcc32.exe -B -Q -N"%INTERMEDIATE_DIR%" "TDumpParserProfiler.dpr"
+set "BUILD_RESULT=%ERRORLEVEL%"
+popd
+if not "%BUILD_RESULT%"=="0" exit /b %BUILD_RESULT%
+
+if not exist "%PROFILER_EXE%" (
+  echo Build completed, but the expected profiler executable was not found:
+  echo   %PROFILER_EXE%
+  exit /b 1
+)
+
+echo Build succeeded: %PROFILER_EXE%
+exit /b 0
 
 :RUN_CONSOLE
 set "FIXTURE=%~1"
@@ -99,10 +137,29 @@ for %%F in (
 )
 exit /b 0
 
+:PROFILE
+call :BUILD_PROFILER
+if errorlevel 1 exit /b 1
+
+if "%~2"=="" goto PROFILE_DEFAULT
+if "%~3"=="" goto PROFILE_DIRECTORY
+"%PROFILER_EXE%" "%~2" "%~3"
+exit /b %ERRORLEVEL%
+
+:PROFILE_DIRECTORY
+"%PROFILER_EXE%" "%~2"
+exit /b %ERRORLEVEL%
+
+:PROFILE_DEFAULT
+"%PROFILER_EXE%"
+exit /b %ERRORLEVEL%
+
 :USAGE
-echo Usage: build.bat [build^|run [fixture]^|test]
+echo Usage: build.bat [build^|run [fixture]^|test^|profile [fixture-directory] [iterations]]
 echo.
 echo   build  Build the Win32 Debug console harness ^(default^).
 echo   run    Build, then run the console harness with an optional fixture.
 echo   test   Build, then run non-interactive smoke tests for registered fixtures.
+echo   profile Build and profile every *.tdump under fixtures, optionally using a
+echo           fixture directory and positive iteration count.
 exit /b 1

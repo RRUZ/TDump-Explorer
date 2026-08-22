@@ -1,0 +1,1753 @@
+Turbo Dump  Version 6.6.2.0 Copyright (c) 1988-2022 Embarcadero Technologies, Inc.
+                   Display of File package1.bpl
+
+Old Executable Header
+
+DOS File Size                                       5C31h  ( 23601. )
+Load Image Size                                      210h  (   528. )
+Relocation Table entry count                          0000h  (     0. )
+Relocation Table address                              0040h  (    64. )
+Size of header record      (in paragraphs)            0004h  (     4. )
+Minimum Memory Requirement (in paragraphs)            000Fh  (    15. )
+Maximum Memory Requirement (in paragraphs)            FFFFh  ( 65535. )
+File load checksum                                    0000h  (     0. )
+Overlay Number                                        001Ah  (    26. )
+
+Initial Stack Segment  (SS:SP)			  0000:00B8
+Program Entry Point    (CS:IP)			  0000:0000
+
+
+Portable Executable (PE) File
+
+Header base: 00000100
+
+CPU type                 80386
+Flags                    2102 [ executable linenumbers symbols backwards 32bit library ]
+DLL flags                0140 [ DynamicBase NXCompat ]
+Linker Version           2.19
+Time stamp               6A88AB61 : Fri Aug 21 16:47:45 2026
+O/S Version              6.0
+User Version             0.0
+Subsystem Version        6.0
+Subsystem                0002 [ Windows GUI ]
+Object count             0000000A
+Symbols offset           00000000
+Symbols count            00000000
+Optional header size     00E0
+Magic #                  10B
+Code size                00001000
+Init Data size           00004831
+Uninit Data size         00000000
+Entry RVA                00002010
+Image base               00400000
+Code base                00001000
+Data base                00003000
+Object/File align        00001000/00000200
+Reserved                 00000000
+Image size               0000E000
+Header size              00000400
+Checksum                 00000000
+Stack reserve/commit     00000000/00000000
+Heap reserve/commit      00100000/00001000
+Number interesting RVAs  00000010
+Name                   RVA       Size  
+------------------  --------  --------
+Exports             00006000  0000015C
+Imports             00005000  00000334
+Resources           00009000  00000600
+Exceptions          00000000  00000000
+Security            00000000  00000000
+Fixups              00008000  000000E0
+Debug               0000A000  00000001
+Description         00000000  00000000
+Global Ptr          00000000  00000000
+TLS                 00000000  00000000
+Callbacks           00000000  00000000
+Bound Imports       00000000  00000000
+Import Addr Table   00005094  00000058
+Delayed Imports     00000000  00000000
+COM Runtime         00000000  00000000
+reserved            00000000  00000000
+
+Object table:
+#   Name              VirtSize    RVA     PhysSize  Phys off  Flags   
+--  --------          --------  --------  --------  --------  --------
+01  .text             00000DB0  00001000  00000E00  00000400  60000020 [CER]
+02  .itext            00000018  00002000  00000200  00001200  60000020 [CER]
+03  .data             00000088  00003000  00000200  00001400  C0000040 [IRW]
+04  .bss              00000024  00004000  00000000  00000000  C0000000 [RW]
+05  .idata            00000334  00005000  00000400  00001600  C0000040 [IRW]
+06  .edata            0000015C  00006000  00000200  00001A00  40000040 [IR]
+07  .rdata            00000045  00007000  00000200  00001C00  40000040 [IR]
+08  .reloc            000000E0  00008000  00000200  00001E00  42000040 [DIR]
+09  .rsrc             00000600  00009000  00000600  00002000  40000040 [IR]
+0a  .debug            00003631  0000A000  00003631  00002600  40000040 [IR]
+
+Key to section flags:
+  C - contains code
+  D - discardable
+  E - executable
+  I - contains initialized data
+  R - readable
+  W - writeable
+
+******************************************************************************
+Section:             Import
+File Offset:         00001600 (5632)
+  ImportLookUpTblRVA:0000503C
+  Time Stamp:        00000000
+  Forwarder Chain:   00000000 (index of first forwarder reference)
+
+Imports from kernel32.dll
+                  GetLastError
+                  FreeLibrary
+                  LoadLibraryA
+                  LocalAlloc
+                  GetProcAddress
+                  TlsGetValue
+                  RaiseException
+                  LocalFree
+                  TlsFree
+                  TlsAlloc
+                  TlsSetValue
+
+Imports from rtl370.bpl
+                  __fastcall System::Finalization()
+                  __fastcall System::initialization()
+                  __fastcall System::RegisterModule(System::TLibModule *)
+                  System::__linkproc__ __fastcall HandleAnyException()
+                  System::__linkproc__ __fastcall DoneExcept()
+                  System::__linkproc__ __fastcall RunError(unsigned char)
+                  System::__linkproc__ __fastcall PackageUnload(System::PackageInfoTable * const, System::TLibModule *)
+                  __fastcall System::UnregisterModule(System::TLibModule *)
+                  System::__linkproc__ __fastcall PackageLoad(System::PackageInfoTable * const, System::TLibModule *)
+
+******************************************************************************
+Section:             Exports
+File Offset:         00001A00 (6656)
+  Flags:             00000000
+  Time Stamp:        00000000
+  Major Version:     0000
+  Minor Version:     0000
+
+Exports from Package1.bpl
+  9 exported name(s), 9 export addresse(s).  Ordinal base is 1.
+  Sorted by Name:
+    RVA      Ord. Hint Name
+    -------- ---- ---- ----
+    00001D90    9 0000 GetPackageInfoTable
+    00001D90    5 0001 Package1::__linkproc__ __fastcall GetPackageInfoTable()
+    00001D98    4 0002 Package1::__linkproc__ __fastcall PackageLoad()
+    00001DA4    3 0003 Package1::__linkproc__ __fastcall PackageUnload()
+    00002010    6 0004 __fastcall Package1::initialization()
+    00001DA4    7 0005 Finalize
+    00001D98    8 0006 Initialize
+    000015A8    2 0007 __dbk_fcall_wrapper
+    0000400C    1 0008 dbkFCallWrapperAddr
+
+******************************************************************************
+Section:             Resources
+File Offset:         00002000 (8192)
+  Flags:             00000000
+  Time Stamp:        5D1585F7 : Fri Jun 28 00:13:59 2019
+  Major Version:     0000
+  Minor Version:     0000
+
+Resources:
+Type          Name                   Lang Id
+--------------------------------------------
+[0 named entries, 2 ID entries]
+type: RCData (10)  (next directory @00000020)
+
+              [3 named entries, 0 ID entries]
+              PACKAGEINFO  (next directory @00000060)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (0)  (data @000000C0)
+                                         Offset:    00009158
+                                         Size:      00000038
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+              PACKAGEOPTIONS  (next directory @00000078)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (0)  (data @000000D0)
+                                         Offset:    00009190
+                                         Size:      000000E8
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+              PLATFORMTARGETS  (next directory @00000090)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (1033)  (data @000000E0)
+                                         Offset:    00009278
+                                         Size:      00000004
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+type: Version (16)  (next directory @00000048)
+
+              [0 named entries, 1 ID entries]
+              type: Cursor (1)  (next directory @000000A8)
+
+                                     [0 named entries, 1 ID entries]
+                                     type: Unknown (1033)  (data @000000F0)
+                                         Offset:    0000927C
+                                         Size:      00000200
+                                         Code Page: 00000000
+                                         Reserved:  00000000
+
+
+Borland 32 bit symbol table
+
+SubSection Directory - Offset: 05BAD
+    ModIndex: 0001  FileOffs: 02628  Size: 0004C  Type: sstModule
+    ModIndex: 0002  FileOffs: 02674  Size: 0004C  Type: sstModule
+    ModIndex: 0001  FileOffs: 026A8  Size: 0069C  Type: sstSrcModule
+    ModIndex: 0001  FileOffs: 02D44  Size: 011EB  Type: sstAlignSym
+    ModIndex: 0002  FileOffs: 03F2F  Size: 0002E  Type: sstSrcModule
+    ModIndex: 0002  FileOffs: 03F5D  Size: 00156  Type: sstAlignSym
+    ModIndex: 0000  FileOffs: 040B3  Size: 00200  Type: sstGlobalSym
+    ModIndex: 0000  FileOffs: 042B3  Size: 00D14  Type: sstGlobalTypes
+    ModIndex: 0000  FileOffs: 04FC7  Size: 00BE6  Type: sstNames
+
+--------------------------------
+ModIndex: 0001  FileOffs: 02628  sstModule
+  OvlNum: 0000  LibIndex: 0000  SegCount: 0004  Time: 0000  Name: SysInit [001]
+    0001:00040-00D2F  Flags: 0001
+    0002:00008-0000F  Flags: 0001
+    0003:00000-00087  Flags: 0000
+    0004:00000-00023  Flags: 0000
+
+--------------------------------
+ModIndex: 0002  FileOffs: 02674  sstModule
+  OvlNum: 0000  LibIndex: 0000  SegCount: 0002  Time: 0000  Name: .Package1 [002]
+    0001:00D30-00DAF  Flags: 0001
+    0002:00010-00017  Flags: 0001
+
+--------------------------------
+ModIndex: 0001  FileOffs: 026A8  sstSrcModule
+Segment ranges:
+  0001:00040-00756
+  0001:00758-00C07
+  0001:00D20-00D2D
+  0002:00008-0000F
+
+Source files:
+    File: SysInit.pas [003]  Offset: 026E0
+    Range: 0001:00040-00756
+      Line numbers:
+      0404:00040  0405:00043  0406:0004C  0409:00050  
+      0436:00058  0439:00060  0442:00068  0445:00070  
+      0448:00078  0451:00080  0466:00088  0489:00090  
+      0493:00098  0494:000A0  0577:000A8  0578:000B0  
+      0741:000B4  0745:000B9  0753:000BC  0754:000C1  
+      0758:000C5  0759:000CE  0760:000D8  0761:000DD  
+      0762:000E1  0764:000ED  0765:000F9  0770:000FC  
+      0772:00105  0773:0010F  0774:00114  0775:00124  
+      0781:00128  0783:00131  0785:0013A  0786:00145  
+      0788:00149  0789:0014F  0792:0015C  0796:00160  
+      0798:00169  0799:0016E  0800:00177  0801:00182  
+      0927:00184  0928:0018E  0939:00190  0940:0019A  
+      0941:001AB  0942:001B1  1027:001B4  1036:001B8  
+      1037:001BB  1038:001CF  1039:001E3  1040:001F7  
+      1041:0020B  1042:0021F  1043:00233  1044:00247  
+      1045:0025B  1046:0026F  1047:00283  1048:00297  
+      1049:002AB  1050:002BF  1051:002D3  1052:002E7  
+      1053:002FB  1054:0030F  1055:00323  1056:00337  
+      1057:0034B  1058:0035F  1059:00373  1060:00387  
+      1061:0039B  1062:003AF  1063:003C3  1064:003D7  
+      1065:003EB  1066:003FF  1067:00413  1068:00427  
+      1069:0043B  1070:0044F  1071:00463  1072:00477  
+      1073:0048B  1074:0049F  1075:004B3  1076:004C7  
+      1077:004DB  1078:004EF  1079:00503  1080:00517  
+      1081:0052B  1082:0053F  1083:00553  1084:00567  
+      1085:0057B  1086:0058F  1088:005A3  1228:005A8  
+      1229:005AF  1230:005B4  1231:005C2  1236:0064E  
+      1241:006CD  1259:006D4  1260:006DF  1262:006E6  
+      1264:006ED  1265:006F4  1266:006F9  1267:00701  
+      1268:00709  1270:0070E  1271:00717  1273:00720  
+      1274:00725  1275:0072C  1276:00730  1277:00735  
+      1278:00738  1348:00740  1349:0074A  1353:0074C  
+      1354:00756  
+    Range: 0001:00D20-00D2D
+      Line numbers:
+      1831:00D20  1833:00D2D  
+
+    File: C:\Projects\Ganymede\tp\runtime\rtl\sys\delayhlp.cpp [004]  Offset: 026FE
+    Range: 0001:00758-00C07
+      Line numbers:
+      0223:00758  0231:0075E  0223:00763  0231:00766  
+      0223:00769  0231:0076C  0242:007CB  0231:007CE  
+      0242:007D1  0253:007EE  0254:007F4  0256:00803  
+      0262:00815  0265:0081C  0271:0081F  0265:00827  
+      0271:00829  0272:00834  0274:00837  0276:0083F  
+      0278:0084C  0279:00850  0280:0085F  0282:00861  
+      0288:0086C  0290:0086E  0291:00877  0293:00885  
+      0294:00889  0300:0088E  0301:00896  0302:0089F  
+      0304:008AD  0305:008B1  0307:008BC  0308:008C0  
+      0309:008C8  0314:008D1  0317:008DF  0318:008E3  
+      0320:008F1  0331:00903  0339:0090B  0340:00915  
+      0342:00919  0345:0091F  0347:0094A  0349:0094C  
+      0356:00952  0357:00955  0358:0095E  0360:0096C  
+      0361:00970  0364:0097C  0366:00981  0373:009A0  
+      0374:009A9  0375:009AD  0380:009AF  0383:009BB  
+      0384:009BF  0385:009C7  0389:009D0  0391:009DE  
+      0392:009E2  0394:009F0  0405:00A02  0410:00A05  
+      0413:00A0A  0414:00A13  0415:00A18  0416:00A1B  
+      0417:00A1E  0419:00A2A  0420:00A2C  0424:00A38  
+      0426:00A3E  0424:00A40  0426:00A46  0429:00A49  
+      0431:00A5B  0432:00A69  0433:00A78  0439:00A82  
+      0440:00A84  0439:00A86  0440:00A89  0443:00AAD  
+      0444:00ABA  0445:00ABD  0446:00ACA  0448:00AD2  
+      0452:00B03  0453:00B0C  0455:00B13  0457:00B26  
+      0460:00B2D  0461:00B31  0464:00B3C  0465:00B3F  
+      0469:00B48  0471:00B4D  0469:00B52  0471:00B53  
+      0469:00B59  0470:00B5A  0475:00B61  0478:00B6E  
+      0490:00B7F  0491:00B88  0492:00B91  0495:00BB1  
+      0500:00BB3  0484:00BB6  0503:00BBD  0508:00BC3  
+      0509:00BCF  0510:00BD6  0512:00BDD  0513:00BE1  
+      0512:00BE8  0518:00BEF  0521:00BF4  0522:00BF7  
+      0536:00C00  0537:00C07  
+
+    File: SysInit.pas [003]  Offset: 02710
+    Range: 0002:00008-0000F
+      Line numbers:
+      1829:00008  1830:0000F  
+
+
+--------------------------------
+ModIndex: 0001  FileOffs: 02D44  sstAlignSym
+02D48  S_SSEARCH  0001:00018  CodeSyms: 002C  DataSyms 001C  FirstData: 00000F0F
+
+02D5C  S_GPROC32 
+  0001:00040-0004F  @Sysinit@InterlockedExchange$qqsrii [008]
+  Debug: 0001:00043-0004C  Type: 1013
+  Parent: 00000  End: 000B6  Next: 000BA
+  Linker name: '@Sysinit@InterlockedExchange$qqsrii'  Browser offset: 0000
+
+02DB0  S_BPREL32   type: 1008        [EBP+00008]  Target [005]  Browser offset: 0000
+
+02DC4  S_BPREL32   type: rint32      [EBP+0000C]  Value [006]  Browser offset: 0000
+
+02DD8  S_REGISTER  Type: rint32      Register: none  Result [007]  Browser offset: 0000
+
+02DEA  S_OPTVAR32   Start: 0000C  Len: 00004  (0004C-0004F)  Reg: EAX
+
+02DFA  S_END    
+
+02DFE  S_GPROC32 
+  0001:00050-00055  @Sysinit@FreeLibrary$qqsui [009]
+  Debug: 0001:00050-00056  Type: 1015
+  Parent: 00000  End: 00105  Next: 00109
+  Linker name: '@Sysinit@FreeLibrary$qqsui'  Browser offset: 0000
+
+02E49  S_END    
+
+02E4D  S_GPROC32 
+  0001:00058-0005D  @Sysinit@LocalAlloc$qqsii [00A]
+  Debug: 0001:00058-0005E  Type: 1019
+  Parent: 00000  End: 00153  Next: 00157
+  Linker name: '@Sysinit@LocalAlloc$qqsii'  Browser offset: 0000
+
+02E97  S_END    
+
+02E9B  S_GPROC32 
+  0001:00060-00065  @Sysinit@LocalFree$qqspv [00B]
+  Debug: 0001:00060-00066  Type: 101D
+  Parent: 00000  End: 001A0  Next: 001A4
+  Linker name: '@Sysinit@LocalFree$qqspv'  Browser offset: 0000
+
+02EE4  S_END    
+
+02EE8  S_GPROC32 
+  0001:00068-0006D  @Sysinit@TlsAlloc$qqsv [00C]
+  Debug: 0001:00068-0006E  Type: 101F
+  Parent: 00000  End: 001EB  Next: 001EF
+  Linker name: '@Sysinit@TlsAlloc$qqsv'  Browser offset: 0000
+
+02F2F  S_END    
+
+02F33  S_GPROC32 
+  0001:00070-00075  @Sysinit@TlsFree$qqsi [00D]
+  Debug: 0001:00070-00076  Type: 1020
+  Parent: 00000  End: 00235  Next: 00239
+  Linker name: '@Sysinit@TlsFree$qqsi'  Browser offset: 0000
+
+02F79  S_END    
+
+02F7D  S_GPROC32 
+  0001:00078-0007D  @Sysinit@TlsGetValue$qqsi [00E]
+  Debug: 0001:00078-0007E  Type: 1022
+  Parent: 00000  End: 00283  Next: 00287
+  Linker name: '@Sysinit@TlsGetValue$qqsi'  Browser offset: 0000
+
+02FC7  S_END    
+
+02FCB  S_GPROC32 
+  0001:00080-00085  @Sysinit@TlsSetValue$qqsipv [00F]
+  Debug: 0001:00080-00086  Type: 1024
+  Parent: 00000  End: 002D3  Next: 002D7
+  Linker name: '@Sysinit@TlsSetValue$qqsipv'  Browser offset: 0000
+
+03017  S_END    
+
+0301B  S_GPROC32 
+  0001:00088-0008D  @Sysinit@GetLastError$qqsv [010]
+  Debug: 0001:00088-0008E  Type: 1026
+  Parent: 00000  End: 00322  Next: 00326
+  Linker name: '@Sysinit@GetLastError$qqsv'  Browser offset: 0000
+
+03066  S_END    
+
+0306A  S_GPROC32 
+  0001:00090-00095  @Sysinit@LoadLibraryA$qqspc [011]
+  Debug: 0001:00090-00096  Type: 1027
+  Parent: 00000  End: 00372  Next: 00376
+  Linker name: '@Sysinit@LoadLibraryA$qqspc'  Browser offset: 0000
+
+030B6  S_END    
+
+030BA  S_GPROC32 
+  0001:00098-0009D  @Sysinit@RaiseException$qqsuiuiuipui [012]
+  Debug: 0001:00098-0009E  Type: 102B
+  Parent: 00000  End: 003CB  Next: 003CF
+  Linker name: '@Sysinit@RaiseException$qqsuiuiuipui'  Browser offset: 0000
+
+0310F  S_END    
+
+03113  S_GPROC32 
+  0001:000A0-000A5  @Sysinit@GetProcAddress$qqsuipc [013]
+  Debug: 0001:000A0-000A6  Type: 102F
+  Parent: 00000  End: 0041F  Next: 00423
+  Linker name: '@Sysinit@GetProcAddress$qqsuipc'  Browser offset: 0000
+
+03163  S_END    
+
+03167  S_GPROC32 
+  0001:000A8-000B0  @Sysinit@AllocTlsBuffer$qqri [015]
+  Debug: 0001:000B0-000B1  Type: 1031
+  Parent: 00000  End: 004B4  Next: 004B8
+  Linker name: '@Sysinit@AllocTlsBuffer$qqri'  Browser offset: 0000
+
+031B4  S_REGISTER  Type: rint32      Register: none  Size [014]  Browser offset: 0000
+
+031C6  S_OPTVAR32   Start: 00000  Len: 00008  (000A8-000AF)  Reg: EAX
+
+031D6  S_REGISTER  Type: 101C        Register: none  Result [007]  Browser offset: 0000
+
+031E8  S_OPTVAR32   Start: 00008  Len: 00001  (000B0-000B0)  Reg: EAX
+
+031F8  S_END    
+
+031FC  S_GPROC32 
+  0001:000B4-000B9  @Sysinit@GetTlsSize$qqrv [016]
+  Debug: 0001:000B9-000B9  Type: 1033
+  Parent: 00000  End: 00523  Next: 00527
+  Linker name: '@Sysinit@GetTlsSize$qqrv'  Browser offset: 0000
+
+03245  S_REGISTER  Type: rint32      Register: none  Result [007]  Browser offset: 0000
+
+03257  S_OPTVAR32   Start: 00005  Len: 00001  (000B9-000B9)  Reg: EAX
+
+03267  S_END    
+
+0326B  S_GPROC32 
+  0001:000BC-000F9  @Sysinit@InitThreadTLS$qqrv [019]
+  Debug: 0001:000C1-000F9  Type: 1034
+  Parent: 00000  End: 005CB  Next: 005CF
+  Linker name: '@Sysinit@InitThreadTLS$qqrv'  Browser offset: 0000
+
+032B7  S_REGISTER  Type: 101C        Register: none  p [017]  Browser offset: 0000
+
+032C9  S_OPTVAR32 
+  Start: 00021  Len: 00004  (000DD-000E0)  Reg: EAX
+  Start: 00031  Len: 0000C  (000ED-000F8)  Reg: EAX
+
+032E3  S_REGISTER  Type: rint32      Register: none  tlsSize [018]  Browser offset: 0000
+
+032F5  S_OPTVAR32 
+  Start: 00005  Len: 0000D  (000C1-000CD)  Reg: EAX
+  Start: 0001C  Len: 00005  (000D8-000DC)  Reg: EAX
+
+0330F  S_END    
+
+03313  S_GPROC32 
+  0001:000FC-00124  @Sysinit@InitProcessTLS$qqrv [01A]
+  Debug: 0001:00105-00124  Type: 1034
+  Parent: 00000  End: 0061C  Next: 00620
+  Linker name: '@Sysinit@InitProcessTLS$qqrv'  Browser offset: 0000
+
+03360  S_END    
+
+03364  S_GPROC32 
+  0001:00128-0015C  @Sysinit@ExitThreadTLS$qqrv [01B]
+  Debug: 0001:00131-0015C  Type: 1034
+  Parent: 00000  End: 0068E  Next: 00692
+  Linker name: '@Sysinit@ExitThreadTLS$qqrv'  Browser offset: 0000
+
+033B0  S_REGISTER  Type: 101C        Register: none  p [017]  Browser offset: 0000
+
+033C2  S_OPTVAR32   Start: 0001D  Len: 0000A  (00145-0014E)  Reg: EAX
+
+033D2  S_END    
+
+033D6  S_GPROC32 
+  0001:00160-00182  @Sysinit@ExitProcessTLS$qqrv [01C]
+  Debug: 0001:00169-00182  Type: 1034
+  Parent: 00000  End: 006DF  Next: 006E3
+  Linker name: '@Sysinit@ExitProcessTLS$qqrv'  Browser offset: 0000
+
+03423  S_END    
+
+03427  S_GPROC32 
+  0001:00184-0018E  @Sysinit@InitializeModule$qqrv [01D]
+  Debug: 0001:0018E-0018E  Type: 1034
+  Parent: 00000  End: 00732  Next: 00736
+  Linker name: '@Sysinit@InitializeModule$qqrv'  Browser offset: 0000
+
+03476  S_END    
+
+0347A  S_GPROC32 
+  0001:00190-001B1  @Sysinit@UninitializeModule$qqrv [01E]
+  Debug: 0001:0019A-001B1  Type: 1034
+  Parent: 00000  End: 00787  Next: 0078B
+  Linker name: '@Sysinit@UninitializeModule$qqrv'  Browser offset: 0000
+
+034CB  S_END    
+
+034CF  S_GPROC32 
+  0001:001B4-001B4  @Sysinit@@_dbkDummyProc$qqrv [01F]
+  Debug: 0001:001B4-001B5  Type: 1034
+  Parent: 00000  End: 007D8  Next: 007DC
+  Linker name: '@Sysinit@@_dbkDummyProc$qqrv'  Browser offset: 0000
+
+0351C  S_END    
+
+03520  S_GPROC32 
+  0001:001B8-005A6  @Sysinit@@_dbkFCallArgs$qqrpvt1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1 [03E]
+  Debug: 0001:001BB-005A3  Type: 1035
+  Parent: 00000  End: 00AB6  Next: 00ABA
+  Linker name: '@Sysinit@@_dbkFCallArgs$qqrpvt1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1'  Browser offset: 0000
+
+035A8  S_REGISTER  Type: 101C        Register: EAX  a01 [020]  Browser offset: 0000
+
+035BA  S_REGISTER  Type: 101C        Register: EDX  a02 [021]  Browser offset: 0000
+
+035CC  S_REGISTER  Type: 101C        Register: ECX  a03 [022]  Browser offset: 0000
+
+035DE  S_BPREL32   type: 101C        [EBP+00070]  a04 [023]  Browser offset: 0000
+
+035F2  S_BPREL32   type: 101C        [EBP+0006C]  a05 [024]  Browser offset: 0000
+
+03606  S_BPREL32   type: 101C        [EBP+00068]  a06 [025]  Browser offset: 0000
+
+0361A  S_BPREL32   type: 101C        [EBP+00064]  a07 [026]  Browser offset: 0000
+
+0362E  S_BPREL32   type: 101C        [EBP+00060]  a08 [027]  Browser offset: 0000
+
+03642  S_BPREL32   type: 101C        [EBP+0005C]  a09 [028]  Browser offset: 0000
+
+03656  S_BPREL32   type: 101C        [EBP+00058]  a10 [029]  Browser offset: 0000
+
+0366A  S_BPREL32   type: 101C        [EBP+00054]  a11 [02A]  Browser offset: 0000
+
+0367E  S_BPREL32   type: 101C        [EBP+00050]  a12 [02B]  Browser offset: 0000
+
+03692  S_BPREL32   type: 101C        [EBP+0004C]  a13 [02C]  Browser offset: 0000
+
+036A6  S_BPREL32   type: 101C        [EBP+00048]  a14 [02D]  Browser offset: 0000
+
+036BA  S_BPREL32   type: 101C        [EBP+00044]  a15 [02E]  Browser offset: 0000
+
+036CE  S_BPREL32   type: 101C        [EBP+00040]  a16 [02F]  Browser offset: 0000
+
+036E2  S_BPREL32   type: 101C        [EBP+0003C]  a17 [030]  Browser offset: 0000
+
+036F6  S_BPREL32   type: 101C        [EBP+00038]  a18 [031]  Browser offset: 0000
+
+0370A  S_BPREL32   type: 101C        [EBP+00034]  a19 [032]  Browser offset: 0000
+
+0371E  S_BPREL32   type: 101C        [EBP+00030]  a20 [033]  Browser offset: 0000
+
+03732  S_BPREL32   type: 101C        [EBP+0002C]  a21 [034]  Browser offset: 0000
+
+03746  S_BPREL32   type: 101C        [EBP+00028]  a22 [035]  Browser offset: 0000
+
+0375A  S_BPREL32   type: 101C        [EBP+00024]  a23 [036]  Browser offset: 0000
+
+0376E  S_BPREL32   type: 101C        [EBP+00020]  a24 [037]  Browser offset: 0000
+
+03782  S_BPREL32   type: 101C        [EBP+0001C]  a25 [038]  Browser offset: 0000
+
+03796  S_BPREL32   type: 101C        [EBP+00018]  a26 [039]  Browser offset: 0000
+
+037AA  S_BPREL32   type: 101C        [EBP+00014]  a27 [03A]  Browser offset: 0000
+
+037BE  S_BPREL32   type: 101C        [EBP+00010]  a28 [03B]  Browser offset: 0000
+
+037D2  S_BPREL32   type: 101C        [EBP+0000C]  a29 [03C]  Browser offset: 0000
+
+037E6  S_BPREL32   type: 101C        [EBP+00008]  a30 [03D]  Browser offset: 0000
+
+037FA  S_END    
+
+037FE  S_GPROC32 
+  0001:005A8-006D2  @Sysinit@@_dbk_fcall_wrapper$qqrv [03F]
+  Debug: 0001:005AF-006CD  Type: 1034
+  Parent: 00000  End: 00B20  Next: 00B24
+  Linker name: '@Sysinit@@_dbk_fcall_wrapper$qqrv'  Browser offset: 0000
+
+03850  S_BPREL32   type: 101C        [ESP-00004]  p [017]  Browser offset: 0000
+
+03864  S_END    
+
+03868  S_GPROC32 
+  0001:006D4-0073D  @Sysinit@@InitPkg$qqsuiipv [043]
+  Debug: 0001:006DF-00738  Type: 1037
+  Parent: 00000  End: 00BF3  Next: 00BF7
+  Linker name: '@Sysinit@@InitPkg$qqsuiipv'  Browser offset: 0000
+
+038B3  S_REGISTER  Type: ruint32     Register: none  AHInst [040]  Browser offset: 0000
+
+038C5  S_OPTVAR32   Start: 0000B  Len: 0002F  (006DF-0070D)  Reg: EAX
+
+038D5  S_REGISTER  Type: rint32      Register: none  Reason [041]  Browser offset: 0000
+
+038E7  S_OPTVAR32 
+  Start: 0000B  Len: 00046  (006DF-00724)  Reg: EBX
+  Start: 00058  Len: 00004  (0072C-0072F)  Reg: EBX
+
+03901  S_BPREL32   type: 101C        [EBP+00010]  Resvd [042]  Browser offset: 0000
+
+03915  S_REGISTER  Type: 1018        Register: none  Result [007]  Browser offset: 0000
+
+03927  S_OPTVAR32   Start: 00064  Len: 00006  (00738-0073D)  Reg: EAX
+
+03937  S_END    
+
+0393B  S_GPROC32 
+  0001:00740-0074A  @Sysinit@@PackageLoad$qqrxp23System@PackageInfoTable [045]
+  Debug: 0001:0074A-0074A  Type: 1039
+  Parent: 00000  End: 00C7E  Next: 00C82
+  Linker name: '@Sysinit@@PackageLoad$qqrxp23System@PackageInfoTable'  Browser offset: 0000
+
+039A0  S_REGISTER  Type: 103C        Register: none  Table [044]  Browser offset: 0000
+
+039B2  S_OPTVAR32   Start: 00000  Len: 0000A  (00740-00749)  Reg: EAX
+
+039C2  S_END    
+
+039C6  S_GPROC32 
+  0001:0074C-00756  @Sysinit@@PackageUnload$qqrxp23System@PackageInfoTable [046]
+  Debug: 0001:00756-00756  Type: 1054
+  Parent: 00000  End: 00D0B  Next: 00D0F
+  Linker name: '@Sysinit@@PackageUnload$qqrxp23System@PackageInfoTable'  Browser offset: 0000
+
+03A2D  S_REGISTER  Type: 103C        Register: none  Table [044]  Browser offset: 0000
+
+03A3F  S_OPTVAR32   Start: 00000  Len: 0000A  (0074C-00755)  Reg: EAX
+
+03A4F  S_END    
+
+03A53  S_GPROC32 
+  0001:00758-00A37  @Sysinit@@_delayLoadHelper2$qqrv [047]
+  Debug: 0001:0075E-00A2C  Type: 1034
+  Parent: 00000  End: 00D60  Next: 00D64
+  Linker name: '@Sysinit@@_delayLoadHelper2$qqrv'  Browser offset: 0000
+
+03AA4  S_END    
+
+03AA8  S_GPROC32 
+  0001:00A38-00B47  @Sysinit@@_FUnloadDelayLoadedDLL2$qqrv [048]
+  Debug: 0001:00A3E-00B3F  Type: 1034
+  Parent: 00000  End: 00DBB  Next: 00DBF
+  Linker name: '@Sysinit@@_FUnloadDelayLoadedDLL2$qqrv'  Browser offset: 0000
+
+03AFF  S_END    
+
+03B03  S_GPROC32 
+  0001:00B48-00BFF  @Sysinit@@_HrLoadAllImportsForDll$qqrv [049]
+  Debug: 0001:00B4D-00BF7  Type: 1034
+  Parent: 00000  End: 00E16  Next: 00E1A
+  Linker name: '@Sysinit@@_HrLoadAllImportsForDll$qqrv'  Browser offset: 0000
+
+03B5A  S_END    
+
+03B5E  S_GPROC32 
+  0001:00C00-00C07  @Sysinit@ShutdownDelayHelp2$qqrv [04A]
+  Debug: 0001:00C07-00C07  Type: 1034
+  Parent: 00000  End: 00E6B  Next: 00E6F
+  Linker name: '@Sysinit@ShutdownDelayHelp2$qqrv'  Browser offset: 0000
+
+03BAF  S_END    
+
+03BB3  S_GPROC32 
+  0001:00D20-00D2D  @Sysinit@Finalization$qqrv [04B]
+  Debug: 0001:00D2D-00D2D  Type: 1056
+  Parent: 00000  End: 00EBA  Next: 00EBE
+  Linker name: '@Sysinit@Finalization$qqrv'  Browser offset: 0000
+
+03BFE  S_END    
+
+03C02  S_GPROC32 
+  0002:00008-0000F  @Sysinit@initialization$qqrv [04C]
+  Debug: 0002:00008-00010  Type: 1057
+  Parent: 00000  End: 00F0B  Next: 00000
+  Linker name: '@Sysinit@initialization$qqrv'  Browser offset: 0000
+
+03C4F  S_END    
+
+03C53  S_GDATA32   type: bool8       0004:00000  @Sysinit@ModuleIsLib [04D]  Browser offset: 0000
+    flags: 0000
+
+03C6B  S_GDATA32   type: bool8       0004:00001  @Sysinit@ModuleIsPackage [04E]  Browser offset: 0000
+    flags: 0000
+
+03C83  S_GDATA32   type: ruint32     0003:00000  @Sysinit@TlsIndex [04F]  Browser offset: 0000
+    flags: 0000
+
+03C9B  S_PCONSTANT  Type: ruint32    Name @Sysinit@TlsLast [050] Property 0004  Browser offset: 0000
+    Value: 0x0000
+
+03CB1  S_GDATA32   type: ruint32     0004:00004  @Sysinit@HInstance [051]  Browser offset: 0000
+    flags: 0000
+
+03CC9  S_GDATA32   type: 101C        0004:0000C  @Sysinit@dbkFCallWrapperAddr [052]  Browser offset: 0000
+    flags: 0000
+
+03CE1  S_GDATA32   type: 101C        0003:00004  @Sysinit@PtrToNil [053]  Browser offset: 0000
+    flags: 0000
+
+03CF9  S_PCONSTANT  Type: 1062       Name @Sysinit@dliStartProcessing [054] Property 0004  Browser offset: 0000
+    Value: 0x0000
+
+03D0F  S_PCONSTANT  Type: 1062       Name @Sysinit@dliNoteStartProcessing [055] Property 0004  Browser offset: 0000
+    Value: 0x0000
+
+03D25  S_PCONSTANT  Type: 1062       Name @Sysinit@dliNotePreLoadLibrary [056] Property 0004  Browser offset: 0000
+    Value: 0x0001
+
+03D3B  S_PCONSTANT  Type: 1062       Name @Sysinit@dliNotePreGetProcAddress [057] Property 0004  Browser offset: 0000
+    Value: 0x0002
+
+03D51  S_PCONSTANT  Type: 1062       Name @Sysinit@dliFailLoadLibrary [058] Property 0004  Browser offset: 0000
+    Value: 0x0003
+
+03D67  S_PCONSTANT  Type: 1062       Name @Sysinit@dliFailGetProcAddress [059] Property 0004  Browser offset: 0000
+    Value: 0x0004
+
+03D7D  S_PCONSTANT  Type: 1062       Name @Sysinit@dliNoteEndProcessing [05A] Property 0004  Browser offset: 0000
+    Value: 0x0005
+
+03D93  S_GDATA32   type: 101C        0004:00010  @Sysinit@@_pfnDliNotifyHook2 [05B]  Browser offset: 0000
+    flags: 0000
+
+03DAB  S_GDATA32   type: 101C        0004:00014  @Sysinit@@_pfnDliFailureHook2 [05C]  Browser offset: 0000
+    flags: 0000
+
+03DC3  S_PCONSTANT  Type: 1065       Name @Sysinit@kernel [05D] Property 0000  Browser offset: 0000
+    Value: 0x204B0
+
+03DD9  S_PCONSTANT  Type: int8       Name @Sysinit@tlsArray [05E] Property 0000  Browser offset: 0000
+    Value: 0x002C
+
+03DEF  S_PCONSTANT  Type: int8       Name @Sysinit@LMEM_ZEROINIT [05F] Property 0000  Browser offset: 0000
+    Value: 0x0040
+
+03E05  S_UDT      Type: ruint32       typedef  Nest: No   Cardinal [060]  Browser offset: 0000
+
+03E17  S_UDT      Type: 102E          typedef  Nest: No   @Sysinit@PDWORD [061]  Browser offset: 0000
+
+03E29  S_LDATA32   type: 101C        0004:0001C  @Sysinit@tlsBuffer [062]  Browser offset: 0000
+    flags: 0000
+
+03E41  S_PCONSTANT  Type: ruint32    Name @Sysinit@NEG_ONE [063] Property 0000  Browser offset: 0000
+    Value: 0xFFFFFFFF
+
+03E57  S_LDATA32   type: 1059        0003:00008  @Sysinit@Module [064]  Browser offset: 0000
+    flags: 0000
+
+03E6F  S_LDATA32   type: bool8       0004:00020  @Sysinit@UseTlsAPI [065]  Browser offset: 0000
+    flags: 0000
+
+03E87  S_PCONSTANT  Type: int8       Name @Sysinit@DLL_PROCESS_DETACH [066] Property 0000  Browser offset: 0000
+    Value: 0x0000
+
+03E9D  S_PCONSTANT  Type: int8       Name @Sysinit@DLL_PROCESS_ATTACH [067] Property 0000  Browser offset: 0000
+    Value: 0x0001
+
+03EB3  S_PCONSTANT  Type: int8       Name @Sysinit@DLL_THREAD_ATTACH [068] Property 0000  Browser offset: 0000
+    Value: 0x0002
+
+03EC9  S_PCONSTANT  Type: int8       Name @Sysinit@DLL_THREAD_DETACH [069] Property 0000  Browser offset: 0000
+    Value: 0x0003
+
+03EDF  S_LDATA32   type: 105F        0003:00024  @Sysinit@TlsProc [06A]  Browser offset: 0000
+    flags: 0000
+
+03EF7  S_USES   
+  Unit: System [06B]
+
+03EFF  S_COMPILE  machine: Intel 80386  language: Pascal
+  Fast floating code  Emulator  Near Ambient data  Near Ambient code
+   32 bit addresses  'char' is signed  Compiler: BP320.0
+03F0F  S_NAMESPACE  Namespace:Sysinit [06C]  Browser offset: 0000
+  Using count:1
+  System [06B]
+03F21  S_USING  
+  Sysinit [06C]
+  System [06B]
+
+
+--------------------------------
+ModIndex: 0002  FileOffs: 03F2F  sstSrcModule
+Segment ranges:
+  0001:00D2E-00D2E
+
+Source files:
+    File: Package1.dpk [06D]  Offset: 03F41
+    Range: 0001:00D2E-00D2E
+      Line numbers:
+      0033:00D2E  
+
+
+--------------------------------
+ModIndex: 0002  FileOffs: 03F5D  sstAlignSym
+03F61  S_SSEARCH  0001:00018  CodeSyms: 0004  DataSyms 0000  FirstData: 00000112
+
+03F75  S_GPROC32 
+  0001:00D90-00D95  @Package1@@GetPackageInfoTable$qqrv [06E]
+  Debug: 0001:00D90-00D96  Type: 1034
+  Parent: 00000  End: 0006C  Next: 00070
+  Linker name: '@Package1@@GetPackageInfoTable$qqrv'  Browser offset: 0000
+
+03FC9  S_END    
+
+03FCD  S_GPROC32 
+  0001:00D98-00DA2  @Package1@@PackageLoad$qqrv [06F]
+  Debug: 0001:00D98-00DA3  Type: 1034
+  Parent: 00000  End: 000BC  Next: 000C0
+  Linker name: '@Package1@@PackageLoad$qqrv'  Browser offset: 0000
+
+04019  S_END    
+
+0401D  S_GPROC32 
+  0001:00DA4-00DAE  @Package1@@PackageUnload$qqrv [070]
+  Debug: 0001:00DA4-00DAF  Type: 1034
+  Parent: 00000  End: 0010E  Next: 00000
+  Linker name: '@Package1@@PackageUnload$qqrv'  Browser offset: 0000
+
+0406B  S_END    
+
+0406F  S_USES   
+  Unit: SysInit [001]
+  Unit: System [06B]
+
+0407B  S_COMPILE  machine: Intel 80386  language: Pascal
+  Fast floating code  Emulator  Near Ambient data  Near Ambient code
+   32 bit addresses  'char' is signed  Compiler: BP320.0
+0408B  S_NAMESPACE  Namespace:.Package1 [002]  Browser offset: 0000
+  Using count:2
+  Sysinit [06C]
+  System [06B]
+040A1  S_USING  
+  .Package1 [002]
+  Sysinit [06C]
+  System [06B]
+
+
+--------------------------------
+ModIndex: 0000  FileOffs: 040B3  sstGlobalSym
+  cbSymbols: 001E0  cNamespaces: 00000000X  cUDTs: 00000000  cOthers: 00000012  Total: 00000012
+  SymHash: 0000  cbSymHash: 0000  AddrHash: 0000  cbAddrHash: 0000
+040D3  S_GDATA32   type: bool8       0004:00000  @Sysinit@ModuleIsLib [04D]  Browser offset: 0000
+    flags: 0000
+
+040EB  S_GDATA32   type: bool8       0004:00001  @Sysinit@ModuleIsPackage [04E]  Browser offset: 0000
+    flags: 0000
+
+04103  S_GDATA32   type: ruint32     0004:00004  @Sysinit@HInstance [051]  Browser offset: 0000
+    flags: 0000
+
+0411B  S_GDATA32   type: 101C        0004:0000C  @Sysinit@dbkFCallWrapperAddr [052]  Browser offset: 0000
+    flags: 0000
+
+04133  S_GDATA32   type: 101C        0004:00010  @Sysinit@@_pfnDliNotifyHook2 [05B]  Browser offset: 0000
+    flags: 0000
+
+0414B  S_GDATA32   type: 101C        0004:00014  @Sysinit@@_pfnDliFailureHook2 [05C]  Browser offset: 0000
+    flags: 0000
+
+04163  S_GPROCREF  00000000  type: 1037        0001:006D4  @Sysinit@@InitPkg$qqsuiipv [043]  Browser offset: 0000
+
+0417F  S_GPROCREF  00000000  type: 1039        0001:00740  @Sysinit@@PackageLoad$qqrxp23System@PackageInfoTable [045]  Browser offset: 0000
+
+0419B  S_GPROCREF  00000000  type: 1054        0001:0074C  @Sysinit@@PackageUnload$qqrxp23System@PackageInfoTable [046]  Browser offset: 0000
+
+041B7  S_GPROCREF  00000000  type: 1034        0001:00758  @Sysinit@@_delayLoadHelper2$qqrv [047]  Browser offset: 0000
+
+041D3  S_GPROCREF  00000000  type: 1034        0001:00A38  @Sysinit@@_FUnloadDelayLoadedDLL2$qqrv [048]  Browser offset: 0000
+
+041EF  S_GPROCREF  00000000  type: 1034        0001:00B48  @Sysinit@@_HrLoadAllImportsForDll$qqrv [049]  Browser offset: 0000
+
+0420B  S_GPROCREF  00000000  type: 1056        0001:00D20  @Sysinit@Finalization$qqrv [04B]  Browser offset: 0000
+
+04227  S_GPROCREF  00000000  type: 1057        0002:00008  @Sysinit@initialization$qqrv [04C]  Browser offset: 0000
+
+04243  S_GPROCREF  00000000  type: 107D        0002:00010  <none> [000]  Browser offset: 0000
+
+0425F  S_GPROCREF  00000000  type: 1034        0001:00D90  @Package1@@GetPackageInfoTable$qqrv [06E]  Browser offset: 0000
+
+0427B  S_GPROCREF  00000000  type: 1034        0001:00D98  @Package1@@PackageLoad$qqrv [06F]  Browser offset: 0000
+
+04297  S_GPROCREF  00000000  type: 1034        0001:00DA4  @Package1@@PackageUnload$qqrv [070]  Browser offset: 0000
+
+
+
+--------------------------------
+ModIndex: 0000  FileOffs: 042B3  sstGlobalTypes
+Number of types: 007E
+
+044B3  Type: 1000  Len: 0004 ARGLIST 
+
+
+044B9  Type: 1001  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: void
+
+044C5  Type: 1002  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: PasChar
+
+044D1  Type: 1003  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: wchar
+
+044DD  Type: 1004  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: int8
+
+044E9  Type: 1005  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: uint8
+
+044F5  Type: 1006  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: rint16
+
+04501  Type: 1007  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: ruint16
+
+0450D  Type: 1008  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: rint32
+
+04519  Type: 1009  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: ruint32
+
+04525  Type: 100A  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: rint64
+
+04531  Type: 100B  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: ruint64
+
+0453D  Type: 100C  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: real32
+
+04549  Type: 100D  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: real48
+
+04555  Type: 100E  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: real64
+
+04561  Type: 100F  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: real80
+
+0456D  Type: 1010  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: bool8
+
+04579  Type: 1011  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: bool16
+
+04585  Type: 1012  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: bool32
+
+04591  Type: 1013  Len: 000E PROCEDURE 
+  near stdcall returns rint32
+  Params: 0002  ArgList: 1014
+
+045A1  Type: 1014  Len: 000C ARGLIST 
+  Type: 1008
+  Type: rint32
+
+
+045AF  Type: 1015  Len: 000E PROCEDURE 
+  near stdcall returns 1018
+  Params: 0001  ArgList: 1016
+
+045BF  Type: 1016  Len: 0008 ARGLIST 
+  Type: ruint32
+
+
+045CB  Type: 1017  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 1018
+
+045D7  Type: 1018  Len: 0018 SUBRANGE 
+  Type: rint32      Name: @System@LongBool [071]
+  Low: 80000000
+  High: 7FFFFFFF
+  Size: 00004
+
+045F3  Type: 1019  Len: 000E PROCEDURE 
+  near stdcall returns 101C
+  Params: 0002  ArgList: 101A
+
+04603  Type: 101A  Len: 000C ARGLIST 
+  Type: rint32
+  Type: rint32
+
+
+04613  Type: 101B  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 101C
+
+0461F  Type: 101C  Len: 000A POINTER 
+  near32 *  (PtrType: 0A  PtrMode: 0)
+  Points to: void
+
+0462B  Type: 101D  Len: 000E PROCEDURE 
+  near stdcall returns 101C
+  Params: 0001  ArgList: 101E
+
+0463B  Type: 101E  Len: 0008 ARGLIST 
+  Type: 101C
+
+
+04647  Type: 101F  Len: 000E PROCEDURE 
+  near stdcall returns rint32
+  Params: 0000  ArgList: 1000
+
+04657  Type: 1020  Len: 000E PROCEDURE 
+  near stdcall returns bool8
+  Params: 0001  ArgList: 1021
+
+04667  Type: 1021  Len: 0008 ARGLIST 
+  Type: rint32
+
+
+04673  Type: 1022  Len: 000E PROCEDURE 
+  near stdcall returns 101C
+  Params: 0001  ArgList: 1023
+
+04683  Type: 1023  Len: 0008 ARGLIST 
+  Type: rint32
+
+
+0468F  Type: 1024  Len: 000E PROCEDURE 
+  near stdcall returns bool8
+  Params: 0002  ArgList: 1025
+
+0469F  Type: 1025  Len: 000C ARGLIST 
+  Type: rint32
+  Type: 101C
+
+
+046AF  Type: 1026  Len: 000E PROCEDURE 
+  near stdcall returns rint32
+  Params: 0000  ArgList: 1000
+
+046BF  Type: 1027  Len: 000E PROCEDURE 
+  near stdcall returns ruint32
+  Params: 0001  ArgList: 1028
+
+046CF  Type: 1028  Len: 0008 ARGLIST 
+  Type: 102A
+
+
+046DB  Type: 1029  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 102A
+
+046E7  Type: 102A  Len: 000A POINTER 
+  near32 *  (PtrType: 0A  PtrMode: 0)
+  Points to: PasChar
+
+046F3  Type: 102B  Len: 000E PROCEDURE 
+  near stdcall returns void
+  Params: 0004  ArgList: 102C
+
+04703  Type: 102C  Len: 0014 ARGLIST 
+  Type: ruint32
+  Type: ruint32
+  Type: ruint32
+  Type: 102E
+
+
+0471B  Type: 102D  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 102E
+
+04727  Type: 102E  Len: 000A POINTER 
+  near32 *  (PtrType: 0A  PtrMode: 0)
+  Points to: ruint32
+
+04733  Type: 102F  Len: 000E PROCEDURE 
+  near stdcall returns 101C
+  Params: 0002  ArgList: 1030
+
+04743  Type: 1030  Len: 000C ARGLIST 
+  Type: ruint32
+  Type: 102A
+
+
+04753  Type: 1031  Len: 000E PROCEDURE 
+  near fastcall returns 101C
+  Params: 0001  ArgList: 1032
+
+04763  Type: 1032  Len: 0008 ARGLIST 
+  Type: rint32
+
+
+0476F  Type: 1033  Len: 000E PROCEDURE 
+  near fastcall returns rint32
+  Params: 0000  ArgList: 1000
+
+0477F  Type: 1034  Len: 000E PROCEDURE 
+  near fastcall returns void
+  Params: 0000  ArgList: 1000
+
+0478F  Type: 1035  Len: 000E PROCEDURE 
+  near fastcall returns void
+  Params: 001E  ArgList: 1036
+
+0479F  Type: 1036  Len: 007C ARGLIST 
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+  Type: 101C
+
+
+0481F  Type: 1037  Len: 000E PROCEDURE 
+  near stdcall returns 1018
+  Params: 0003  ArgList: 1038
+
+0482F  Type: 1038  Len: 0010 ARGLIST 
+  Type: ruint32
+  Type: rint32
+  Type: 101C
+
+
+04843  Type: 1039  Len: 000E PROCEDURE 
+  near fastcall returns void
+  Params: 0001  ArgList: 103A
+
+04853  Type: 103A  Len: 0008 ARGLIST 
+  Type: 103C
+
+
+0485F  Type: 103B  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 103C
+
+0486B  Type: 103C  Len: 000A POINTER 
+  near32 *  (PtrType: 0A  PtrMode: 0)
+  Points to: 103E
+
+04877  Type: 103D  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 103E
+
+04883  Type: 103E  Len: 001C STRUCT 
+  Fields: 0003  FieldIdx: 103F  Name: @System@PackageInfoTable [072]
+  Containing Class: 0000  Length: 00018
+  Derivation list: 0000  VTable: 0000
+  Packed: No   Constructors: No   Destructors: No   Overloaded operators: No 
+  Is nested: No   Nested classes: No   Overload assignments: No 
+  Casting methods: No   Forward Ref: No 
+
+048A1  Type: 103F  Len: 003E FIELDLIST 
+  MEMBER   Type: rint32      Offs: 00000  Access: public     Name: UnitCount [073]  Browser offset: 0000
+
+  MEMBER   Type: 1041        Offs: 00004  Access: public     Name: UnitInfo [074]  Browser offset: 0000
+
+  MEMBER   Type: 1049        Offs: 00008  Access: public     Name: TypeInfo [075]  Browser offset: 0000
+
+
+
+048E3  Type: 1040  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 1041
+
+048EF  Type: 1041  Len: 000A POINTER 
+  near32 *  (PtrType: 0A  PtrMode: 0)
+  Points to: 1043
+
+048FB  Type: 1042  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 1043
+
+04907  Type: 1043  Len: 001A PARRAY 
+  Type: 1046        Indexed by: 1044        Name: @System@UnitEntryTable [076]
+  Size: 4C4B400  Elements: 989680
+
+04923  Type: 1044  Len: 0014 SUBRANGE 
+  Type: rint32      Name: <none> [000]
+  Low: 00000
+  High: 98967F
+  Size: 00004
+
+0493B  Type: 1045  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 1046
+
+04947  Type: 1046  Len: 001C STRUCT 
+  Fields: 0002  FieldIdx: 1047  Name: @System@PackageUnitEntry [077]
+  Containing Class: 0000  Length: 00008
+  Derivation list: 0000  VTable: 0000
+  Packed: No   Constructors: No   Destructors: No   Overloaded operators: No 
+  Is nested: No   Nested classes: No   Overload assignments: No 
+  Casting methods: No   Forward Ref: No 
+
+04965  Type: 1047  Len: 002A FIELDLIST 
+  MEMBER   Type: 101C        Offs: 00000  Access: public     Name: Init [078]  Browser offset: 0000
+
+  MEMBER   Type: 101C        Offs: 00004  Access: public     Name: FInit [079]  Browser offset: 0000
+
+
+
+04993  Type: 1048  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 1049
+
+0499F  Type: 1049  Len: 001C STRUCT 
+  Fields: 0004  FieldIdx: 104A  Name: @System@TPackageTypeInfo [07A]
+  Containing Class: 0000  Length: 00010
+  Derivation list: 0000  VTable: 0000
+  Packed: No   Constructors: No   Destructors: No   Overloaded operators: No 
+  Is nested: No   Nested classes: No   Overload assignments: No 
+  Casting methods: No   Forward Ref: No 
+
+049BD  Type: 104A  Len: 0052 FIELDLIST 
+  MEMBER   Type: rint32      Offs: 00000  Access: public     Name: TypeCount [07B]  Browser offset: 0000
+
+  MEMBER   Type: 104C        Offs: 00004  Access: public     Name: TypeTable [07C]  Browser offset: 0000
+
+  MEMBER   Type: rint32      Offs: 00008  Access: public     Name: UnitCount [073]  Browser offset: 0000
+
+  MEMBER   Type: 1051        Offs: 0000C  Access: public     Name: UnitNames [07D]  Browser offset: 0000
+
+
+
+04A13  Type: 104B  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 104C
+
+04A1F  Type: 104C  Len: 000A POINTER 
+  near32 *  (PtrType: 0A  PtrMode: 0)
+  Points to: 104E
+
+04A2B  Type: 104D  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 104E
+
+04A37  Type: 104E  Len: 001A PARRAY 
+  Type: 101C        Indexed by: 104F        Name: @System@TTypeTable [07E]
+  Size: 7FFFFFFC  Elements: 1FFFFFFF
+
+04A53  Type: 104F  Len: 0014 SUBRANGE 
+  Type: rint32      Name: <none> [000]
+  Low: 00000
+  High: 1FFFFFFE
+  Size: 00004
+
+04A6B  Type: 1050  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 1051
+
+04A77  Type: 1051  Len: 000A POINTER 
+  near32 *  (PtrType: 0A  PtrMode: 0)
+  Points to: 1053
+
+04A83  Type: 1052  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 1053
+
+04A8F  Type: 1053  Len: 0012 PSTRING 
+  Element Type: PasChar     Index Type: uint8       Name: @System@ShortString [07F]
+
+
+04AA3  Type: 1054  Len: 000E PROCEDURE 
+  near fastcall returns void
+  Params: 0001  ArgList: 1055
+
+04AB3  Type: 1055  Len: 0008 ARGLIST 
+  Type: 103C
+
+
+04ABF  Type: 1056  Len: 000E PROCEDURE 
+  near fastcall returns void
+  Params: 0000  ArgList: 1000
+
+04ACF  Type: 1057  Len: 000E PROCEDURE 
+  near fastcall returns void
+  Params: 0000  ArgList: 1000
+
+04ADF  Type: 1058  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 1059
+
+04AEB  Type: 1059  Len: 001C STRUCT 
+  Fields: 0007  FieldIdx: 105A  Name: @System@TLibModule [080]
+  Containing Class: 0000  Length: 0001C
+  Derivation list: 0000  VTable: 0000
+  Packed: No   Constructors: No   Destructors: No   Overloaded operators: No 
+  Is nested: No   Nested classes: No   Overload assignments: No 
+  Casting methods: No   Forward Ref: No 
+
+04B09  Type: 105A  Len: 008E FIELDLIST 
+  MEMBER   Type: 105C        Offs: 00000  Access: public     Name: Next [081]  Browser offset: 0000
+
+  MEMBER   Type: ruint32     Offs: 00004  Access: public     Name: Instance [082]  Browser offset: 0000
+
+  MEMBER   Type: ruint32     Offs: 00008  Access: public     Name: CodeInstance [083]  Browser offset: 0000
+
+  MEMBER   Type: ruint32     Offs: 0000C  Access: public     Name: DataInstance [084]  Browser offset: 0000
+
+  MEMBER   Type: ruint32     Offs: 00010  Access: public     Name: ResInstance [085]  Browser offset: 0000
+
+  MEMBER   Type: 105E        Offs: 00014  Access: public     Name: TypeInfo [075]  Browser offset: 0000
+
+  MEMBER   Type: rint32      Offs: 00018  Access: public     Name: Reserved [086]  Browser offset: 0000
+
+
+
+04B9B  Type: 105B  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 105C
+
+04BA7  Type: 105C  Len: 000A POINTER 
+  near32 *  (PtrType: 0A  PtrMode: 0)
+  Points to: 1059
+
+04BB3  Type: 105D  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 105E
+
+04BBF  Type: 105E  Len: 000A POINTER 
+  near32 *  (PtrType: 0A  PtrMode: 0)
+  Points to: 1049
+
+04BCB  Type: 105F  Len: 0012 PARRAY 
+  Type: 1034        Indexed by: 1060        Name: <none> [000]
+  Size: 00010  Elements: 00004
+
+04BDF  Type: 1060  Len: 0010 SUBRANGE 
+  Type: rint32      Name: <none> [000]
+  Low: 00000
+  High: 00003
+  Size: 00001
+
+04BF3  Type: 1061  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 1062
+
+04BFF  Type: 1062  Len: 0014 ENUM 
+  Count: 0007  Type: int8  Fields: 1063  Class: 0000  Name: dliNotification [087]
+
+
+04C15  Type: 1063  Len: 0072 FIELDLIST 
+  ENUMERATE   Attr: 0000  Value: 00000  Name: dliStartProcessing [088]  Browser offset: 0000
+
+  ENUMERATE   Attr: 0000  Value: 00000  Name: dliNoteStartProcessing [089]  Browser offset: 0000
+
+  ENUMERATE   Attr: 0000  Value: 00001  Name: dliNotePreLoadLibrary [08A]  Browser offset: 0000
+
+  ENUMERATE   Attr: 0000  Value: 00002  Name: dliNotePreGetProcAddress [08B]  Browser offset: 0000
+
+  ENUMERATE   Attr: 0000  Value: 00003  Name: dliFailLoadLibrary [08C]  Browser offset: 0000
+
+  ENUMERATE   Attr: 0000  Value: 00004  Name: dliFailGetProcAddress [08D]  Browser offset: 0000
+
+  ENUMERATE   Attr: 0000  Value: 00005  Name: dliNoteEndProcessing [08E]  Browser offset: 0000
+
+
+
+04C8B  Type: 1064  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 1065
+
+04C97  Type: 1065  Len: 0006 USTRING 
+  Name: string [08F]
+
+
+04C9F  Type: 1066  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 1067
+
+04CAB  Type: 1067  Len: 000A POINTER 
+  near32 *  (PtrType: 0A  PtrMode: 0)
+  Points to: 1069
+
+04CB7  Type: 1068  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 1069
+
+04CC3  Type: 1069  Len: 001C STRUCT 
+  Fields: 0004  FieldIdx: 106A  Name: TImageThunkData [090]
+  Containing Class: 0000  Length: 00004
+  Derivation list: 0000  VTable: 0000
+  Packed: No   Constructors: No   Destructors: No   Overloaded operators: No 
+  Is nested: No   Nested classes: No   Overload assignments: No 
+  Casting methods: No   Forward Ref: No 
+
+04CE1  Type: 106A  Len: 0052 FIELDLIST 
+  MEMBER   Type: ruint32     Offs: 00000  Access: public     Name: ForwarderString [091]  Browser offset: 0000
+
+  MEMBER   Type: ruint32     Offs: 00000  Access: public     Name: _Function [092]  Browser offset: 0000
+
+  MEMBER   Type: ruint32     Offs: 00000  Access: public     Name: Ordinal [093]  Browser offset: 0000
+
+  MEMBER   Type: ruint32     Offs: 00000  Access: public     Name: AddressOfData [094]  Browser offset: 0000
+
+
+
+04D37  Type: 106B  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 106C
+
+04D43  Type: 106C  Len: 001C STRUCT 
+  Fields: 0008  FieldIdx: 106D  Name: ImgDelayDescr [095]
+  Containing Class: 0000  Length: 00020
+  Derivation list: 0000  VTable: 0000
+  Packed: No   Constructors: No   Destructors: No   Overloaded operators: No 
+  Is nested: No   Nested classes: No   Overload assignments: No 
+  Casting methods: No   Forward Ref: No 
+
+04D61  Type: 106D  Len: 00A2 FIELDLIST 
+  MEMBER   Type: ruint32     Offs: 00000  Access: public     Name: grAttrs [096]  Browser offset: 0000
+
+  MEMBER   Type: 102A        Offs: 00004  Access: public     Name: szName [097]  Browser offset: 0000
+
+  MEMBER   Type: ruint32     Offs: 00008  Access: public     Name: hmod [098]  Browser offset: 0000
+
+  MEMBER   Type: 1067        Offs: 0000C  Access: public     Name: pIAT [099]  Browser offset: 0000
+
+  MEMBER   Type: 1067        Offs: 00010  Access: public     Name: pINT [09A]  Browser offset: 0000
+
+  MEMBER   Type: 1067        Offs: 00014  Access: public     Name: pBoundIAT [09B]  Browser offset: 0000
+
+  MEMBER   Type: 1067        Offs: 00018  Access: public     Name: pUnloadIAT [09C]  Browser offset: 0000
+
+  MEMBER   Type: ruint32     Offs: 0001C  Access: public     Name: dwTimeStamp [09D]  Browser offset: 0000
+
+
+
+04E07  Type: 106E  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 106F
+
+04E13  Type: 106F  Len: 000A POINTER 
+  near32 *  (PtrType: 0A  PtrMode: 0)
+  Points to: 106C
+
+04E1F  Type: 1070  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 1071
+
+04E2B  Type: 1071  Len: 001C STRUCT 
+  Fields: 0003  FieldIdx: 1072  Name: DelayLoadProc [09E]
+  Containing Class: 0000  Length: 00008
+  Derivation list: 0000  VTable: 0000
+  Packed: No   Constructors: No   Destructors: No   Overloaded operators: No 
+  Is nested: No   Nested classes: No   Overload assignments: No 
+  Casting methods: No   Forward Ref: No 
+
+04E49  Type: 1072  Len: 003E FIELDLIST 
+  MEMBER   Type: 1018        Offs: 00000  Access: public     Name: fImportByName [09F]  Browser offset: 0000
+
+  MEMBER   Type: 102A        Offs: 00004  Access: public     Name: szProcName [0A0]  Browser offset: 0000
+
+  MEMBER   Type: ruint32     Offs: 00004  Access: public     Name: dwOrdinal [0A1]  Browser offset: 0000
+
+
+
+04E8B  Type: 1073  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 1074
+
+04E97  Type: 1074  Len: 000A POINTER 
+  near32 *  (PtrType: 0A  PtrMode: 0)
+  Points to: 1071
+
+04EA3  Type: 1075  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 1076
+
+04EAF  Type: 1076  Len: 001C STRUCT 
+  Fields: 0008  FieldIdx: 1077  Name: DelayLoadInfo [0A2]
+  Containing Class: 0000  Length: 00024
+  Derivation list: 0000  VTable: 0000
+  Packed: No   Constructors: No   Destructors: No   Overloaded operators: No 
+  Is nested: No   Nested classes: No   Overload assignments: No 
+  Casting methods: No   Forward Ref: No 
+
+04ECD  Type: 1077  Len: 00A2 FIELDLIST 
+  MEMBER   Type: ruint32     Offs: 00000  Access: public     Name: cb [0A3]  Browser offset: 0000
+
+  MEMBER   Type: 106F        Offs: 00004  Access: public     Name: pidd [0A4]  Browser offset: 0000
+
+  MEMBER   Type: 101C        Offs: 00008  Access: public     Name: ppfn [0A5]  Browser offset: 0000
+
+  MEMBER   Type: 102A        Offs: 0000C  Access: public     Name: szDll [0A6]  Browser offset: 0000
+
+  MEMBER   Type: 1071        Offs: 00010  Access: public     Name: dlp [0A7]  Browser offset: 0000
+
+  MEMBER   Type: ruint32     Offs: 00018  Access: public     Name: hmodCur [0A8]  Browser offset: 0000
+
+  MEMBER   Type: 101C        Offs: 0001C  Access: public     Name: pfnCur [0A9]  Browser offset: 0000
+
+  MEMBER   Type: ruint32     Offs: 00020  Access: public     Name: dwLastError [0AA]  Browser offset: 0000
+
+
+
+04F73  Type: 1078  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 1079
+
+04F7F  Type: 1079  Len: 000A POINTER 
+  near32 *  (PtrType: 0A  PtrMode: 0)
+  Points to: 1076
+
+04F8B  Type: 107A  Len: 000A POINTER 
+  near32 &  (PtrType: 0A  PtrMode: 1)
+  Points to: 107B
+
+04F97  Type: 107B  Len: 000E PROCEDURE 
+  near stdcall returns 101C
+  Params: 0002  ArgList: 107C
+
+04FA7  Type: 107C  Len: 000C ARGLIST 
+  Type: 1062
+  Type: 1079
+
+
+04FB7  Type: 107D  Len: 000E PROCEDURE 
+  near fastcall returns void
+  Params: 0000  ArgList: 1000
+
+
+--------------------------------
+ModIndex: 0000  FileOffs: 04FC7  sstNames
+0001: SysInit
+0002: .Package1
+0003: SysInit.pas
+0004: C:\Projects\Ganymede\tp\runtime\rtl\sys\delayhlp.cpp
+0005: Target
+0006: Value
+0007: Result
+0008: @Sysinit@InterlockedExchange$qqsrii
+0009: @Sysinit@FreeLibrary$qqsui
+000A: @Sysinit@LocalAlloc$qqsii
+000B: @Sysinit@LocalFree$qqspv
+000C: @Sysinit@TlsAlloc$qqsv
+000D: @Sysinit@TlsFree$qqsi
+000E: @Sysinit@TlsGetValue$qqsi
+000F: @Sysinit@TlsSetValue$qqsipv
+0010: @Sysinit@GetLastError$qqsv
+0011: @Sysinit@LoadLibraryA$qqspc
+0012: @Sysinit@RaiseException$qqsuiuiuipui
+0013: @Sysinit@GetProcAddress$qqsuipc
+0014: Size
+0015: @Sysinit@AllocTlsBuffer$qqri
+0016: @Sysinit@GetTlsSize$qqrv
+0017: p
+0018: tlsSize
+0019: @Sysinit@InitThreadTLS$qqrv
+001A: @Sysinit@InitProcessTLS$qqrv
+001B: @Sysinit@ExitThreadTLS$qqrv
+001C: @Sysinit@ExitProcessTLS$qqrv
+001D: @Sysinit@InitializeModule$qqrv
+001E: @Sysinit@UninitializeModule$qqrv
+001F: @Sysinit@@_dbkDummyProc$qqrv
+0020: a01
+0021: a02
+0022: a03
+0023: a04
+0024: a05
+0025: a06
+0026: a07
+0027: a08
+0028: a09
+0029: a10
+002A: a11
+002B: a12
+002C: a13
+002D: a14
+002E: a15
+002F: a16
+0030: a17
+0031: a18
+0032: a19
+0033: a20
+0034: a21
+0035: a22
+0036: a23
+0037: a24
+0038: a25
+0039: a26
+003A: a27
+003B: a28
+003C: a29
+003D: a30
+003E: @Sysinit@@_dbkFCallArgs$qqrpvt1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1t1
+003F: @Sysinit@@_dbk_fcall_wrapper$qqrv
+0040: AHInst
+0041: Reason
+0042: Resvd
+0043: @Sysinit@@InitPkg$qqsuiipv
+0044: Table
+0045: @Sysinit@@PackageLoad$qqrxp23System@PackageInfoTable
+0046: @Sysinit@@PackageUnload$qqrxp23System@PackageInfoTable
+0047: @Sysinit@@_delayLoadHelper2$qqrv
+0048: @Sysinit@@_FUnloadDelayLoadedDLL2$qqrv
+0049: @Sysinit@@_HrLoadAllImportsForDll$qqrv
+004A: @Sysinit@ShutdownDelayHelp2$qqrv
+004B: @Sysinit@Finalization$qqrv
+004C: @Sysinit@initialization$qqrv
+004D: @Sysinit@ModuleIsLib
+004E: @Sysinit@ModuleIsPackage
+004F: @Sysinit@TlsIndex
+0050: @Sysinit@TlsLast
+0051: @Sysinit@HInstance
+0052: @Sysinit@dbkFCallWrapperAddr
+0053: @Sysinit@PtrToNil
+0054: @Sysinit@dliStartProcessing
+0055: @Sysinit@dliNoteStartProcessing
+0056: @Sysinit@dliNotePreLoadLibrary
+0057: @Sysinit@dliNotePreGetProcAddress
+0058: @Sysinit@dliFailLoadLibrary
+0059: @Sysinit@dliFailGetProcAddress
+005A: @Sysinit@dliNoteEndProcessing
+005B: @Sysinit@@_pfnDliNotifyHook2
+005C: @Sysinit@@_pfnDliFailureHook2
+005D: @Sysinit@kernel
+005E: @Sysinit@tlsArray
+005F: @Sysinit@LMEM_ZEROINIT
+0060: Cardinal
+0061: @Sysinit@PDWORD
+0062: @Sysinit@tlsBuffer
+0063: @Sysinit@NEG_ONE
+0064: @Sysinit@Module
+0065: @Sysinit@UseTlsAPI
+0066: @Sysinit@DLL_PROCESS_DETACH
+0067: @Sysinit@DLL_PROCESS_ATTACH
+0068: @Sysinit@DLL_THREAD_ATTACH
+0069: @Sysinit@DLL_THREAD_DETACH
+006A: @Sysinit@TlsProc
+006B: System
+006C: Sysinit
+006D: Package1.dpk
+006E: @Package1@@GetPackageInfoTable$qqrv
+006F: @Package1@@PackageLoad$qqrv
+0070: @Package1@@PackageUnload$qqrv
+0071: @System@LongBool
+0072: @System@PackageInfoTable
+0073: UnitCount
+0074: UnitInfo
+0075: TypeInfo
+0076: @System@UnitEntryTable
+0077: @System@PackageUnitEntry
+0078: Init
+0079: FInit
+007A: @System@TPackageTypeInfo
+007B: TypeCount
+007C: TypeTable
+007D: UnitNames
+007E: @System@TTypeTable
+007F: @System@ShortString
+0080: @System@TLibModule
+0081: Next
+0082: Instance
+0083: CodeInstance
+0084: DataInstance
+0085: ResInstance
+0086: Reserved
+0087: dliNotification
+0088: dliStartProcessing
+0089: dliNoteStartProcessing
+008A: dliNotePreLoadLibrary
+008B: dliNotePreGetProcAddress
+008C: dliFailLoadLibrary
+008D: dliFailGetProcAddress
+008E: dliNoteEndProcessing
+008F: string
+0090: TImageThunkData
+0091: ForwarderString
+0092: _Function
+0093: Ordinal
+0094: AddressOfData
+0095: ImgDelayDescr
+0096: grAttrs
+0097: szName
+0098: hmod
+0099: pIAT
+009A: pINT
+009B: pBoundIAT
+009C: pUnloadIAT
+009D: dwTimeStamp
+009E: DelayLoadProc
+009F: fImportByName
+00A0: szProcName
+00A1: dwOrdinal
+00A2: DelayLoadInfo
+00A3: cb
+00A4: pidd
+00A5: ppfn
+00A6: szDll
+00A7: dlp
+00A8: hmodCur
+00A9: pfnCur
+00AA: dwLastError
+
+
