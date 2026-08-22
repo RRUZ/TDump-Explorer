@@ -7,6 +7,8 @@ set "RSVARS=%STUDIO_ROOT%\bin\rsvars.bat"
 set "PROJECT_ROOT=%~dp0.."
 set "CONSOLE_SOURCE=%PROJECT_ROOT%\tests\TDumpParserConsole.dpr"
 set "CONSOLE_EXE=%PROJECT_ROOT%\tests\TDumpParserConsole.exe"
+set "TESTS_SOURCE=%PROJECT_ROOT%\tests\TDumpParserTests.dpr"
+set "TESTS_EXE=%PROJECT_ROOT%\tests\TDumpParserTests.exe"
 set "RUNNER_SOURCE=%PROJECT_ROOT%\tests\TDumpRunnerConsole.dpr"
 set "RUNNER_EXE=%PROJECT_ROOT%\tests\TDumpRunnerConsole.exe"
 set "FINDER_SOURCE=%PROJECT_ROOT%\tests\TDumpFinderConsole.dpr"
@@ -77,6 +79,40 @@ exit /b 0
 :BUILD
 call :BUILD_CONSOLE
 exit /b %ERRORLEVEL%
+
+:BUILD_TESTS
+call :INIT_RAD_STUDIO
+if errorlevel 1 exit /b 1
+
+if not exist "%TESTS_SOURCE%" (
+  echo Parser assertion source was not found:
+  echo   %TESTS_SOURCE%
+  exit /b 1
+)
+
+echo Building TDumpParserTests ^(Win32 Debug^)...
+set "INTERMEDIATE_DIR=%INTERMEDIATE_ROOT%\%RANDOM%%RANDOM%"
+if not exist "%INTERMEDIATE_DIR%" mkdir "%INTERMEDIATE_DIR%"
+if not exist "%INTERMEDIATE_DIR%" (
+  echo Unable to create the intermediate output directory:
+  echo   %INTERMEDIATE_DIR%
+  exit /b 1
+)
+pushd "%PROJECT_ROOT%\tests"
+if errorlevel 1 exit /b 1
+dcc32.exe -B -Q -N"%INTERMEDIATE_DIR%" "TDumpParserTests.dpr"
+set "BUILD_RESULT=%ERRORLEVEL%"
+popd
+if not "%BUILD_RESULT%"=="0" exit /b %BUILD_RESULT%
+
+if not exist "%TESTS_EXE%" (
+  echo Build completed, but the expected assertion executable was not found:
+  echo   %TESTS_EXE%
+  exit /b 1
+)
+
+echo Build succeeded: %TESTS_EXE%
+exit /b 0
 
 :BUILD_RUNNER
 call :INIT_RAD_STUDIO
@@ -246,18 +282,11 @@ if errorlevel 1 exit /b 1
 exit /b %ERRORLEVEL%
 
 :TEST
-call :BUILD_CONSOLE
+call :BUILD_TESTS
 if errorlevel 1 exit /b 1
 
-rem Extend this fixture list as assertion-based parser tests are added.
-for %%F in (
-  "%PROJECT_ROOT%\fixtures\PlainVanilla.Delphi.Package.bpl.tdump"
-  "%PROJECT_ROOT%\fixtures\PlainVanilla.VCL.Application.tdump"
-) do (
-  echo Running console smoke test: %%~nxF
-  echo.|"%CONSOLE_EXE%" "%%~fF"
-  if errorlevel 1 exit /b 1
-)
+echo Running parser assertion suite...
+"%TESTS_EXE%"
 exit /b 0
 
 :PROFILE

@@ -14,6 +14,8 @@ type
     SizeBytes: Int64;
     LineCount: Integer;
     DiagnosticCount: Integer;
+    RelocationCount: Integer;
+    UnsupportedStructureCount: Integer;
     UnsupportedStructures: TArray<string>;
     TotalMilliseconds: Double;
   end;
@@ -87,9 +89,13 @@ begin
       begin
         Result.LineCount := LDocument.Lines.Count;
         Result.DiagnosticCount := LDocument.Diagnostics.Count;
-        SetLength(Result.UnsupportedStructures,
-          LDocument.UnsupportedStructures.Count);
-        for var LIndex := 0 to LDocument.UnsupportedStructures.Count - 1 do
+        Result.RelocationCount := LDocument.Relocations.Count;
+        Result.UnsupportedStructureCount := LDocument.UnsupportedStructures.Count;
+        var LSampleCount := Result.UnsupportedStructureCount;
+        if LSampleCount > 10 then
+          LSampleCount := 10;
+        SetLength(Result.UnsupportedStructures, LSampleCount);
+        for var LIndex := 0 to LSampleCount - 1 do
         begin
           var LStructure := LDocument.UnsupportedStructures[LIndex];
           Result.UnsupportedStructures[LIndex] := 'line ' +
@@ -116,10 +122,14 @@ begin
     ' lines, ', AIterations, ' runs, total ', FormatFloat('0.000',
     AProfile.TotalMilliseconds), ' ms, average ', FormatFloat('0.000',
     LAverageMilliseconds), ' ms, ', FormatFloat('0.000', LThroughput),
-    ' MiB/s, diagnostics ', AProfile.DiagnosticCount, ', unsupported ',
-    Length(AProfile.UnsupportedStructures));
+    ' MiB/s, relocations ', AProfile.RelocationCount, ', diagnostics ',
+    AProfile.DiagnosticCount, ', unsupported ',
+    AProfile.UnsupportedStructureCount);
   for var LStructure in AProfile.UnsupportedStructures do
     Writeln('  Unsupported ', LStructure);
+  if Length(AProfile.UnsupportedStructures) < AProfile.UnsupportedStructureCount then
+    Writeln('  ... ', AProfile.UnsupportedStructureCount -
+      Length(AProfile.UnsupportedStructures), ' more unsupported block(s)');
 end;
 
 begin

@@ -120,6 +120,26 @@ begin
   Writeln;
 end;
 
+procedure DumpRelocations(const ADocument: TDumpDocument);
+begin
+  Writeln('Relocations: ', ADocument.Relocations.Count);
+  var LLimit := ADocument.Relocations.Count;
+  if LLimit > 20 then
+    LLimit := 20;
+  for var LIndex := 0 to LLimit - 1 do
+  begin
+    var LRelocation := ADocument.Relocations[LIndex];
+    Write('  block ', LRelocation.BlockIndex, ' page=',
+      IntToHex(LRelocation.PageRVA, 8), ' ', LRelocation.RelocationType);
+    if LRelocation.HasOffset then
+      Write(' +', IntToHex(LRelocation.Offset, 4));
+    Writeln;
+  end;
+  if LLimit < ADocument.Relocations.Count then
+    Writeln('  ... ', ADocument.Relocations.Count - LLimit, ' more entries');
+  Writeln;
+end;
+
 procedure DumpSectionMetadata(const ATitle: string;
   const AMetadata: TDumpSectionMetadata);
 begin
@@ -308,6 +328,37 @@ begin
   Writeln;
 end;
 
+procedure DumpDebugInformation(const ADocument: TDumpDocument);
+begin
+  if ADocument.DebugInformation = nil then
+  begin
+    Writeln('Debug information: none');
+    Writeln;
+    Exit;
+  end;
+  Writeln('Debug source modules: ',
+    ADocument.DebugInformation.SourceModules.Count);
+  Writeln('Normalized methods: ', ADocument.DebugInformation.Methods.Count);
+  var LLimit := ADocument.DebugInformation.Methods.Count;
+  if LLimit > 20 then
+    LLimit := 20;
+  for var LIndex := 0 to LLimit - 1 do
+  begin
+    var LMethod := ADocument.DebugInformation.Methods[LIndex];
+    Write('  ', LMethod.Name, ' @ ', LMethod.Address,
+      ' lines ', LMethod.SourceSpan.StartLine, '..', LMethod.SourceSpan.EndLine);
+    if LMethod.SourceFileName <> '' then
+      Write('  ', LMethod.SourceFileName);
+    if LMethod.HasSourceLine then
+      Write(':', LMethod.SourceLine);
+    Writeln;
+  end;
+  if LLimit < ADocument.DebugInformation.Methods.Count then
+    Writeln('  ... ', ADocument.DebugInformation.Methods.Count - LLimit,
+      ' more method(s)');
+  Writeln;
+end;
+
 begin
   ReportMemoryLeaksOnShutdown := True;
   try
@@ -336,6 +387,12 @@ begin
         Writeln('Import modules: ', LDocument.Imports.Count);
         Writeln('Exports: ', LDocument.ExportList.Count);
         Writeln('Resources: ', LDocument.Resources.Count);
+        Writeln('Relocations: ', LDocument.Relocations.Count);
+        Writeln('Strings: ', LDocument.Strings.Count);
+        Writeln('Object records: ', LDocument.ObjectRecords.Count);
+        Writeln('Library members: ', LDocument.LibraryMembers.Count);
+        Writeln('Mach architectures: ', LDocument.MachArchitectures.Count);
+        Writeln('Mach load commands: ', LDocument.MachLoadCommands.Count);
         Writeln('Symbol subsections: ', LDocument.SymbolSubsections.Count);
         Writeln('Symbol modules: ', LDocument.SymbolModules.Count);
         Writeln('Source modules: ', LDocument.SourceModules.Count);
@@ -347,6 +404,10 @@ begin
         Writeln('Borland names: ', LDocument.BorlandNames.Count);
         Writeln('Borland name resolver entries: ', LDocument.BorlandNameLookup.Count);
         Writeln('Symbols: ', LDocument.Symbols.Count);
+        if LDocument.DebugInformation <> nil then
+          Writeln('Normalized methods: ', LDocument.DebugInformation.Methods.Count)
+        else
+          Writeln('Normalized methods: 0');
         Writeln;
 
         for var LIndex := 0 to LDocument.Headers.Count - 1 do
@@ -360,6 +421,7 @@ begin
         DumpExports(LDocument);
         DumpSectionMetadata('Resource', LDocument.ResourceMetadata);
         DumpResources(LDocument);
+        DumpRelocations(LDocument);
         DumpSymbolSubsections(LDocument);
         DumpSymbolModules(LDocument);
         DumpSourceModules(LDocument);
@@ -368,6 +430,7 @@ begin
         DumpGlobalTypeSections(LDocument);
         DumpBorlandNames(LDocument);
         DumpSymbols(LDocument);
+        DumpDebugInformation(LDocument);
 
         if LDocument.Diagnostics.Count > 0 then
         begin

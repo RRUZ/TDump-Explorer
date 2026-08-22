@@ -25,6 +25,15 @@ begin
   Writeln('Import modules: ', ADocument.Imports.Count);
   Writeln('Exports: ', ADocument.ExportList.Count);
   Writeln('Resources: ', ADocument.Resources.Count);
+  Writeln('Relocations: ', ADocument.Relocations.Count);
+  Writeln('Strings: ', ADocument.Strings.Count);
+  Writeln('Object records: ', ADocument.ObjectRecords.Count);
+  Writeln('Library members: ', ADocument.LibraryMembers.Count);
+  Writeln('Mach load commands: ', ADocument.MachLoadCommands.Count);
+  if ADocument.DebugInformation <> nil then
+    Writeln('Normalized methods: ', ADocument.DebugInformation.Methods.Count)
+  else
+    Writeln('Normalized methods: 0');
   Writeln('Diagnostics: ', ADocument.Diagnostics.Count);
   Writeln('Unsupported structures: ', ADocument.UnsupportedStructures.Count);
 end;

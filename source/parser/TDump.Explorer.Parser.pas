@@ -32,6 +32,9 @@ type
     nkDisassembly, nkHexDump, nkUnknown);
   TDumpValueKind = (vkUnknown, vkText, vkUInt, vkAddress, vkRVA, vkFileOffset,
     vkOrdinal, vkSize);
+  // Selects the only valid numeric base for a TDUMP field.
+  // Ambiguous values remain raw instead of being guessed from their spelling.
+  TDumpNumericContext = (ncAmbiguous, ncDecimal, ncHexadecimal);
   TDumpDiagnosticSeverity = (dsInfo, dsWarning, dsError);
   TDumpParserProgressPhase = (ppPreparing, ppLineCatalog, ppSemanticModel,
     ppBorlandSymbols, ppComplete);
@@ -50,13 +53,36 @@ type
     tlkNameEntry, tlkSeparator, tlkHeaderDetail, tlkDataDirectoryDetail,
     tlkObjectTable, tlkObjectTableDetail, tlkImportDetail, tlkExportDetail,
     tlkResourceDetail, tlkModuleDetail, tlkSourceModuleDetail,
-    tlkGlobalSymbolDetail, tlkText, tlkUnknown);
+    tlkGlobalSymbolDetail, tlkRelocation, tlkText, tlkUnknown);
 
   TDumpGlobalTypeRecord = class;
   TDumpGlobalTypeMember = class;
   TDumpGlobalTypeDetail = class;
   TDumpLine = class;
   TDumpNode = class;
+  TDumpBorlandSymbolRecord = class;
+  TDumpDocument = class;
+  TDumpRun = class;
+
+  // Identifies a contiguous source range from one TDUMP invocation.
+  // Raw text remains document-owned; the run provides provenance without copies.
+  TDumpSourceSpan = record
+    Run: TDumpRun;
+    StartLine: Integer;
+    EndLine: Integer;
+    function IsValid: Boolean;
+  end;
+
+  // Captures one parsed TDUMP invocation. A document owns its runs and may later
+  // combine projections from several runs without losing their original source.
+  TDumpRun = class
+  public
+    Document: TDumpDocument;
+    SourceFileName: string;
+    ToolKind: TDumpToolKind;
+    ToolVersion: string;
+    CommandLine: string;
+  end;
 
   // Reports parser progress in source-line units for long-running consumers.
   // The callback is optional and receives only throttled, monotonic updates.
@@ -92,6 +118,7 @@ type
     Description: string;
     SourceLine: TDumpLine;
     Node: TDumpNode;
+    SourceSpan: TDumpSourceSpan;
   end;
 
   // Provides the typed lexical projection of one physical source line.
@@ -103,6 +130,7 @@ type
     Kind: TDumpLineKind;
     Tokens: TList<string>;
     Properties: TList<TDumpProperty>;
+    SourceSpan: TDumpSourceSpan;
     constructor Create;
     destructor Destroy; override;
   end;
@@ -154,6 +182,7 @@ type
     RawRVA: string;
     RawSize: string;
     StartLine: Integer;
+    SourceSpan: TDumpSourceSpan;
   end;
 
   // Forms the generic, hierarchical TDUMP document tree.
@@ -164,6 +193,7 @@ type
     Title: string;
     StartLine: Integer;
     EndLine: Integer;
+    SourceSpan: TDumpSourceSpan;
     Properties: TList<TDumpProperty>;
     Children: TObjectList<TDumpNode>;
     RawText: string;
@@ -179,6 +209,7 @@ type
     Properties: TList<TDumpProperty>;
     StartLine: Integer;
     EndLine: Integer;
+    SourceSpan: TDumpSourceSpan;
     constructor Create;
     destructor Destroy; override;
   end;
@@ -197,6 +228,7 @@ type
     FlagsText: string;
     Properties: TList<TDumpProperty>;
     StartLine: Integer;
+    SourceSpan: TDumpSourceSpan;
     constructor Create;
     destructor Destroy; override;
   end;
@@ -218,6 +250,7 @@ type
     DemangledName: string;
     RawText: string;
     StartLine: Integer;
+    SourceSpan: TDumpSourceSpan;
   end;
 
   // Owns all import entries emitted for one imported module.
@@ -229,6 +262,7 @@ type
     Properties: TList<TDumpProperty>;
     StartLine: Integer;
     EndLine: Integer;
+    SourceSpan: TDumpSourceSpan;
     constructor Create;
     destructor Destroy; override;
   end;
@@ -250,6 +284,7 @@ type
     Properties: TList<TDumpProperty>;
     RawText: string;
     StartLine: Integer;
+    SourceSpan: TDumpSourceSpan;
     constructor Create;
     destructor Destroy; override;
   end;
@@ -269,6 +304,7 @@ type
     Node: TDumpNode;
     StartLine: Integer;
     EndLine: Integer;
+    SourceSpan: TDumpSourceSpan;
     constructor Create;
     destructor Destroy; override;
   end;
@@ -304,6 +340,81 @@ type
     Children: TObjectList<TDumpResource>;
     StartLine: Integer;
     EndLine: Integer;
+    SourceSpan: TDumpSourceSpan;
+    constructor Create;
+    destructor Destroy; override;
+  end;
+
+  // Represents one relocation entry emitted by TDUMP's relocation display.
+  // Block metadata and the entry's relative offset retain their raw source text.
+  TDumpRelocation = class
+  public
+    BlockIndex: UInt64;
+    HasBlockIndex: Boolean;
+    PageRVA: UInt64;
+    HasPageRVA: Boolean;
+    BlockSize: UInt64;
+    HasBlockSize: Boolean;
+    Offset: UInt64;
+    HasOffset: Boolean;
+    RelocationType: string;
+    RawOffset: string;
+    StartLine: Integer;
+    SourceSpan: TDumpSourceSpan;
+  end;
+
+  // Represents one printable string emitted by TDUMP's strings display.
+  TDumpStringEntry = class
+  public
+    Offset: UInt64;
+    HasOffset: Boolean;
+    Value: string;
+    StartLine: Integer;
+    SourceSpan: TDumpSourceSpan;
+  end;
+
+  // Represents an OMF/COFF-style record heading without duplicating its body.
+  TDumpObjectRecord = class
+  public
+    Offset: UInt64;
+    HasOffset: Boolean;
+    RawOffset: string;
+    RecordKind: string;
+    StartLine: Integer;
+    EndLine: Integer;
+    SourceSpan: TDumpSourceSpan;
+  end;
+
+  // Identifies one OMF library member introduced by a THEADR record.
+  TDumpLibraryMember = class
+  public
+    Name: string;
+    StartLine: Integer;
+    EndLine: Integer;
+    SourceSpan: TDumpSourceSpan;
+  end;
+
+  // Identifies one architecture in a Mach FAT binary display.
+  TDumpMachArchitecture = class
+  public
+    CPUType: string;
+    CPUSubtype: string;
+    Offset: UInt64;
+    HasOffset: Boolean;
+    StartLine: Integer;
+    EndLine: Integer;
+    SourceSpan: TDumpSourceSpan;
+  end;
+
+  // Represents a Mach load command and its typed key/value rows.
+  TDumpMachLoadCommand = class
+  public
+    Index: Integer;
+    Name: string;
+    Properties: TList<TDumpProperty>;
+    StartLine: Integer;
+    EndLine: Integer;
+    SourceSpan: TDumpSourceSpan;
     constructor Create;
     destructor Destroy; override;
   end;
@@ -323,6 +434,9 @@ type
     Properties: TList<TDumpProperty>;
     RawText: string;
     StartLine: Integer;
+    SourceSpan: TDumpSourceSpan;
+    Node: TDumpNode;
+    RecordModel: TDumpBorlandSymbolRecord;
     constructor Create;
     destructor Destroy; override;
   end;
@@ -615,6 +729,53 @@ type
     EndLine: Integer;
   end;
 
+  // Provides a normalized, consumer-oriented view of a procedure symbol.
+  // Symbol, Node, and source objects remain owned by their original models.
+  TDumpMethod = class
+  public
+    Name: string;
+    MangledName: string;
+    DemangledName: string;
+    Address: UInt64;
+    HasAddress: Boolean;
+    EndAddress: UInt64;
+    HasEndAddress: Boolean;
+    SourceFileName: string;
+    SourceLine: Integer;
+    HasSourceLine: Boolean;
+    Symbol: TDumpSymbol;
+    RecordModel: TDumpBorlandSymbolRecord;
+    SourceModule: TDumpSourceModule;
+    SourceFile: TDumpSourceFile;
+    Node: TDumpNode;
+    SourceSpan: TDumpSourceSpan;
+  end;
+
+  // Aggregates the currently supported debug projections without copying raw
+  // TDUMP text or replacing the specialized Borland models.
+  TDumpDebugInformation = class
+  public
+    SourceModules: TList<TDumpSourceModule>;
+    Methods: TObjectList<TDumpMethod>;
+    Node: TDumpNode;
+    SourceSpan: TDumpSourceSpan;
+    constructor Create;
+    destructor Destroy; override;
+  end;
+
+  TDumpMergeConflictKind = (mckSourceText, mckToolDialect);
+
+  // A non-owning aggregate over independently parsed documents. Its lifetime
+  // is bounded by the supplied documents; it never copies raw TDUMP text.
+  TDumpDocumentMerge = class
+  public
+    Documents: TList<TDumpDocument>;
+    Runs: TList<TDumpRun>;
+    Conflicts: TList<string>;
+    constructor Create;
+    destructor Destroy; override;
+  end;
+
   // Stores one index/value pair from the shared Borland sstNames table.
   // Other models resolve their name indexes through the document lookup dictionary.
   TDumpBorlandName = record
@@ -635,6 +796,8 @@ type
     FileKind: TDumpFileKind;
     Architecture: string;
     RawText: string;
+    Runs: TObjectList<TDumpRun>;
+    PrimaryRun: TDumpRun;
     Lines: TObjectList<TDumpLine>;
     Headers: TObjectList<TDumpHeader>;
     DataDirectories: TList<TDumpDataDirectory>;
@@ -645,10 +808,17 @@ type
     ExportMetadata: TDumpSectionMetadata;
     ResourceMetadata: TDumpSectionMetadata;
     Resources: TObjectList<TDumpResource>;
+    Relocations: TObjectList<TDumpRelocation>;
+    Strings: TObjectList<TDumpStringEntry>;
+    ObjectRecords: TObjectList<TDumpObjectRecord>;
+    LibraryMembers: TObjectList<TDumpLibraryMember>;
+    MachArchitectures: TObjectList<TDumpMachArchitecture>;
+    MachLoadCommands: TObjectList<TDumpMachLoadCommand>;
     Symbols: TObjectList<TDumpSymbol>;
     SymbolSubsections: TList<TDumpSymbolSubsection>;
     SymbolModules: TObjectList<TDumpSymbolModule>;
     SourceModules: TObjectList<TDumpSourceModule>;
+    DebugInformation: TDumpDebugInformation;
     AlignSymbolSections: TObjectList<TDumpAlignSymbolSection>;
     SymbolSearches: TObjectList<TDumpSymbolSearch>;
     GlobalSymbolSections: TObjectList<TDumpGlobalSymbolSection>;
@@ -661,6 +831,7 @@ type
     UnsupportedStructures: TObjectList<TDumpUnsupportedStructure>;
     constructor Create;
     destructor Destroy; override;
+    function MergeWith(AOther: TDumpDocument): TDumpDocumentMerge;
   end;
 
   // Parses TDUMP text into a lossless document plus typed semantic projections.
@@ -678,7 +849,13 @@ type
       ALineNumber: Integer; const AMessage, ARawLine: string);
     procedure AddUnsupportedStructure(AKind: TDumpUnsupportedStructureKind;
       ALineNumber: Integer; const ADescription: string);
+    procedure AddUnknownBlock(AKind: TDumpUnsupportedStructureKind;
+      AStartLine, AEndLine: Integer; const ADescription: string);
     procedure DetectUnsupportedStructures;
+    procedure BuildGenericFallbackBlocks;
+    procedure AttachRunProvenance;
+    procedure AttachNodeSourceSpans(ANode: TDumpNode; ARun: TDumpRun);
+    procedure AttachResourceSourceSpans(AResource: TDumpResource; ARun: TDumpRun);
     procedure ReportProgress(APhase: TDumpParserProgressPhase;
       ACompletedLines: Integer);
     procedure ParseMetadata;
@@ -688,9 +865,16 @@ type
     procedure ParseImportSection;
     procedure ParseExportSection;
     procedure ParseResourceSection;
+    procedure ParseRelocationSection;
     procedure ParseBorlandSymbolTable;
+    procedure BuildDebugInformation;
+    procedure ParseStrings;
+    procedure ParseOMF;
+    procedure ParseMach;
+    procedure ParseELF;
     procedure BuildLineCatalog;
     function ClassifyTDumpLine(const ALine: string): TDumpLineKind;
+    function IsGenericBlockHeading(const ALine: string): Boolean;
     function IsKnownTopLevelHeading(const ALine: string): Boolean;
     function TryParsePropertyLine(const ALine: string; ALineNumber: Integer;
       out AProperty: TDumpProperty): Boolean;
@@ -704,6 +888,10 @@ type
       out AExport: TDumpExport): Boolean;
     function TryParseResourceLine(const ALine: string; ALineNumber: Integer;
       out AIndent: Integer; out AResource: TDumpResource): Boolean;
+    function TryParseRelocationBlock(const ALine: string; out ABlockIndex,
+      APageRVA, ABlockSize: UInt64): Boolean;
+    function TryParseRelocationEntry(const AToken: string; ALineNumber: Integer;
+      ABlockIndex, APageRVA, ABlockSize: UInt64; out ARelocation: TDumpRelocation): Boolean;
     function TryParseBorlandSymbolLine(const ARecordKind, ALine: string;
       ALineNumber: Integer; out ASymbol: TDumpSymbol): Boolean;
     function TryParseBorlandSymbolSearchLine(const ALine: string;
@@ -734,6 +922,8 @@ type
       const ARecordKind: string): TDumpBorlandSymbolRecordKind;
     function TryParseUIntToken(const AToken: string; out AValue: UInt64): Boolean;
     function TryParseHexUIntToken(const AToken: string; out AValue: UInt64): Boolean;
+    function TryParseNumericToken(const AToken: string;
+      AContext: TDumpNumericContext; out AValue: UInt64): Boolean;
     function PropertyValueKind(const AName: string): TDumpValueKind;
   public
     constructor Create;
@@ -794,6 +984,62 @@ begin
   Result := SameText(Copy(S, 1, Length(Prefix)), Prefix);
 end;
 
+function NormalizeTDumpHeading(const AText: string): string;
+begin
+  Result := '';
+  var LPendingSpace := False;
+  for var LCharacter in Trim(AText) do
+    if CharInSet(LCharacter, ['A'..'Z', 'a'..'z', '0'..'9']) then
+    begin
+      if LPendingSpace and (Result <> '') then
+        Result := Result + ' ';
+      Result := Result + LowerCase(LCharacter);
+      LPendingSpace := False;
+    end
+    else
+      LPendingSpace := True;
+end;
+
+function IsOldExecutableHeaderHeading(const ALine: string): Boolean;
+begin
+  var LHeading := NormalizeTDumpHeading(ALine);
+  Result := (LHeading = 'old executable header') or
+    (LHeading = 'old executable mz header') or (LHeading = 'mz header');
+end;
+
+function IsPortableExecutableHeaderHeading(const ALine: string): Boolean;
+begin
+  var LHeading := NormalizeTDumpHeading(ALine);
+  Result := (LHeading = 'portable executable pe file') or
+    (LHeading = 'portable executable file') or (LHeading = 'pe header') or
+    (LHeading = 'portable executable header');
+end;
+
+function IsObjectTableHeading(const ALine: string): Boolean;
+begin
+  var LHeading := NormalizeTDumpHeading(ALine);
+  Result := (LHeading = 'object table') or (LHeading = 'object table header') or
+    (LHeading = 'section table') or (LHeading = 'section headers');
+end;
+
+function IsDataDirectoryColumnHeading(const ALine: string): Boolean;
+begin
+  var LHeading := NormalizeTDumpHeading(ALine);
+  Result := (Pos('name', LHeading) > 0) and (Pos('rva', LHeading) > 0) and
+    (Pos('size', LHeading) > 0) and
+    ((LHeading = 'name rva size') or
+     (LHeading = 'directory name rva size') or
+     (LHeading = 'data directory name rva size'));
+end;
+
+function IsObjectTableColumnHeading(const ALine: string): Boolean;
+begin
+  var LHeading := NormalizeTDumpHeading(ALine);
+  Result := (Pos('name', LHeading) > 0) and
+    ((Pos('virt', LHeading) > 0) or (Pos('virtual', LHeading) > 0)) and
+    ((Pos('rva', LHeading) > 0) or (Pos('address', LHeading) > 0));
+end;
+
 procedure AppendNodeRawLine(const ANode: TDumpNode; const ALine: string);
 begin
   if ANode.RawText <> '' then
@@ -808,6 +1054,13 @@ begin
     Exit('');
   var LValueText := Copy(ALine, LLabelPos + Length(ALabel), MaxInt);
   Result := FirstToken(LValueText);
+end;
+
+{ TDumpSourceSpan }
+
+function TDumpSourceSpan.IsValid: Boolean;
+begin
+  Result := (Run <> nil) and (StartLine >= 1) and (EndLine >= StartLine);
 end;
 
 { TDumpNode }
@@ -1112,6 +1365,54 @@ begin
   inherited;
 end;
 
+{ TDumpMachLoadCommand }
+
+constructor TDumpMachLoadCommand.Create;
+begin
+  inherited Create;
+  Properties := TList<TDumpProperty>.Create;
+end;
+
+destructor TDumpMachLoadCommand.Destroy;
+begin
+  Properties.Free;
+  inherited;
+end;
+
+{ TDumpDebugInformation }
+
+constructor TDumpDebugInformation.Create;
+begin
+  inherited Create;
+  SourceModules := TList<TDumpSourceModule>.Create;
+  Methods := TObjectList<TDumpMethod>.Create(True);
+end;
+
+destructor TDumpDebugInformation.Destroy;
+begin
+  Methods.Free;
+  SourceModules.Free;
+  inherited;
+end;
+
+{ TDumpDocumentMerge }
+
+constructor TDumpDocumentMerge.Create;
+begin
+  inherited Create;
+  Documents := TList<TDumpDocument>.Create;
+  Runs := TList<TDumpRun>.Create;
+  Conflicts := TList<string>.Create;
+end;
+
+destructor TDumpDocumentMerge.Destroy;
+begin
+  Conflicts.Free;
+  Runs.Free;
+  Documents.Free;
+  inherited;
+end;
+
 { TDumpDocument }
 
 constructor TDumpDocument.Create;
@@ -1119,6 +1420,8 @@ begin
   inherited Create;
   ToolKind := tkUnknown;
   FileKind := dfUnknown;
+  Runs := TObjectList<TDumpRun>.Create(True);
+  PrimaryRun := nil;
   Lines := TObjectList<TDumpLine>.Create(True);
   Headers := TObjectList<TDumpHeader>.Create(True);
   DataDirectories := TList<TDumpDataDirectory>.Create;
@@ -1129,10 +1432,17 @@ begin
   ExportMetadata := nil;
   ResourceMetadata := nil;
   Resources := TObjectList<TDumpResource>.Create(True);
+  Relocations := TObjectList<TDumpRelocation>.Create(True);
+  Strings := TObjectList<TDumpStringEntry>.Create(True);
+  ObjectRecords := TObjectList<TDumpObjectRecord>.Create(True);
+  LibraryMembers := TObjectList<TDumpLibraryMember>.Create(True);
+  MachArchitectures := TObjectList<TDumpMachArchitecture>.Create(True);
+  MachLoadCommands := TObjectList<TDumpMachLoadCommand>.Create(True);
   Symbols := TObjectList<TDumpSymbol>.Create(True);
   SymbolSubsections := TList<TDumpSymbolSubsection>.Create;
   SymbolModules := TObjectList<TDumpSymbolModule>.Create(True);
   SourceModules := TObjectList<TDumpSourceModule>.Create(True);
+  DebugInformation := nil;
   AlignSymbolSections := TObjectList<TDumpAlignSymbolSection>.Create(True);
   SymbolSearches := TObjectList<TDumpSymbolSearch>.Create(True);
   GlobalSymbolSections := TObjectList<TDumpGlobalSymbolSection>.Create(True);
@@ -1158,10 +1468,17 @@ begin
   GlobalSymbolSections.Free;
   SymbolSearches.Free;
   AlignSymbolSections.Free;
+  DebugInformation.Free;
   SourceModules.Free;
   SymbolModules.Free;
   SymbolSubsections.Free;
   Symbols.Free;
+  MachLoadCommands.Free;
+  MachArchitectures.Free;
+  LibraryMembers.Free;
+  ObjectRecords.Free;
+  Strings.Free;
+  Relocations.Free;
   Resources.Free;
   ResourceMetadata.Free;
   ExportMetadata.Free;
@@ -1171,7 +1488,29 @@ begin
   Sections.Free;
   DataDirectories.Free;
   Headers.Free;
+  Runs.Free;
   inherited;
+end;
+
+function TDumpDocument.MergeWith(AOther: TDumpDocument): TDumpDocumentMerge;
+begin
+  Result := TDumpDocumentMerge.Create;
+  Result.Documents.Add(Self);
+  if (AOther <> nil) and (AOther <> Self) then
+    Result.Documents.Add(AOther);
+  for var LDocument in Result.Documents do
+    for var LRun in LDocument.Runs do
+      Result.Runs.Add(LRun);
+  if (AOther = nil) or (AOther = Self) then
+    Exit;
+  if SameText(SourceFileName, AOther.SourceFileName) and
+    (RawText <> AOther.RawText) then
+    Result.Conflicts.Add('Source file has different TDUMP text across runs: ' +
+      SourceFileName);
+  if (ToolKind <> tkUnknown) and (AOther.ToolKind <> tkUnknown) and
+    (ToolKind <> AOther.ToolKind) then
+    Result.Conflicts.Add('TDUMP dialect differs across runs for: ' +
+      SourceFileName + ' / ' + AOther.SourceFileName);
 end;
 
 { TDumpParser }
@@ -1211,11 +1550,12 @@ begin
     Exit(tlkBlank);
   if StartsWithText(LTrimmed, '---') or StartsWithText(LTrimmed, '***') then
     Exit(tlkSeparator);
-  if StartsWithText(LTrimmed, 'Turbo Dump') then
+  if StartsWithText(LTrimmed, 'Turbo Dump') or
+    StartsWithText(LTrimmed, 'TDUMP') then
     Exit(tlkMetadata);
   if StartsWithText(LTrimmed, 'Data directory') then
     Exit(tlkDataDirectory);
-  if StartsWithText(LTrimmed, 'Object table') then
+  if IsObjectTableHeading(LTrimmed) then
     Exit(tlkObjectTable);
   if StartsWithText(LTrimmed, 'ModIndex:') then
     Exit(tlkBorlandSubsection);
@@ -1236,16 +1576,68 @@ begin
   end;
   if StartsWithText(LTrimmed, 'Section:') then
     Exit(tlkSection);
-  if StartsWithText(LTrimmed, 'Imports from ') then
+  if StartsWithText(LTrimmed, 'Imports from ') or StartsWithText(LTrimmed, 'IMPORT:') then
     Exit(tlkImport);
-  if StartsWithText(LTrimmed, 'Exports from ') then
+  if StartsWithText(LTrimmed, 'Exports from ') or StartsWithText(LTrimmed, 'EXPORT ') then
     Exit(tlkExport);
+  if StartsWithText(LTrimmed, 'Block #') or StartsWithText(LTrimmed, 'PTR ') or
+    StartsWithText(LTrimmed, 'ABS ') or StartsWithText(LTrimmed, 'DIR64 ') then
+    Exit(tlkRelocation);
   if StartsWithText(LTrimmed, 'type:') or (Pos('named entries', LTrimmed) > 0) then
     Exit(tlkResource);
-  if SameText(LTrimmed, SOldExecutableHeader) or
-    SameText(LTrimmed, SPortableExecutableHeader) then
+  if IsOldExecutableHeaderHeading(LTrimmed) or
+    IsPortableExecutableHeaderHeading(LTrimmed) then
     Exit(tlkHeader);
   Result := tlkText;
+end;
+
+function TDumpParser.IsGenericBlockHeading(const ALine: string): Boolean;
+begin
+  var LTrimmed := Trim(ALine);
+  if LTrimmed = '' then
+    Exit(False);
+  Result := StartsWithText(LTrimmed, 'Section:') or
+    StartsWithText(LTrimmed, 'Fixup Table') or
+    StartsWithText(LTrimmed, 'IMPORT:') or StartsWithText(LTrimmed, 'EXPORT ') or
+    StartsWithText(LTrimmed, 'Block #') or StartsWithText(LTrimmed, '#');
+  if Result then
+    Exit;
+  var LSeparatorOnly := True;
+  var LSeparatorCount := 0;
+  for var LSeparatorCharacter in LTrimmed do
+    if CharInSet(LSeparatorCharacter, ['-', '=', '*', '_']) then
+      Inc(LSeparatorCount)
+    else
+      LSeparatorOnly := False;
+  if LSeparatorOnly and (LSeparatorCount >= 3) then
+    Exit(True);
+  if (ALine = LTrimmed) and (Pos(' Binary', LTrimmed) > 0) then
+    Exit(True);
+  if (ALine = LTrimmed) and EndsText(':', LTrimmed) then
+  begin
+    var LLowerCase := LowerCase(LTrimmed);
+    if (Pos('table', LLowerCase) > 0) or
+      (Pos('directory', LLowerCase) > 0) or
+      (Pos('commands', LLowerCase) > 0) or
+      (Pos('records', LLowerCase) > 0) or
+      (Pos('header', LLowerCase) > 0) then
+      Exit(True);
+  end;
+  var LRecordText := LTrimmed;
+  var LRecordOffset := FirstToken(LRecordText);
+  var LRecordKind := FirstToken(LRecordText);
+  if (Length(LRecordOffset) >= 6) and (LRecordKind <> '') then
+  begin
+    Result := True;
+    for var LHexCharacter in LRecordOffset do
+      if not CharInSet(LHexCharacter, ['0'..'9', 'A'..'F', 'a'..'f']) then
+      begin
+        Result := False;
+        Break;
+      end;
+  end
+  else
+    Result := False;
 end;
 
 procedure TDumpParser.BuildLineCatalog;
@@ -1315,6 +1707,10 @@ begin
   try
     FDocument.SourceFileName := ASourceFileName;
     FDocument.RawText := AText;
+    FDocument.PrimaryRun := TDumpRun.Create;
+    FDocument.PrimaryRun.Document := FDocument;
+    FDocument.PrimaryRun.SourceFileName := ASourceFileName;
+    FDocument.Runs.Add(FDocument.PrimaryRun);
     FLastProgressPhase := ppComplete;
     FLastProgressLine := -1;
 
@@ -1334,8 +1730,15 @@ begin
     ParseImportSection;
     ParseExportSection;
     ParseResourceSection;
+    ParseRelocationSection;
     ParseBorlandSymbolTable;
+    ParseStrings;
+    ParseOMF;
+    ParseMach;
+    ParseELF;
+    BuildDebugInformation;
     DetectUnsupportedStructures;
+    AttachRunProvenance;
     ReportProgress(ppComplete, FLines.Count);
 
     Result := FDocument;
@@ -1354,6 +1757,163 @@ begin
   Result.StartLine := AStartLine;
   Result.EndLine := AEndLine;
   FDocument.Nodes.Add(Result);
+end;
+
+procedure TDumpParser.AttachNodeSourceSpans(ANode: TDumpNode; ARun: TDumpRun);
+begin
+  ANode.SourceSpan.Run := ARun;
+  ANode.SourceSpan.StartLine := ANode.StartLine;
+  ANode.SourceSpan.EndLine := ANode.EndLine;
+  for var LChild in ANode.Children do
+    AttachNodeSourceSpans(LChild, ARun);
+end;
+
+procedure TDumpParser.AttachResourceSourceSpans(AResource: TDumpResource;
+  ARun: TDumpRun);
+begin
+  AResource.SourceSpan.Run := ARun;
+  AResource.SourceSpan.StartLine := AResource.StartLine;
+  AResource.SourceSpan.EndLine := AResource.EndLine;
+  for var LChild in AResource.Children do
+    AttachResourceSourceSpans(LChild, ARun);
+end;
+
+procedure TDumpParser.AttachRunProvenance;
+begin
+  var LRun := FDocument.PrimaryRun;
+  LRun.ToolKind := FDocument.ToolKind;
+  LRun.ToolVersion := FDocument.ToolVersion;
+  LRun.CommandLine := FDocument.CommandLine;
+
+  for var LLine in FDocument.Lines do
+  begin
+    LLine.SourceSpan.Run := LRun;
+    LLine.SourceSpan.StartLine := LLine.LineNumber;
+    LLine.SourceSpan.EndLine := LLine.LineNumber;
+  end;
+  for var LNode in FDocument.Nodes do
+    AttachNodeSourceSpans(LNode, LRun);
+  for var LHeader in FDocument.Headers do
+  begin
+    LHeader.SourceSpan.Run := LRun;
+    LHeader.SourceSpan.StartLine := LHeader.StartLine;
+    LHeader.SourceSpan.EndLine := LHeader.EndLine;
+  end;
+  for var LDirectoryIndex := 0 to FDocument.DataDirectories.Count - 1 do
+  begin
+    var LDirectory := FDocument.DataDirectories[LDirectoryIndex];
+    LDirectory.SourceSpan.Run := LRun;
+    LDirectory.SourceSpan.StartLine := LDirectory.StartLine;
+    LDirectory.SourceSpan.EndLine := LDirectory.StartLine;
+    FDocument.DataDirectories[LDirectoryIndex] := LDirectory;
+  end;
+  for var LSection in FDocument.Sections do
+  begin
+    LSection.SourceSpan.Run := LRun;
+    LSection.SourceSpan.StartLine := LSection.StartLine;
+    LSection.SourceSpan.EndLine := LSection.StartLine;
+  end;
+  for var LModule in FDocument.Imports do
+  begin
+    LModule.SourceSpan.Run := LRun;
+    LModule.SourceSpan.StartLine := LModule.StartLine;
+    LModule.SourceSpan.EndLine := LModule.EndLine;
+    for var LImport in LModule.Entries do
+    begin
+      LImport.SourceSpan.Run := LRun;
+      LImport.SourceSpan.StartLine := LImport.StartLine;
+      LImport.SourceSpan.EndLine := LImport.StartLine;
+    end;
+  end;
+  for var LExport in FDocument.ExportList do
+  begin
+    LExport.SourceSpan.Run := LRun;
+    LExport.SourceSpan.StartLine := LExport.StartLine;
+    LExport.SourceSpan.EndLine := LExport.StartLine;
+  end;
+  for var LMetadata in [FDocument.ImportMetadata, FDocument.ExportMetadata,
+    FDocument.ResourceMetadata] do
+    if LMetadata <> nil then
+    begin
+      LMetadata.SourceSpan.Run := LRun;
+      LMetadata.SourceSpan.StartLine := LMetadata.StartLine;
+      LMetadata.SourceSpan.EndLine := LMetadata.EndLine;
+    end;
+  for var LResource in FDocument.Resources do
+    AttachResourceSourceSpans(LResource, LRun);
+  for var LRelocation in FDocument.Relocations do
+  begin
+    LRelocation.SourceSpan.Run := LRun;
+    LRelocation.SourceSpan.StartLine := LRelocation.StartLine;
+    LRelocation.SourceSpan.EndLine := LRelocation.StartLine;
+  end;
+  for var LString in FDocument.Strings do
+  begin
+    LString.SourceSpan.Run := LRun;
+    LString.SourceSpan.StartLine := LString.StartLine;
+    LString.SourceSpan.EndLine := LString.StartLine;
+  end;
+  for var LRecord in FDocument.ObjectRecords do
+  begin
+    LRecord.SourceSpan.Run := LRun;
+    LRecord.SourceSpan.StartLine := LRecord.StartLine;
+    LRecord.SourceSpan.EndLine := LRecord.EndLine;
+  end;
+  for var LMember in FDocument.LibraryMembers do
+  begin
+    LMember.SourceSpan.Run := LRun;
+    LMember.SourceSpan.StartLine := LMember.StartLine;
+    LMember.SourceSpan.EndLine := LMember.EndLine;
+  end;
+  for var LArchitecture in FDocument.MachArchitectures do
+  begin
+    LArchitecture.SourceSpan.Run := LRun;
+    LArchitecture.SourceSpan.StartLine := LArchitecture.StartLine;
+    LArchitecture.SourceSpan.EndLine := LArchitecture.EndLine;
+  end;
+  for var LCommand in FDocument.MachLoadCommands do
+  begin
+    LCommand.SourceSpan.Run := LRun;
+    LCommand.SourceSpan.StartLine := LCommand.StartLine;
+    LCommand.SourceSpan.EndLine := LCommand.EndLine;
+  end;
+  for var LSymbol in FDocument.Symbols do
+  begin
+    LSymbol.SourceSpan.Run := LRun;
+    LSymbol.SourceSpan.StartLine := LSymbol.StartLine;
+    LSymbol.SourceSpan.EndLine := LSymbol.StartLine;
+  end;
+  if FDocument.DebugInformation <> nil then
+  begin
+    if FDocument.DebugInformation.Node <> nil then
+    begin
+      FDocument.DebugInformation.SourceSpan.Run := LRun;
+      FDocument.DebugInformation.SourceSpan.StartLine :=
+        FDocument.DebugInformation.Node.StartLine;
+      FDocument.DebugInformation.SourceSpan.EndLine :=
+        FDocument.DebugInformation.Node.EndLine;
+    end;
+    for var LMethod in FDocument.DebugInformation.Methods do
+    begin
+      LMethod.SourceSpan.Run := LRun;
+      if LMethod.Node <> nil then
+      begin
+        LMethod.SourceSpan.StartLine := LMethod.Node.StartLine;
+        LMethod.SourceSpan.EndLine := LMethod.Node.EndLine;
+      end
+      else
+      begin
+        LMethod.SourceSpan.StartLine := LMethod.Symbol.StartLine;
+        LMethod.SourceSpan.EndLine := LMethod.Symbol.StartLine;
+      end;
+    end;
+  end;
+  for var LStructure in FDocument.UnsupportedStructures do
+  begin
+    LStructure.SourceSpan.Run := LRun;
+    LStructure.SourceSpan.StartLine := LStructure.Node.StartLine;
+    LStructure.SourceSpan.EndLine := LStructure.Node.EndLine;
+  end;
 end;
 
 procedure TDumpParser.AddDiagnostic(ASeverity: TDumpDiagnosticSeverity;
@@ -1403,29 +1963,128 @@ begin
   LStructure.Description := ADescription;
   LStructure.SourceLine := FDocument.Lines[ALineNumber - 1];
   LStructure.Node := AddNode(nkUnknown, ADescription, ALineNumber, ALineNumber);
+  LStructure.Node.RawText := FLines[ALineNumber - 1];
   FDocument.UnsupportedStructures.Add(LStructure);
+end;
+
+procedure TDumpParser.AddUnknownBlock(AKind: TDumpUnsupportedStructureKind;
+  AStartLine, AEndLine: Integer; const ADescription: string);
+begin
+  if (AStartLine < 1) or (AStartLine > FDocument.Lines.Count) then
+    Exit;
+  if AEndLine < AStartLine then
+    AEndLine := AStartLine;
+  if AEndLine > FDocument.Lines.Count then
+    AEndLine := FDocument.Lines.Count;
+  for var LExisting in FDocument.UnsupportedStructures do
+    if (LExisting.Kind = AKind) and
+      (LExisting.SourceLine.LineNumber = AStartLine) then
+      Exit;
+
+  var LStructure := TDumpUnsupportedStructure.Create;
+  LStructure.Kind := AKind;
+  LStructure.Description := ADescription;
+  LStructure.SourceLine := FDocument.Lines[AStartLine - 1];
+  LStructure.Node := AddNode(nkUnknown, ADescription, AStartLine, AEndLine);
+  var LRaw := TStringBuilder.Create;
+  try
+    for var LLineIndex := AStartLine - 1 to AEndLine - 1 do
+    begin
+      if LRaw.Length > 0 then
+        LRaw.AppendLine;
+      LRaw.Append(FLines[LLineIndex]);
+    end;
+    LStructure.Node.RawText := LRaw.ToString;
+  finally
+    LRaw.Free;
+  end;
+  FDocument.UnsupportedStructures.Add(LStructure);
+end;
+
+procedure TDumpParser.BuildGenericFallbackBlocks;
+begin
+  var LCoveredLines: TArray<Boolean>;
+  SetLength(LCoveredLines, FLines.Count);
+  var LHasSemanticNode := False;
+  for var LNode in FDocument.Nodes do
+    if (LNode.Kind <> nkDocument) and (LNode.Kind <> nkUnknown) then
+    begin
+      LHasSemanticNode := True;
+      var LStartLine := LNode.StartLine;
+      if LStartLine < 1 then
+        LStartLine := 1;
+      var LEndLine := LNode.EndLine;
+      if LEndLine > FLines.Count then
+        LEndLine := FLines.Count;
+      for var LLineNumber := LStartLine to LEndLine do
+        LCoveredLines[LLineNumber - 1] := True;
+    end;
+
+  var LAddedFallback := False;
+  var LLineIndex := 0;
+  while LLineIndex < FLines.Count do
+  begin
+    while (LLineIndex < FLines.Count) and LCoveredLines[LLineIndex] do
+      Inc(LLineIndex);
+    if LLineIndex >= FLines.Count then
+      Break;
+    var LRangeStart := LLineIndex;
+    while (LLineIndex < FLines.Count) and not LCoveredLines[LLineIndex] do
+      Inc(LLineIndex);
+    var LRangeEnd := LLineIndex - 1;
+    var LBoundaries := TList<Integer>.Create;
+    try
+      for var LCandidateIndex := LRangeStart to LRangeEnd do
+        if IsGenericBlockHeading(FLines[LCandidateIndex]) then
+          LBoundaries.Add(LCandidateIndex);
+      if (LBoundaries.Count = 0) and LHasSemanticNode then
+        Continue;
+      if LBoundaries.Count = 0 then
+      begin
+        AddUnknownBlock(uskUnknownHeading, LRangeStart + 1, LRangeEnd + 1,
+          'Unrecognized TDUMP document.');
+        LAddedFallback := True;
+        Continue;
+      end;
+
+      if LBoundaries[0] > LRangeStart then
+      begin
+        AddUnknownBlock(uskUnknownHeading, LRangeStart + 1, LBoundaries[0],
+          'Unrecognized TDUMP preamble.');
+        LAddedFallback := True;
+      end;
+      for var LBoundaryIndex := 0 to LBoundaries.Count - 1 do
+      begin
+        var LBlockStart := LBoundaries[LBoundaryIndex];
+        var LBlockEnd := LRangeEnd;
+        if LBoundaryIndex < LBoundaries.Count - 1 then
+          LBlockEnd := LBoundaries[LBoundaryIndex + 1] - 1;
+        var LHeading := Trim(FLines[LBlockStart]);
+        var LKind := uskUnknownHeading;
+        if StartsWithText(LHeading, 'Section:') then
+          LKind := uskUnknownSection;
+        AddUnknownBlock(LKind, LBlockStart + 1, LBlockEnd + 1,
+          'Unsupported TDUMP block: ' + LHeading);
+        LAddedFallback := True;
+      end;
+    finally
+      LBoundaries.Free;
+    end;
+  end;
+
+  if LAddedFallback and not LHasSemanticNode then
+    for var LIndex := 0 to FLines.Count - 1 do
+      if Trim(FLines[LIndex]) <> '' then
+      begin
+        AddDiagnostic(dsWarning, LIndex + 1,
+          'No specialized parser recognized this TDUMP document.', FLines[LIndex]);
+        Break;
+      end;
 end;
 
 procedure TDumpParser.DetectUnsupportedStructures;
 begin
-  for var LIndex := 0 to FLines.Count - 1 do
-  begin
-    var LLine := Trim(FLines[LIndex]);
-    if StartsWithText(LLine, 'Section:') then
-    begin
-      var LSectionName := Trim(Copy(LLine, Length('Section:') + 1, MaxInt));
-      if not SameText(LSectionName, 'Import') and
-        not SameText(LSectionName, 'Exports') and
-        not SameText(LSectionName, 'Resources') and
-        not SameText(LSectionName, 'Borland 32 bit symbol table') then
-        AddUnsupportedStructure(uskUnknownSection, LIndex + 1,
-          'Unsupported TDUMP section: ' + LSectionName);
-    end
-    else if SameText(LLine, 'New Executable (NE) File') or
-      SameText(LLine, 'Linear Executable (LE) File') then
-      AddUnsupportedStructure(uskUnknownHeading, LIndex + 1,
-        'Unsupported TDUMP file-header format: ' + LLine);
-  end;
+  BuildGenericFallbackBlocks;
 end;
 
 procedure TDumpParser.ParseMetadata;
@@ -1433,21 +2092,31 @@ begin
   var LLine: string;
   var LVersionPos: Integer;
   var LDisplayPrefix := 'Display of File ';
-  if FLines.Count = 0 then
-    Exit;
-
-  LLine := FLines[0];
-  if Pos('Turbo Dump', LLine) > 0 then
+  var LMetadataLineCount := FLines.Count;
+  if LMetadataLineCount > 8 then
+    LMetadataLineCount := 8;
+  for var LIndex := 0 to LMetadataLineCount - 1 do
   begin
-    FDocument.ToolKind := tkTDump32;
-    LVersionPos := Pos('Version', LLine);
-    if LVersionPos > 0 then
-      FDocument.ToolVersion := Trim(Copy(LLine, LVersionPos + Length('Version'), MaxInt));
-  end;
-
-  if FLines.Count > 1 then
-  begin
-    LLine := Trim(FLines[1]);
+    LLine := Trim(FLines[LIndex]);
+    var LNormalizedLine := NormalizeTDumpHeading(LLine);
+    if (Pos('tdump64', LNormalizedLine) > 0) or
+      (Pos('turbo dump 64', LNormalizedLine) > 0) then
+    begin
+      FDocument.ToolKind := tkTDump64;
+      LVersionPos := Pos('version', LowerCase(LLine));
+      if LVersionPos > 0 then
+        FDocument.ToolVersion := Trim(Copy(LLine,
+          LVersionPos + Length('version'), MaxInt));
+    end
+    else if (Pos('turbo dump', LNormalizedLine) > 0) or
+      StartsWithText(LLine, 'TDUMP') then
+    begin
+      FDocument.ToolKind := tkTDump32;
+      LVersionPos := Pos('version', LowerCase(LLine));
+      if LVersionPos > 0 then
+        FDocument.ToolVersion := Trim(Copy(LLine,
+          LVersionPos + Length('version'), MaxInt));
+    end;
     if StartsWithText(LLine, LDisplayPrefix) then
       FDocument.CommandLine := LLine;
   end;
@@ -1457,17 +2126,14 @@ procedure TDumpParser.ParseOldExecutableHeader;
 begin
   var LHeaderStart := -1;
   for var LIndex := 0 to FLines.Count - 1 do
-    if SameText(Trim(FLines[LIndex]), SOldExecutableHeader) then
+    if IsOldExecutableHeaderHeading(FLines[LIndex]) then
     begin
       LHeaderStart := LIndex;
       Break;
     end;
 
   if LHeaderStart < 0 then
-  begin
-    AddDiagnostic(dsInfo, 0, 'Old Executable Header section was not found.', '');
     Exit;
-  end;
 
   var LHeaderEnd := FLines.Count - 1;
   for var LIndex := LHeaderStart + 1 to FLines.Count - 1 do
@@ -1519,7 +2185,7 @@ procedure TDumpParser.ParsePortableExecutableHeader;
 begin
   var LHeaderStart := -1;
   for var LIndex := 0 to FLines.Count - 1 do
-    if SameText(Trim(FLines[LIndex]), SPortableExecutableHeader) then
+    if IsPortableExecutableHeaderHeading(FLines[LIndex]) then
     begin
       LHeaderStart := LIndex;
       Break;
@@ -1529,7 +2195,7 @@ begin
 
   var LHeaderEnd := FLines.Count - 1;
   for var LIndex := LHeaderStart + 1 to FLines.Count - 1 do
-    if SameText(Trim(FLines[LIndex]), 'Object table:') or
+    if IsObjectTableHeading(FLines[LIndex]) or
       StartsWithText(Trim(FLines[LIndex]), 'Section:') then
     begin
       LHeaderEnd := LIndex - 1;
@@ -1559,7 +2225,7 @@ begin
       if (LIndex = LHeaderStart) or (Trim(LLine) = '') then
         Continue;
 
-      if SameText(Trim(LLine), 'Name                   RVA       Size') then
+      if IsDataDirectoryColumnHeading(LLine) then
       begin
         LInDirectoryTable := True;
         LDirectoryNode := AddNode(nkDataDirectory, 'PE Data Directory',
@@ -1619,7 +2285,7 @@ procedure TDumpParser.ParseObjectTable;
 begin
   var LTableStart := -1;
   for var LIndex := 0 to FLines.Count - 1 do
-    if SameText(Trim(FLines[LIndex]), 'Object table:') then
+    if IsObjectTableHeading(FLines[LIndex]) then
     begin
       LTableStart := LIndex;
       Break;
@@ -1629,7 +2295,7 @@ begin
 
   var LTableEnd := FLines.Count - 1;
   for var LIndex := LTableStart + 1 to FLines.Count - 1 do
-    if StartsWithText(Trim(FLines[LIndex]), 'Section:') then
+    if IsKnownTopLevelHeading(FLines[LIndex]) then
     begin
       LTableEnd := LIndex - 1;
       Break;
@@ -1647,6 +2313,7 @@ begin
       var LLine := FLines[LIndex];
       if (LIndex = LTableStart) or (Trim(LLine) = '') or
         (Pos('----', LLine) > 0) or (Pos('****', Trim(LLine)) > 0) or
+        IsObjectTableColumnHeading(LLine) or
         StartsWithText(Trim(LLine), '#') or
         StartsWithText(Trim(LLine), 'Key to section flags:') or
         ((Length(Trim(LLine)) >= 3) and (Trim(LLine)[2] = '-')) then
@@ -1657,6 +2324,11 @@ begin
         StartsWithText(Trim(LLine), 'I -') or
         StartsWithText(Trim(LLine), 'R -') or
         StartsWithText(Trim(LLine), 'W -') then
+        Continue;
+      var LTrimmedLine := Trim(LLine);
+      if (Length(LTrimmedLine) >= 3) and
+        CharInSet(LTrimmedLine[1], ['A'..'Z', 'a'..'z']) and
+        (LTrimmedLine[2] = ' ') and (LTrimmedLine[3] = '-') then
         Continue;
 
       var LSection: TDumpSection;
@@ -1683,6 +2355,7 @@ end;
 procedure TDumpParser.ParseImportSection;
 begin
   var LSectionStart := -1;
+  var LCompactMode := False;
   for var LIndex := 0 to FLines.Count - 1 do
     if SameText(Trim(FLines[LIndex]), 'Section:             Import') then
     begin
@@ -1690,18 +2363,37 @@ begin
       Break;
     end;
   if LSectionStart < 0 then
+    for var LCompactIndex := 0 to FLines.Count - 1 do
+      if StartsWithText(Trim(FLines[LCompactIndex]), 'IMPORT:') then
+      begin
+        LSectionStart := LCompactIndex;
+        LCompactMode := True;
+        Break;
+      end;
+  if LSectionStart < 0 then
     Exit;
 
   var LSectionEnd := FLines.Count - 1;
-  for var LIndex := LSectionStart + 1 to FLines.Count - 1 do
-    if StartsWithText(Trim(FLines[LIndex]), 'Section:') and
-      (LIndex > LSectionStart) then
-    begin
-      LSectionEnd := LIndex - 1;
-      Break;
-    end;
+  if LCompactMode then
+    for var LIndex := LSectionStart + 1 to FLines.Count - 1 do
+      if (Trim(FLines[LIndex]) <> '') and not StartsWithText(Trim(FLines[LIndex]), 'IMPORT:') then
+      begin
+        LSectionEnd := LIndex - 1;
+        Break;
+      end
+  else
+    for var LEndIndex := LSectionStart + 1 to FLines.Count - 1 do
+      if StartsWithText(Trim(FLines[LEndIndex]), 'Section:') and
+        (LEndIndex > LSectionStart) then
+      begin
+        LSectionEnd := LEndIndex - 1;
+        Break;
+      end;
 
-  var LNode := AddNode(nkImports, 'Section: Import', LSectionStart + 1,
+  var LNodeTitle := 'Section: Import';
+  if LCompactMode then
+    LNodeTitle := 'Compact imports';
+  var LNode := AddNode(nkImports, LNodeTitle, LSectionStart + 1,
     LSectionEnd + 1);
   FDocument.ImportMetadata := TDumpSectionMetadata.Create;
   FDocument.ImportMetadata.Name := 'Import';
@@ -1721,7 +2413,49 @@ begin
       var LTrimmed := Trim(LLine);
       if (LIndex = LSectionStart) or (LTrimmed = '') or
         (Pos('****', LTrimmed) > 0) then
+      begin
+        if not LCompactMode or (LTrimmed = '') then
+          Continue;
+      end;
+
+      if LCompactMode then
+      begin
+        var LImportText := Trim(Copy(LTrimmed, Length('IMPORT:') + 1, MaxInt));
+        var LEqualsPos := Pos('=', LImportText);
+        if LEqualsPos <= 1 then
+        begin
+          AddUnsupportedStructure(uskImportEntry, LIndex + 1,
+            'Malformed compact import entry.');
+          AddDiagnostic(dsWarning, LIndex + 1, 'Malformed compact import entry.', LLine);
+          Continue;
+        end;
+        var LModuleName := Trim(Copy(LImportText, 1, LEqualsPos - 1));
+        var LEntryName := Trim(Copy(LImportText, LEqualsPos + 1, MaxInt));
+        if (Length(LEntryName) >= 2) and (LEntryName[1] = '''') and
+          (LEntryName[Length(LEntryName)] = '''') then
+          LEntryName := Copy(LEntryName, 2, Length(LEntryName) - 2);
+        if (LCurrentModule = nil) or not SameText(LCurrentModule.Name, LModuleName) then
+        begin
+          LCurrentModule := TDumpImportModule.Create;
+          LCurrentModule.Name := LModuleName;
+          LCurrentModule.StartLine := LIndex + 1;
+          LCurrentModule.EndLine := LSectionEnd + 1;
+          FDocument.Imports.Add(LCurrentModule);
+          LModuleNode := TDumpNode.Create;
+          LModuleNode.Kind := nkImports;
+          LModuleNode.Title := LModuleName;
+          LModuleNode.StartLine := LIndex + 1;
+          LModuleNode.EndLine := LSectionEnd + 1;
+          LNode.Children.Add(LModuleNode);
+        end;
+        var LCompactImport := TDumpImport.Create;
+        LCompactImport.Name := LEntryName;
+        LCompactImport.MangledName := LEntryName;
+        LCompactImport.RawText := LLine;
+        LCompactImport.StartLine := LIndex + 1;
+        LCurrentModule.Entries.Add(LCompactImport);
         Continue;
+      end;
 
       if StartsWithText(LTrimmed, 'Imports from ') then
       begin
@@ -1800,6 +2534,7 @@ end;
 procedure TDumpParser.ParseExportSection;
 begin
   var LSectionStart := -1;
+  var LCompactMode := False;
   for var LIndex := 0 to FLines.Count - 1 do
     if StartsWithText(Trim(FLines[LIndex]), 'Section:') and
       SameText(Trim(Copy(Trim(FLines[LIndex]), Length('Section:') + 1, MaxInt)), 'Exports') then
@@ -1808,18 +2543,37 @@ begin
       Break;
     end;
   if LSectionStart < 0 then
+    for var LCompactIndex := 0 to FLines.Count - 1 do
+      if StartsWithText(Trim(FLines[LCompactIndex]), 'EXPORT ') then
+      begin
+        LSectionStart := LCompactIndex;
+        LCompactMode := True;
+        Break;
+      end;
+  if LSectionStart < 0 then
     Exit;
 
   var LSectionEnd := FLines.Count - 1;
-  for var LIndex := LSectionStart + 1 to FLines.Count - 1 do
-    if StartsWithText(Trim(FLines[LIndex]), 'Section:') then
-    begin
-      LSectionEnd := LIndex - 1;
-      Break;
-    end;
+  if LCompactMode then
+    for var LIndex := LSectionStart + 1 to FLines.Count - 1 do
+      if (Trim(FLines[LIndex]) <> '') and not StartsWithText(Trim(FLines[LIndex]), 'EXPORT ') then
+      begin
+        LSectionEnd := LIndex - 1;
+        Break;
+      end
+  else
+    for var LEndIndex := LSectionStart + 1 to FLines.Count - 1 do
+      if StartsWithText(Trim(FLines[LEndIndex]), 'Section:') then
+      begin
+        LSectionEnd := LEndIndex - 1;
+        Break;
+      end;
 
   // Preserve the entire section while projecting recognizable export rows.
-  var LNode := AddNode(nkExports, 'Section: Exports', LSectionStart + 1, LSectionEnd + 1);
+  var LNodeTitle := 'Section: Exports';
+  if LCompactMode then
+    LNodeTitle := 'Compact exports';
+  var LNode := AddNode(nkExports, LNodeTitle, LSectionStart + 1, LSectionEnd + 1);
   FDocument.ExportMetadata := TDumpSectionMetadata.Create;
   FDocument.ExportMetadata.Name := 'Exports';
   FDocument.ExportMetadata.Node := LNode;
@@ -1835,6 +2589,40 @@ begin
 
       var LLine := FLines[LIndex];
       var LTrimmed := Trim(LLine);
+      if LCompactMode then
+      begin
+        if not StartsWithText(LTrimmed, 'EXPORT ') then
+          Continue;
+        var LExportText := Trim(Copy(LTrimmed, Length('EXPORT ') + 1, MaxInt));
+        var LEqualsPos := Pos('=', LExportText);
+        var LOrdinalText := LExportText;
+        if LEqualsPos > 0 then
+          LOrdinalText := Trim(Copy(LExportText, 1, LEqualsPos - 1));
+        if StartsWithText(LOrdinalText, 'ord:') then
+          LOrdinalText := Trim(Copy(LOrdinalText, Length('ord:') + 1, MaxInt));
+        var LCompactExport := TDumpExport.Create;
+        LCompactExport.RawText := LLine;
+        LCompactExport.StartLine := LIndex + 1;
+        LCompactExport.HasOrdinal := TryParseHexUIntToken(LOrdinalText,
+          LCompactExport.Ordinal);
+        if LEqualsPos > 0 then
+          LCompactExport.Name := Trim(Copy(LExportText, LEqualsPos + 1, MaxInt));
+        if (Length(LCompactExport.Name) >= 2) and (LCompactExport.Name[1] = '''') and
+          (LCompactExport.Name[Length(LCompactExport.Name)] = '''') then
+          LCompactExport.Name := Copy(LCompactExport.Name, 2,
+            Length(LCompactExport.Name) - 2);
+        LCompactExport.MangledName := LCompactExport.Name;
+        if not LCompactExport.HasOrdinal then
+        begin
+          LCompactExport.Free;
+          AddUnsupportedStructure(uskUnknownHeading, LIndex + 1,
+            'Malformed compact export entry.');
+          AddDiagnostic(dsWarning, LIndex + 1, 'Malformed compact export entry.', LLine);
+          Continue;
+        end;
+        FDocument.ExportList.Add(LCompactExport);
+        Continue;
+      end;
       var LMetadataProperty: TDumpProperty;
       if TryParsePropertyLine(LLine, LIndex + 1, LMetadataProperty) then
       begin
@@ -1997,8 +2785,8 @@ begin
         var LIdText := FirstToken(LCountsText);
         var LNamedCount: UInt64;
         var LIdCount: UInt64;
-        if TryParseUIntToken(LNamedText, LNamedCount) and
-          TryParseUIntToken(LIdText, LIdCount) then
+        if TryParseNumericToken(LNamedText, ncDecimal, LNamedCount) and
+          TryParseNumericToken(LIdText, ncDecimal, LIdCount) then
         begin
           if LResourceStack.Count > 0 then
           begin
@@ -2063,6 +2851,69 @@ begin
     LIndentStack.Free;
     LNodeStack.Free;
     LResourceStack.Free;
+    LRaw.Free;
+  end;
+end;
+
+procedure TDumpParser.ParseRelocationSection;
+begin
+  var LSectionStart := -1;
+  for var LIndex := 0 to FLines.Count - 1 do
+    if StartsWithText(Trim(FLines[LIndex]), 'Fixup Table') then
+    begin
+      LSectionStart := LIndex;
+      Break;
+    end;
+  if LSectionStart < 0 then
+    for var LBlockSearchIndex := 0 to FLines.Count - 1 do
+      if StartsWithText(Trim(FLines[LBlockSearchIndex]), 'Block #') then
+      begin
+        LSectionStart := LBlockSearchIndex;
+        Break;
+      end;
+  if LSectionStart < 0 then
+    Exit;
+
+  var LNode := AddNode(nkRelocations, 'Relocations', LSectionStart + 1,
+    FLines.Count);
+  var LRaw := TStringBuilder.Create;
+  try
+    var LBlockIndex: UInt64 := 0;
+    var LPageRVA: UInt64 := 0;
+    var LBlockSize: UInt64 := 0;
+    for var LIndex := LSectionStart to FLines.Count - 1 do
+    begin
+      if LRaw.Length > 0 then
+        LRaw.AppendLine;
+      LRaw.Append(FLines[LIndex]);
+      if TryParseRelocationBlock(FLines[LIndex], LBlockIndex, LPageRVA,
+        LBlockSize) then
+        Continue;
+
+      var LEntryText := Trim(FLines[LIndex]);
+      if StartsWithText(LEntryText, 'Fixup Table') then
+        Continue;
+      while LEntryText <> '' do
+      begin
+        var LRelocationType := FirstToken(LEntryText);
+        if LRelocationType = '' then
+          Break;
+        var LOffsetText := FirstToken(LEntryText);
+        var LRelocation: TDumpRelocation;
+        if not TryParseRelocationEntry(LRelocationType + ' ' + LOffsetText,
+          LIndex + 1, LBlockIndex, LPageRVA, LBlockSize, LRelocation) then
+        begin
+          AddUnsupportedStructure(uskUnknownHeading, LIndex + 1,
+            'Malformed relocation entry.');
+          AddDiagnostic(dsWarning, LIndex + 1, 'Malformed relocation entry.',
+            FLines[LIndex]);
+          Break;
+        end;
+        FDocument.Relocations.Add(LRelocation);
+      end;
+    end;
+    LNode.RawText := LRaw.ToString;
+  finally
     LRaw.Free;
   end;
 end;
@@ -2543,6 +3394,11 @@ begin
           LIndex + 1, LSymbol);
         if LCurrentRecordHasSymbol then
         begin
+          LSymbol.Node := LCurrentRecord;
+          if LCurrentAlignRecord <> nil then
+            LSymbol.RecordModel := LCurrentAlignRecord
+          else
+            LSymbol.RecordModel := LCurrentGlobalSymbolRecord;
           FDocument.Symbols.Add(LSymbol);
           if LCurrentAlignSection <> nil then
             LCurrentAlignSection.Symbols.Add(LSymbol);
@@ -2596,6 +3452,11 @@ begin
         if not LCurrentRecordHasSymbol and TryParseBorlandSymbolLine(
           LCurrentRecordKind, LLine, LIndex + 1, LSymbol) then
         begin
+          LSymbol.Node := LCurrentRecord;
+          if LCurrentAlignRecord <> nil then
+            LSymbol.RecordModel := LCurrentAlignRecord
+          else
+            LSymbol.RecordModel := LCurrentGlobalSymbolRecord;
           FDocument.Symbols.Add(LSymbol);
           if LCurrentAlignSection <> nil then
             LCurrentAlignSection.Symbols.Add(LSymbol);
@@ -2648,13 +3509,328 @@ begin
   ResolveBorlandReferences;
 end;
 
+procedure TDumpParser.BuildDebugInformation;
+  procedure ResolveMethodSource(AMethod: TDumpMethod);
+  begin
+    var LSegment: UInt64;
+    if not TryParseHexUIntToken(AMethod.Symbol.SectionName, LSegment) then
+      Exit;
+    for var LSourceModule in FDocument.SourceModules do
+      for var LSourceFile in LSourceModule.SourceFiles do
+        for var LRange in LSourceFile.Ranges do
+          if (LRange.Segment = LSegment) and
+            (AMethod.Address >= LRange.StartOffset) and
+            (AMethod.Address <= LRange.EndOffset) then
+          begin
+            AMethod.SourceModule := LSourceModule;
+            AMethod.SourceFile := LSourceFile;
+            if LSourceFile.ResolvedName <> '' then
+              AMethod.SourceFileName := LSourceFile.ResolvedName
+            else
+              AMethod.SourceFileName := LSourceFile.Name;
+            var LBestOffset: UInt64 := 0;
+            for var LLineInfo in LRange.LineNumbers do
+              if (LLineInfo.Offset <= AMethod.Address) and
+                ((not AMethod.HasSourceLine) or (LLineInfo.Offset >= LBestOffset)) then
+              begin
+                LBestOffset := LLineInfo.Offset;
+                AMethod.SourceLine := LLineInfo.LineNumber;
+                AMethod.HasSourceLine := True;
+              end;
+            Exit;
+          end;
+  end;
+
+begin
+  if (FDocument.Symbols.Count = 0) and (FDocument.SourceModules.Count = 0) then
+    Exit;
+
+  FDocument.DebugInformation := TDumpDebugInformation.Create;
+  var LStartLine := MaxInt;
+  var LEndLine := 0;
+  for var LSourceModule in FDocument.SourceModules do
+  begin
+    FDocument.DebugInformation.SourceModules.Add(LSourceModule);
+    if LSourceModule.StartLine < LStartLine then
+      LStartLine := LSourceModule.StartLine;
+    if LSourceModule.EndLine > LEndLine then
+      LEndLine := LSourceModule.EndLine;
+  end;
+  for var LSymbol in FDocument.Symbols do
+    if LSymbol.Kind = skFunction then
+    begin
+      var LMethod := TDumpMethod.Create;
+      LMethod.Name := LSymbol.Name;
+      LMethod.MangledName := LSymbol.MangledName;
+      LMethod.DemangledName := LSymbol.DemangledName;
+      LMethod.Address := LSymbol.Address;
+      LMethod.HasAddress := LSymbol.HasAddress;
+      LMethod.Symbol := LSymbol;
+      LMethod.RecordModel := LSymbol.RecordModel;
+      LMethod.Node := LSymbol.Node;
+      if (LMethod.RecordModel <> nil) and LMethod.RecordModel.HasEndAddress then
+      begin
+        LMethod.EndAddress := LMethod.RecordModel.EndAddress;
+        LMethod.HasEndAddress := True;
+      end;
+      ResolveMethodSource(LMethod);
+      FDocument.DebugInformation.Methods.Add(LMethod);
+      if LSymbol.StartLine < LStartLine then
+        LStartLine := LSymbol.StartLine;
+      if (LSymbol.Node <> nil) and (LSymbol.Node.EndLine > LEndLine) then
+        LEndLine := LSymbol.Node.EndLine
+      else if LSymbol.StartLine > LEndLine then
+        LEndLine := LSymbol.StartLine;
+    end;
+  if LStartLine = MaxInt then
+    Exit;
+  FDocument.DebugInformation.Node := AddNode(nkDebug, 'Debug information',
+    LStartLine, LEndLine);
+end;
+
+procedure TDumpParser.ParseStrings;
+begin
+  if Pos('.strings.', LowerCase(FDocument.SourceFileName)) = 0 then
+    Exit;
+  var LStartLine := -1;
+  var LEndLine := -1;
+  for var LIndex := 0 to FLines.Count - 1 do
+  begin
+    var LColonPos := Pos(':', FLines[LIndex]);
+    if LColonPos <= 1 then
+      Continue;
+    var LOffsetText := Trim(Copy(FLines[LIndex], 1, LColonPos - 1));
+    var LOffset: UInt64;
+    if not TryParseNumericToken(LOffsetText, ncDecimal, LOffset) then
+      Continue;
+    var LValue := Trim(Copy(FLines[LIndex], LColonPos + 1, MaxInt));
+    if LValue = '' then
+      Continue;
+    var LEntry := TDumpStringEntry.Create;
+    LEntry.Offset := LOffset;
+    LEntry.HasOffset := True;
+    LEntry.Value := LValue;
+    LEntry.StartLine := LIndex + 1;
+    FDocument.Strings.Add(LEntry);
+    if LStartLine < 0 then
+      LStartLine := LIndex;
+    LEndLine := LIndex;
+  end;
+  if LStartLine >= 0 then
+    AddNode(nkStrings, 'Strings', LStartLine + 1, LEndLine + 1);
+end;
+
+procedure TDumpParser.ParseOMF;
+  function TryRecordHeader(const ALine: string; out ARawOffset,
+    ARecordKind, ARemainder: string; out AOffset: UInt64): Boolean;
+  begin
+    var LWork := Trim(ALine);
+    ARawOffset := FirstToken(LWork);
+    ARecordKind := FirstToken(LWork);
+    ARemainder := Trim(LWork);
+    Result := (Length(ARawOffset) = 6) and (ARecordKind <> '') and
+      TryParseHexUIntToken(ARawOffset, AOffset);
+  end;
+
+begin
+  var LStartLine := -1;
+  for var LIndex := 0 to FLines.Count - 1 do
+  begin
+    var LRawOffset, LRecordKind, LRemainder: string;
+    var LOffset: UInt64;
+    if TryRecordHeader(FLines[LIndex], LRawOffset, LRecordKind, LRemainder,
+      LOffset) and SameText(LRecordKind, 'THEADR') then
+    begin
+      LStartLine := LIndex;
+      Break;
+    end;
+  end;
+  if LStartLine < 0 then
+    Exit;
+
+  var LIsLibrary := False;
+  for var LIndex := 0 to LStartLine - 1 do
+    if Pos('MSLIBR', UpperCase(FLines[LIndex])) > 0 then
+    begin
+      LIsLibrary := True;
+      Break;
+    end;
+  if LIsLibrary then
+    FDocument.FileKind := dfOMFLibrary
+  else
+    FDocument.FileKind := dfOMFObject;
+
+  var LCurrentMember: TDumpLibraryMember := nil;
+  for var LIndex := LStartLine to FLines.Count - 1 do
+  begin
+    var LRawOffset, LRecordKind, LRemainder: string;
+    var LOffset: UInt64;
+    if not TryRecordHeader(FLines[LIndex], LRawOffset, LRecordKind, LRemainder,
+      LOffset) then
+      Continue;
+    if FDocument.ObjectRecords.Count > 0 then
+      FDocument.ObjectRecords.Last.EndLine := LIndex;
+    var LRecord := TDumpObjectRecord.Create;
+    LRecord.Offset := LOffset;
+    LRecord.HasOffset := True;
+    LRecord.RawOffset := LRawOffset;
+    LRecord.RecordKind := LRecordKind;
+    LRecord.StartLine := LIndex + 1;
+    LRecord.EndLine := FLines.Count;
+    FDocument.ObjectRecords.Add(LRecord);
+    if LIsLibrary and SameText(LRecordKind, 'THEADR') then
+    begin
+      if LCurrentMember <> nil then
+        LCurrentMember.EndLine := LIndex;
+      LCurrentMember := TDumpLibraryMember.Create;
+      LCurrentMember.Name := LRemainder;
+      LCurrentMember.StartLine := LIndex + 1;
+      LCurrentMember.EndLine := FLines.Count;
+      FDocument.LibraryMembers.Add(LCurrentMember);
+    end;
+  end;
+  if LCurrentMember <> nil then
+    LCurrentMember.EndLine := FLines.Count;
+  if FDocument.ObjectRecords.Count > 0 then
+    AddNode(nkObjectRecord, 'OMF records', LStartLine + 1, FLines.Count);
+end;
+
+procedure TDumpParser.ParseMach;
+  function ValueAfterLabel(const ALine: string): string;
+  begin
+    var LWork := Trim(ALine);
+    FirstToken(LWork);
+    Result := Trim(LWork);
+  end;
+
+begin
+  var LHeaderLine := -1;
+  for var LIndex := 0 to FLines.Count - 1 do
+    if Pos('MACH Header', FLines[LIndex]) > 0 then
+    begin
+      LHeaderLine := LIndex;
+      Break;
+    end;
+  if LHeaderLine < 0 then
+    Exit;
+  FDocument.FileKind := dfMach;
+
+  var LCurrentArchitecture: TDumpMachArchitecture := nil;
+  for var LIndex := 0 to LHeaderLine - 1 do
+  begin
+    var LTrimmed := Trim(FLines[LIndex]);
+    if StartsWithText(LTrimmed, 'cputype') then
+    begin
+      if LCurrentArchitecture <> nil then
+        LCurrentArchitecture.EndLine := LIndex;
+      LCurrentArchitecture := TDumpMachArchitecture.Create;
+      LCurrentArchitecture.CPUType := ValueAfterLabel(LTrimmed);
+      LCurrentArchitecture.StartLine := LIndex + 1;
+      LCurrentArchitecture.EndLine := LHeaderLine;
+      FDocument.MachArchitectures.Add(LCurrentArchitecture);
+    end
+    else if (LCurrentArchitecture <> nil) and
+      StartsWithText(LTrimmed, 'cpusubtype') then
+      LCurrentArchitecture.CPUSubtype := ValueAfterLabel(LTrimmed)
+    else if (LCurrentArchitecture <> nil) and StartsWithText(LTrimmed, 'offset') then
+    begin
+      var LOffsetText := ValueAfterLabel(LTrimmed);
+      LOffsetText := FirstToken(LOffsetText);
+      LCurrentArchitecture.HasOffset := TryParseHexUIntToken(LOffsetText,
+        LCurrentArchitecture.Offset);
+    end;
+  end;
+  if LCurrentArchitecture <> nil then
+    LCurrentArchitecture.EndLine := LHeaderLine;
+
+  var LLoadCommandsLine := -1;
+  for var LIndex := LHeaderLine + 1 to FLines.Count - 1 do
+    if Pos('Load Commands', FLines[LIndex]) > 0 then
+    begin
+      LLoadCommandsLine := LIndex;
+      Break;
+    end;
+  if LLoadCommandsLine < 0 then
+    LLoadCommandsLine := FLines.Count;
+  AddNode(nkHeader, 'Mach Header', LHeaderLine + 1, LLoadCommandsLine);
+
+  var LCurrentCommand: TDumpMachLoadCommand := nil;
+  for var LIndex := LLoadCommandsLine + 1 to FLines.Count - 1 do
+  begin
+    var LTrimmed := Trim(FLines[LIndex]);
+    if (Length(LTrimmed) > 1) and (LTrimmed[1] = '#') then
+    begin
+      if LCurrentCommand <> nil then
+        LCurrentCommand.EndLine := LIndex;
+      var LCommandText := LTrimmed;
+      var LIndexText := FirstToken(LCommandText);
+      Delete(LIndexText, 1, 1);
+      var LCommandIndex: UInt64;
+      if not TryParseNumericToken(LIndexText, ncDecimal, LCommandIndex) then
+        Continue;
+      LCurrentCommand := TDumpMachLoadCommand.Create;
+      LCurrentCommand.Index := Integer(LCommandIndex);
+      LCurrentCommand.Name := FirstToken(LCommandText);
+      LCurrentCommand.StartLine := LIndex + 1;
+      LCurrentCommand.EndLine := FLines.Count;
+      FDocument.MachLoadCommands.Add(LCurrentCommand);
+      Continue;
+    end;
+    if LCurrentCommand <> nil then
+    begin
+      var LProperty: TDumpProperty;
+      if TryParsePropertyLine(FLines[LIndex], LIndex + 1, LProperty) then
+        LCurrentCommand.Properties.Add(LProperty);
+    end;
+  end;
+  if LCurrentCommand <> nil then
+    LCurrentCommand.EndLine := FLines.Count;
+  if FDocument.MachLoadCommands.Count > 0 then
+    AddNode(nkSections, 'Mach load commands', LLoadCommandsLine + 1,
+      FLines.Count);
+end;
+
+procedure TDumpParser.ParseELF;
+begin
+  for var LIndex := 0 to FLines.Count - 1 do
+    if StartsWithText(Trim(FLines[LIndex]), 'ELF Header') then
+    begin
+      var LEndLine := FLines.Count - 1;
+      for var LEndIndex := LIndex + 1 to FLines.Count - 1 do
+        if StartsWithText(Trim(FLines[LEndIndex]), 'Section Headers') then
+        begin
+          LEndLine := LEndIndex - 1;
+          Break;
+        end;
+      var LHeader := TDumpHeader.Create;
+      LHeader.Name := 'ELF Header';
+      LHeader.StartLine := LIndex + 1;
+      LHeader.EndLine := LEndLine + 1;
+      FDocument.Headers.Add(LHeader);
+      FDocument.FileKind := dfELFObject;
+      var LNode := AddNode(nkHeader, LHeader.Name, LHeader.StartLine,
+        LHeader.EndLine);
+      for var LPropertyIndex := LIndex + 1 to LEndLine do
+      begin
+        var LProperty: TDumpProperty;
+        if TryParsePropertyLine(FLines[LPropertyIndex], LPropertyIndex + 1,
+          LProperty) then
+        begin
+          LHeader.Properties.Add(LProperty);
+          LNode.Properties.Add(LProperty);
+        end;
+      end;
+      Exit;
+    end;
+end;
+
 function TDumpParser.IsKnownTopLevelHeading(const ALine: string): Boolean;
 begin
   var LLine := Trim(ALine);
-  Result := SameText(LLine, SPortableExecutableHeader) or
+  Result := IsPortableExecutableHeaderHeading(LLine) or
     SameText(LLine, 'New Executable (NE) File') or
     SameText(LLine, 'Linear Executable (LE) File') or
-    SameText(LLine, 'Object table:') or SameText(LLine, 'Resources:') or
+    IsObjectTableHeading(LLine) or SameText(LLine, 'Resources:') or
     StartsWithText(LLine, 'Section:');
 end;
 
@@ -2798,16 +3974,28 @@ begin
     LToken := FirstToken(LWork);
     if not TryParseHexUIntToken(LToken, ASection.RVA) then
       Exit;
-    LToken := FirstToken(LWork);
-    if not TryParseHexUIntToken(LToken, ASection.RawSize) then
-      Exit;
-    LToken := FirstToken(LWork);
-    if not TryParseHexUIntToken(LToken, ASection.RawOffset) then
-      Exit;
-    LFlagsToken := FirstToken(LWork);
-    if not TryParseHexUIntToken(LFlagsToken, ASection.FlagsValue) then
-      Exit;
-    ASection.FlagsText := Trim(LWork);
+    if LWork <> '' then
+    begin
+      LToken := FirstToken(LWork);
+      if TryParseHexUIntToken(LToken, LValue) then
+        ASection.RawSize := LValue;
+      if not TryParseHexUIntToken(LToken, LValue) then
+        LWork := Trim(LToken + ' ' + LWork);
+    end;
+    if LWork <> '' then
+    begin
+      LToken := FirstToken(LWork);
+      if TryParseHexUIntToken(LToken, LValue) then
+        ASection.RawOffset := LValue;
+      if not TryParseHexUIntToken(LToken, LValue) then
+        LWork := Trim(LToken + ' ' + LWork);
+    end;
+    if LWork <> '' then
+    begin
+      LFlagsToken := FirstToken(LWork);
+      if TryParseHexUIntToken(LFlagsToken, ASection.FlagsValue) then
+        ASection.FlagsText := Trim(LWork);
+    end;
     ASection.StartLine := ALineNumber;
 
     AProperty.Name := ASection.Name;
@@ -2861,7 +4049,7 @@ begin
     if StartsWithText(LowerCase(LText), 'ordinal ') then
     begin
       LHintText := Trim(Copy(LText, Length('ordinal ') + 1, MaxInt));
-      if TryParseUIntToken(LHintText, LValue) then
+      if TryParseNumericToken(LHintText, ncDecimal, LValue) then
       begin
         AImport.Ordinal := LValue;
         AImport.HasOrdinal := True;
@@ -2899,7 +4087,7 @@ begin
     AExport.HasRVA := True;
 
     LToken := FirstToken(LText);
-    if TryParseUIntToken(LToken, AExport.Ordinal) then
+    if TryParseNumericToken(LToken, ncDecimal, AExport.Ordinal) then
       AExport.HasOrdinal := True;
 
     LToken := FirstToken(LText);
@@ -2913,6 +4101,62 @@ begin
     if not Result then
       AExport.Free;
   end;
+end;
+
+function TDumpParser.TryParseRelocationBlock(const ALine: string;
+  out ABlockIndex, APageRVA, ABlockSize: UInt64): Boolean;
+begin
+  ABlockIndex := 0;
+  APageRVA := 0;
+  ABlockSize := 0;
+  var LText := Trim(ALine);
+  if not StartsWithText(LText, 'Block #') then
+    Exit(False);
+  var LColonPos := Pos(':', LText);
+  var LPageLabelPos := Pos('Page RVA =', LText);
+  var LSizeLabelPos := Pos('block size =', LText);
+  if (LColonPos <= Length('Block #')) or (LPageLabelPos = 0) or
+    (LSizeLabelPos = 0) then
+    Exit(False);
+  var LBlockText := Trim(Copy(LText, Length('Block #') + 1,
+    LColonPos - Length('Block #') - 1));
+  var LPageText := Copy(LText, LPageLabelPos + Length('Page RVA ='), MaxInt);
+  var LCommaPos := Pos(',', LPageText);
+  if LCommaPos > 0 then
+    LPageText := Copy(LPageText, 1, LCommaPos - 1);
+  LPageText := FirstToken(LPageText);
+  var LSizeText := Copy(LText, LSizeLabelPos + Length('block size ='), MaxInt);
+  LSizeText := FirstToken(LSizeText);
+  Result := TryParseNumericToken(LBlockText, ncDecimal, ABlockIndex) and
+    TryParseHexUIntToken(LPageText, APageRVA) and
+    TryParseHexUIntToken(LSizeText, ABlockSize);
+end;
+
+function TDumpParser.TryParseRelocationEntry(const AToken: string;
+  ALineNumber: Integer; ABlockIndex, APageRVA, ABlockSize: UInt64;
+  out ARelocation: TDumpRelocation): Boolean;
+begin
+  ARelocation := nil;
+  var LText := Trim(AToken);
+  var LRelocationType := FirstToken(LText);
+  var LOffsetText := FirstToken(LText);
+  if (LRelocationType = '') or (LOffsetText = '') or (LText <> '') then
+    Exit(False);
+  ARelocation := TDumpRelocation.Create;
+  ARelocation.BlockIndex := ABlockIndex;
+  ARelocation.HasBlockIndex := True;
+  ARelocation.PageRVA := APageRVA;
+  ARelocation.HasPageRVA := True;
+  ARelocation.BlockSize := ABlockSize;
+  ARelocation.HasBlockSize := True;
+  ARelocation.RelocationType := UpperCase(LRelocationType);
+  ARelocation.RawOffset := LOffsetText;
+  ARelocation.StartLine := ALineNumber;
+  ARelocation.HasOffset := TryParseHexUIntToken(LOffsetText,
+    ARelocation.Offset);
+  Result := ARelocation.HasOffset;
+  if not Result then
+    FreeAndNil(ARelocation);
 end;
 
 function TDumpParser.TryParseResourceLine(const ALine: string;
@@ -2946,7 +4190,7 @@ begin
       AResource.ResourceType := Trim(Copy(LText, 1, LOpenParen - 1));
       AResource.Name := AResource.ResourceType;
       var LIdText := Trim(Copy(LText, LOpenParen + 1, LCloseParen - LOpenParen - 1));
-      AResource.HasId := TryParseUIntToken(LIdText, AResource.Id);
+      AResource.HasId := TryParseNumericToken(LIdText, ncDecimal, AResource.Id);
       AResource.StartLine := ALineNumber;
       AResource.EndLine := ALineNumber;
       var LDirectoryAtPos := Pos('@', LText);
@@ -3849,6 +5093,18 @@ end;
 function TDumpParser.TryParseUIntToken(const AToken: string;
   out AValue: UInt64): Boolean;
 begin
+  Result := TryParseNumericToken(AToken, ncAmbiguous, AValue);
+end;
+
+function TDumpParser.TryParseHexUIntToken(const AToken: string;
+  out AValue: UInt64): Boolean;
+begin
+  Result := TryParseNumericToken(AToken, ncHexadecimal, AValue);
+end;
+
+function TDumpParser.TryParseNumericToken(const AToken: string;
+  AContext: TDumpNumericContext; out AValue: UInt64): Boolean;
+begin
   var LToken: string;
   var LBase: Integer;
   var LDigit: Integer;
@@ -3859,7 +5115,7 @@ begin
     (Pos('/', LToken) > 0) then
     Exit;
 
-  LBase := 10;
+  LBase := 0;
   if (Length(LToken) > 1) and SameText(Copy(LToken, Length(LToken), 1), 'h') then
   begin
     LBase := 16;
@@ -3870,17 +5126,20 @@ begin
     LBase := 16;
     Delete(LToken, 1, 2);
   end
-  else if (Length(LToken) > 1) and (LToken[1] = '0') then
-    LBase := 16
   else
-    for var LIndex := 1 to Length(LToken) do
-      if CharInSet(LToken[LIndex], ['A'..'F', 'a'..'f']) then
-      begin
-        LBase := 16;
-        Break;
-      end;
+    case AContext of
+      ncDecimal: LBase := 10;
+      ncHexadecimal: LBase := 16;
+      ncAmbiguous:
+        for var LIndex := 1 to Length(LToken) do
+          if CharInSet(LToken[LIndex], ['A'..'F', 'a'..'f']) then
+          begin
+            LBase := 16;
+            Break;
+          end;
+    end;
 
-  if LToken = '' then
+  if (LToken = '') or (LBase = 0) then
     Exit;
   for var LIndex := 1 to Length(LToken) do
   begin
@@ -3899,42 +5158,6 @@ begin
     if AValue > (High(UInt64) - UInt64(LDigit)) div UInt64(LBase) then
       Exit;
     AValue := (AValue * UInt64(LBase)) + UInt64(LDigit);
-  end;
-  Result := True;
-end;
-
-function TDumpParser.TryParseHexUIntToken(const AToken: string;
-  out AValue: UInt64): Boolean;
-begin
-  var LToken: string;
-  var LDigit: Integer;
-  AValue := 0;
-  LToken := Trim(AToken);
-  Result := False;
-  if (LToken = '') or (Pos('?', LToken) > 0) or (Pos(':', LToken) > 0) or
-    (Pos('/', LToken) > 0) then
-    Exit;
-  if (Length(LToken) > 1) and SameText(Copy(LToken, Length(LToken), 1), 'h') then
-    Delete(LToken, Length(LToken), 1)
-  else if (Length(LToken) > 2) and SameText(Copy(LToken, 1, 2), '0x') then
-    Delete(LToken, 1, 2);
-  if LToken = '' then
-    Exit;
-  for var LIndex := 1 to Length(LToken) do
-  begin
-    var LChar := LToken[LIndex];
-    if CharInSet(LChar, ['0'..'9']) then
-      LDigit := Ord(LChar) - Ord('0')
-    else if CharInSet(LChar, ['A'..'F']) then
-      LDigit := Ord(LChar) - Ord('A') + 10
-    else if CharInSet(LChar, ['a'..'f']) then
-      LDigit := Ord(LChar) - Ord('a') + 10
-    else
-      Exit;
-    // Reject oversized hexadecimal tokens before the checked multiply.
-    if AValue > (High(UInt64) - UInt64(LDigit)) div UInt64(16) then
-      Exit;
-    AValue := (AValue * UInt64(16)) + UInt64(LDigit);
   end;
   Result := True;
 end;
