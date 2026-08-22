@@ -1949,19 +1949,19 @@
 005646 COMDEF
     Name: 567: '__fastcall System::TGUID::IsEmpty()'  virtual(_TEXT) Length: 001d bytes
 005668 COMDEF
-    Name: 568: '__fastcall System::StoredAttribute::StoredAttribute()'  virtual(_TEXT) Length: 0041 bytes
+    Name: 568: 'System::StoredAttribute::operator ...'  virtual(_TEXT) Length: 0041 bytes
 005692 COMDEF
-    Name: 569: '__fastcall System::StoredAttribute::StoredAttribute(const bool)'  virtual(_TEXT) Length: 004b bytes
+    Name: 569: 'System::StoredAttribute::operator ...'  virtual(_TEXT) Length: 004b bytes
 0056BD COMDEF
-    Name: 570: '__fastcall System::StoredAttribute::StoredAttribute(System::UnicodeString)'  virtual(_TEXT) Length: 0047 bytes
+    Name: 570: 'System::StoredAttribute::operator ...'  virtual(_TEXT) Length: 0047 bytes
 0056FD COMDEF
-    Name: 571: '__fastcall System::HPPGENAttribute::HPPGENAttribute(System::UnicodeString)'  virtual(_TEXT) Length: 0020 bytes
+    Name: 571: 'System::HPPGENAttribute::operator ...'  virtual(_TEXT) Length: 0020 bytes
 00573D COMDEF
-    Name: 572: '__fastcall System::HPPGENAttribute::HPPGENAttribute(const int, System::UnicodeString)'  virtual(_TEXT) Length: 0026 bytes
+    Name: 572: 'System::HPPGENAttribute::operator ...'  virtual(_TEXT) Length: 0026 bytes
 00577F COMDEF
-    Name: 573: '__fastcall System::HFAAttribute::HFAAttribute(const void *, const int)'  virtual(_TEXT) Length: 0048 bytes
+    Name: 573: 'System::HFAAttribute::operator ...'  virtual(_TEXT) Length: 0048 bytes
 0057AA COMDEF
-    Name: 574: '__fastcall System::AlignAttribute::AlignAttribute(int)'  virtual(_TEXT) Length: 003c bytes
+    Name: 574: 'System::AlignAttribute::operator ...'  virtual(_TEXT) Length: 003c bytes
 0057D3 COMDEF
     Name: 575: '__fastcall System::Int(const long double)'  virtual(_TEXT) Length: 0029 bytes
 0057EC COMDEF
@@ -2435,9 +2435,9 @@
 007929 COMDEF
     Name: 810: '__fastcall System::TMethod::_op_LessThanOrEqual(System::TMethod&, System::TMethod&)'  virtual(_TEXT) Length: 002a bytes
 00796C COMDEF
-    Name: 811: '__fastcall System::TObject::TObject()'  virtual(_TEXT) Length: 0020 bytes
+    Name: 811: 'System::TObject::operator ...'  virtual(_TEXT) Length: 0020 bytes
 00798E COMDEF
-    Name: 812: '__fastcall System::TObject::~TObject()'  virtual(_TEXT) Length: 000f bytes
+    Name: 812: 'System::TObject::operator ...'  virtual(_TEXT) Length: 000f bytes
 0079B0 COMDEF
     Name: 813: '__fastcall System::TObject::Free()'  virtual(_TEXT) Length: 000c bytes
 0079D1 COMDEF
@@ -3519,7 +3519,7 @@
 00D21C COMDEF
     Name: 1349: '__stdcall System::TInterfacedObject::_Release()'  virtual(_TEXT) Length: 0044 bytes
 00D24B COMDEF
-    Name: 1350: '__fastcall System::TAggregatedObject::TAggregatedObject(System::DelphiInterface<System::IInterface>)'  virtual(_TEXT) Length: 0023 bytes
+    Name: 1350: 'System::TAggregatedObject::operator ...'  virtual(_TEXT) Length: 0023 bytes
 00D2A5 COMDEF
     Name: 1351: '__stdcall System::TAggregatedObject::QueryInterface(_GUID&, void *)'  virtual(_TEXT) Length: 001a bytes
 00D2E3 COMDEF
@@ -3529,7 +3529,7 @@
 00D340 COMDEF
     Name: 1354: '__stdcall System::TContainedObject::QueryInterface(_GUID&, void *)'  virtual(_TEXT) Length: 0026 bytes
 00D37D COMDEF
-    Name: 1355: '__fastcall System::TClassHelperBase::TClassHelperBase(System::TObject *)'  virtual(_TEXT) Length: 003c bytes
+    Name: 1355: 'System::TClassHelperBase::operator ...'  virtual(_TEXT) Length: 003c bytes
 00D3B8 COMDEF
     Name: 1356: '__stdcall System::TNoRefCountObject::QueryInterface(_GUID&, void *)'  virtual(_TEXT) Length: 0026 bytes
 00D3F6 COMDEF
@@ -3625,9 +3625,9 @@
 00DCB3 COMDEF
     Name: 1402: '__fastcall System::SetUTF8CompareLocale()'  virtual(_TEXT) Length: 0039 bytes
 00DCDC COMDEF
-    Name: 1403: '__fastcall System::TPtrWrapper::TPtrWrapper(int)'  virtual(_TEXT) Length: 0003 bytes
+    Name: 1403: 'System::TPtrWrapper::operator ...'  virtual(_TEXT) Length: 0003 bytes
 00DD02 COMDEF
-    Name: 1404: '__fastcall System::TPtrWrapper::TPtrWrapper(void *)'  virtual(_TEXT) Length: 0003 bytes
+    Name: 1404: 'System::TPtrWrapper::operator ...'  virtual(_TEXT) Length: 0003 bytes
 00DD29 COMDEF
     Name: 1405: '__fastcall System::TPtrWrapper::ToPointer()'  virtual(_TEXT) Length: 0003 bytes
 00DD53 COMDEF
@@ -3639,7 +3639,7 @@
 00DDEB COMDEF
     Name: 1409: '__fastcall System::TPtrWrapper::_op_Inequality(System::TPtrWrapper, System::TPtrWrapper)'  virtual(_TEXT) Length: 0017 bytes
 00DE2F COMDEF
-    Name: 1410: '__fastcall System::TMarshal::TMarshal()'  virtual(_TEXT) Length: 0027 bytes
+    Name: 1410: 'System::TMarshal::operator ...'  virtual(_TEXT) Length: 0027 bytes
 00DE52 COMDEF
     Name: 1411: '__fastcall System::TMarshal::InString(System::UnicodeString)'  virtual(_TEXT) Length: 000c bytes
 00DE8E COMDEF
@@ -4381,7 +4381,7 @@
     FixUp: 048  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[845]: __fastcall System::TObject::DefaultHandler(void *)
     FixUp: 04c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[803]: __fastcall System::TObject::NewInstance()
     FixUp: 050  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[804]: __fastcall System::TObject::FreeInstance()
-    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: __fastcall System::TObject::~TObject()
+    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: System::TObject::operator ...
     FixUp: 05c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[49]: System::TObject::
     FixUp: 064  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[49]: System::TObject::
     FixUp: 06c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[49]: System::TObject::
@@ -4416,7 +4416,7 @@
     FixUp: 154  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[49]: System::TObject::
     FixUp: 15c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[49]: System::TObject::
     FixUp: 164  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[49]: System::TObject::
-    FixUp: 178  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[811]: __fastcall System::TObject::TObject()
+    FixUp: 178  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[811]: System::TObject::operator ...
     FixUp: 18d  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[50]: __tpdsc__ System::TObject
     FixUp: 19e  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[813]: __fastcall System::TObject::Free()
     FixUp: 1b1  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[50]: __tpdsc__ System::TObject
@@ -4585,7 +4585,7 @@
     FixUp: 00b  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[50]: __tpdsc__ System::TObject
     FixUp: 024  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[804]: __fastcall System::TObject::FreeInstance()
     FixUp: 03f  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[50]: __tpdsc__ System::TObject
-    FixUp: 050  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: __fastcall System::TObject::~TObject()
+    FixUp: 050  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: System::TObject::operator ...
     FixUp: 066  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[50]: __tpdsc__ System::TObject
 01168A LEDATA  Segment: (16434) '__tpdsc__ System::TObject'Offset: 0000  Length: 0026
     0000: 04 00 00 00 07 07 54 4F  62 6A 65 63 74 58 00 00   ......TObjectX..
@@ -4618,7 +4618,7 @@
     FixUp: 048  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[845]: __fastcall System::TObject::DefaultHandler(void *)
     FixUp: 04c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[803]: __fastcall System::TObject::NewInstance()
     FixUp: 050  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[804]: __fastcall System::TObject::FreeInstance()
-    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: __fastcall System::TObject::~TObject()
+    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: System::TObject::operator ...
 011791 LEDATA  Segment: (16436) '__tpdsc__ System::TCustomAttribute'Offset: 0000  Length: 002F
     0000: 04 00 00 00 07 10 54 43  75 73 74 6F 6D 41 74 74   ......TCustomAtt
     0010: 72 69 62 75 74 65 58 00  00 00 00 00 00 00 00 00   ributeX.........
@@ -4658,7 +4658,7 @@
     FixUp: 048  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[845]: __fastcall System::TObject::DefaultHandler(void *)
     FixUp: 04c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[803]: __fastcall System::TObject::NewInstance()
     FixUp: 050  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[804]: __fastcall System::TObject::FreeInstance()
-    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: __fastcall System::TObject::~TObject()
+    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: System::TObject::operator ...
 0118DA LEDATA  Segment: (16439) '__tpdsc__ System::WeakAttribute'Offset: 0000  Length: 002C
     0000: 04 00 00 00 07 0D 57 65  61 6B 41 74 74 72 69 62   ......WeakAttrib
     0010: 75 74 65 58 00 00 00 00  00 00 00 00 00 06 53 79   uteX..........Sy
@@ -4691,7 +4691,7 @@
     FixUp: 048  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[845]: __fastcall System::TObject::DefaultHandler(void *)
     FixUp: 04c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[803]: __fastcall System::TObject::NewInstance()
     FixUp: 050  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[804]: __fastcall System::TObject::FreeInstance()
-    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: __fastcall System::TObject::~TObject()
+    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: System::TObject::operator ...
 0119EB LEDATA  Segment: (16441) '__tpdsc__ System::UnsafeAttribute'Offset: 0000  Length: 002E
     0000: 04 00 00 00 07 0F 55 6E  73 61 66 65 41 74 74 72   ......UnsafeAttr
     0010: 69 62 75 74 65 58 00 00  00 00 00 00 00 00 00 06   ibuteX..........
@@ -4724,7 +4724,7 @@
     FixUp: 048  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[845]: __fastcall System::TObject::DefaultHandler(void *)
     FixUp: 04c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[803]: __fastcall System::TObject::NewInstance()
     FixUp: 050  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[804]: __fastcall System::TObject::FreeInstance()
-    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: __fastcall System::TObject::~TObject()
+    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: System::TObject::operator ...
 011AFB LEDATA  Segment: (16443) '__tpdsc__ System::RefAttribute'Offset: 0000  Length: 002B
     0000: 04 00 00 00 07 0C 52 65  66 41 74 74 72 69 62 75   ......RefAttribu
     0010: 74 65 58 00 00 00 00 00  00 00 00 00 06 53 79 73   teX..........Sys
@@ -4757,7 +4757,7 @@
     FixUp: 048  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[845]: __fastcall System::TObject::DefaultHandler(void *)
     FixUp: 04c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[803]: __fastcall System::TObject::NewInstance()
     FixUp: 050  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[804]: __fastcall System::TObject::FreeInstance()
-    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: __fastcall System::TObject::~TObject()
+    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: System::TObject::operator ...
 011C0D LEDATA  Segment: (16445) '__tpdsc__ System::VolatileAttribute'Offset: 0000  Length: 0030
     0000: 04 00 00 00 07 11 56 6F  6C 61 74 69 6C 65 41 74   ......VolatileAt
     0010: 74 72 69 62 75 74 65 58  00 00 00 00 00 00 00 00   tributeX........
@@ -4808,19 +4808,19 @@
     FixUp: 048  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[845]: __fastcall System::TObject::DefaultHandler(void *)
     FixUp: 04c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[803]: __fastcall System::TObject::NewInstance()
     FixUp: 050  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[804]: __fastcall System::TObject::FreeInstance()
-    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: __fastcall System::TObject::~TObject()
+    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: System::TObject::operator ...
     FixUp: 062  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[27]: __tpdsc__ System::string
     FixUp: 074  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[1]: __tpdsc__ Boolean
     FixUp: 085  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[27]: __tpdsc__ System::string
     FixUp: 09a  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[62]: System::StoredAttribute::
     FixUp: 0a2  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[62]: System::StoredAttribute::
     FixUp: 0aa  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[62]: System::StoredAttribute::
-    FixUp: 0c6  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[568]: __fastcall System::StoredAttribute::StoredAttribute()
+    FixUp: 0c6  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[568]: System::StoredAttribute::operator ...
     FixUp: 0db  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[63]: __tpdsc__ System::StoredAttribute
-    FixUp: 0ec  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[569]: __fastcall System::StoredAttribute::StoredAttribute(const bool)
+    FixUp: 0ec  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[569]: System::StoredAttribute::operator ...
     FixUp: 101  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[63]: __tpdsc__ System::StoredAttribute
     FixUp: 10f  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[1]: __tpdsc__ Boolean
-    FixUp: 12e  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[570]: __fastcall System::StoredAttribute::StoredAttribute(System::UnicodeString)
+    FixUp: 12e  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[570]: System::StoredAttribute::operator ...
     FixUp: 143  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[63]: __tpdsc__ System::StoredAttribute
     FixUp: 151  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[27]: __tpdsc__ System::string
 011E72 LEDATA  Segment: (16447) '__tpdsc__ System::StoredAttribute'Offset: 0000  Length: 007A
@@ -4873,13 +4873,13 @@
     FixUp: 048  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[845]: __fastcall System::TObject::DefaultHandler(void *)
     FixUp: 04c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[803]: __fastcall System::TObject::NewInstance()
     FixUp: 050  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[804]: __fastcall System::TObject::FreeInstance()
-    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: __fastcall System::TObject::~TObject()
+    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: System::TObject::operator ...
     FixUp: 05c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[64]: System::HPPGENAttribute::
     FixUp: 064  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[64]: System::HPPGENAttribute::
-    FixUp: 080  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[571]: __fastcall System::HPPGENAttribute::HPPGENAttribute(System::UnicodeString)
+    FixUp: 080  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[571]: System::HPPGENAttribute::operator ...
     FixUp: 095  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[65]: __tpdsc__ System::HPPGENAttribute
     FixUp: 0a3  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[27]: __tpdsc__ System::string
-    FixUp: 0b5  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[572]: __fastcall System::HPPGENAttribute::HPPGENAttribute(const int, System::UnicodeString)
+    FixUp: 0b5  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[572]: System::HPPGENAttribute::operator ...
     FixUp: 0ca  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[65]: __tpdsc__ System::HPPGENAttribute
     FixUp: 0d8  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[6]: __tpdsc__ Integer
     FixUp: 0e7  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[27]: __tpdsc__ System::string
@@ -4925,11 +4925,11 @@
     FixUp: 048  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[845]: __fastcall System::TObject::DefaultHandler(void *)
     FixUp: 04c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[803]: __fastcall System::TObject::NewInstance()
     FixUp: 050  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[804]: __fastcall System::TObject::FreeInstance()
-    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: __fastcall System::TObject::~TObject()
+    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: System::TObject::operator ...
     FixUp: 061  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[10]: __tpdsc__ Pointer
     FixUp: 079  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[6]: __tpdsc__ Integer
     FixUp: 095  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[66]: System::HFAAttribute::
-    FixUp: 0ae  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[573]: __fastcall System::HFAAttribute::HFAAttribute(const void *, const int)
+    FixUp: 0ae  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[573]: System::HFAAttribute::operator ...
     FixUp: 0c3  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[67]: __tpdsc__ System::HFAAttribute
     FixUp: 0d1  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[10]: __tpdsc__ Pointer
     FixUp: 0e6  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[6]: __tpdsc__ Integer
@@ -4982,10 +4982,10 @@
     FixUp: 048  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[845]: __fastcall System::TObject::DefaultHandler(void *)
     FixUp: 04c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[803]: __fastcall System::TObject::NewInstance()
     FixUp: 050  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[804]: __fastcall System::TObject::FreeInstance()
-    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: __fastcall System::TObject::~TObject()
+    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: System::TObject::operator ...
     FixUp: 061  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[6]: __tpdsc__ Integer
     FixUp: 076  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[68]: System::AlignAttribute::
-    FixUp: 091  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[574]: __fastcall System::AlignAttribute::AlignAttribute(int)
+    FixUp: 091  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[574]: System::AlignAttribute::operator ...
     FixUp: 0a6  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[69]: __tpdsc__ System::AlignAttribute
     FixUp: 0b4  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[6]: __tpdsc__ Integer
 012458 LEDATA  Segment: (16453) '__tpdsc__ System::AlignAttribute'Offset: 0000  Length: 0054
@@ -5102,7 +5102,7 @@
     FixUp: 000  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[76]: __tpdsc__ System::TMonitor
     FixUp: 01b  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[6]: __tpdsc__ Integer
     FixUp: 031  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[61]: __tpdsc__ System::VolatileAttribute
-    FixUp: 035  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[811]: __fastcall System::TObject::TObject()
+    FixUp: 035  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[811]: System::TObject::operator ...
     FixUp: 03b  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[6]: __tpdsc__ Integer
     FixUp: 056  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[9]: __tpdsc__ Cardinal
     FixUp: 06f  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[10]: __tpdsc__ Pointer
@@ -5237,10 +5237,10 @@
     FixUp: 048  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[845]: __fastcall System::TObject::DefaultHandler(void *)
     FixUp: 04c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[1346]: __fastcall System::TInterfacedObject::NewInstance()
     FixUp: 050  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[804]: __fastcall System::TObject::FreeInstance()
-    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: __fastcall System::TObject::~TObject()
+    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: System::TObject::operator ...
     FixUp: 061  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[6]: __tpdsc__ Integer
     FixUp: 075  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[61]: __tpdsc__ System::VolatileAttribute
-    FixUp: 079  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[811]: __fastcall System::TObject::TObject()
+    FixUp: 079  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[811]: System::TObject::operator ...
     FixUp: 083  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[84]: System::TInterfacedObject::
     FixUp: 08b  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[84]: System::TInterfacedObject::
     FixUp: 093  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[84]: System::TInterfacedObject::
@@ -5302,12 +5302,12 @@
     FixUp: 048  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[845]: __fastcall System::TObject::DefaultHandler(void *)
     FixUp: 04c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[803]: __fastcall System::TObject::NewInstance()
     FixUp: 050  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[804]: __fastcall System::TObject::FreeInstance()
-    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: __fastcall System::TObject::~TObject()
+    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: System::TObject::operator ...
     FixUp: 061  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[77]: __tpdsc__ System::IInterface
     FixUp: 077  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[57]: __tpdsc__ System::UnsafeAttribute
-    FixUp: 07b  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[811]: __fastcall System::TObject::TObject()
+    FixUp: 07b  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[811]: System::TObject::operator ...
     FixUp: 085  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[87]: System::TAggregatedObject::
-    FixUp: 0a3  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[1350]: __fastcall System::TAggregatedObject::TAggregatedObject(System::DelphiInterface<System::IInterface>)
+    FixUp: 0a3  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[1350]: System::TAggregatedObject::operator ...
     FixUp: 0b8  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[88]: __tpdsc__ System::TAggregatedObject
     FixUp: 0c6  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[77]: __tpdsc__ System::IInterface
 013031 LEDATA  Segment: (16472) '__tpdsc__ System::TAggregatedObject'Offset: 0000  Length: 005C
@@ -5364,7 +5364,7 @@
     FixUp: 048  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[845]: __fastcall System::TObject::DefaultHandler(void *)
     FixUp: 04c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[803]: __fastcall System::TObject::NewInstance()
     FixUp: 050  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[804]: __fastcall System::TObject::FreeInstance()
-    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: __fastcall System::TObject::~TObject()
+    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: System::TObject::operator ...
     FixUp: 058  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[1354]: __stdcall System::TContainedObject::QueryInterface(_GUID&, void *)
 01320E LEDATA  Segment: (16475) '__tpdsc__ System::TContainedObject'Offset: 0000  Length: 002F
     0000: 04 00 00 00 07 10 54 43  6F 6E 74 61 69 6E 65 64   ......TContained
@@ -5417,7 +5417,7 @@
     FixUp: 048  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[845]: __fastcall System::TObject::DefaultHandler(void *)
     FixUp: 04c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[1346]: __fastcall System::TInterfacedObject::NewInstance()
     FixUp: 050  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[804]: __fastcall System::TObject::FreeInstance()
-    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: __fastcall System::TObject::~TObject()
+    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: System::TObject::operator ...
     FixUp: 061  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[50]: __tpdsc__ System::TObject
 0133D3 LEDATA  Segment: (16478) '__tpdsc__ System::TClassHelperBase'Offset: 0000  Length: 002F
     0000: 04 00 00 00 07 10 54 43  6C 61 73 73 48 65 6C 70   ......TClassHelp
@@ -5474,7 +5474,7 @@
     FixUp: 048  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[845]: __fastcall System::TObject::DefaultHandler(void *)
     FixUp: 04c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[803]: __fastcall System::TObject::NewInstance()
     FixUp: 050  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[804]: __fastcall System::TObject::FreeInstance()
-    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: __fastcall System::TObject::~TObject()
+    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: System::TObject::operator ...
 0135A9 LEDATA  Segment: (16482) '__tpdsc__ System::TNoRefCountObject'Offset: 0000  Length: 0030
     0000: 04 00 00 00 07 11 54 4E  6F 52 65 66 43 6F 75 6E   ......TNoRefCoun
     0010: 74 4F 62 6A 65 63 74 58  00 00 00 00 00 00 00 00   tObjectX........
@@ -6376,9 +6376,9 @@
 01580E FIXU32
     FixUp: 000  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[190]: __tpdsc__ System::TPtrWrapper
     FixUp: 01e  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[125]: __tpdsc__ System::PByte
-    FixUp: 034  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[1403]: __fastcall System::TPtrWrapper::TPtrWrapper(int)
+    FixUp: 034  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[1403]: System::TPtrWrapper::operator ...
     FixUp: 047  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[6]: __tpdsc__ Integer
-    FixUp: 057  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[1404]: __fastcall System::TPtrWrapper::TPtrWrapper(void *)
+    FixUp: 057  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[1404]: System::TPtrWrapper::operator ...
     FixUp: 06a  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[10]: __tpdsc__ Pointer
     FixUp: 07a  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[1405]: __fastcall System::TPtrWrapper::ToPointer()
     FixUp: 08a  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[10]: __tpdsc__ Pointer
@@ -6473,7 +6473,7 @@
     FixUp: 048  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[845]: __fastcall System::TObject::DefaultHandler(void *)
     FixUp: 04c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[803]: __fastcall System::TObject::NewInstance()
     FixUp: 050  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[804]: __fastcall System::TObject::FreeInstance()
-    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: __fastcall System::TObject::~TObject()
+    FixUp: 054  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[812]: System::TObject::operator ...
     FixUp: 05c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[191]: System::TMarshal::
     FixUp: 064  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[191]: System::TMarshal::
     FixUp: 06c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[191]: System::TMarshal::
@@ -6541,7 +6541,7 @@
     FixUp: 25c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[191]: System::TMarshal::
     FixUp: 264  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[191]: System::TMarshal::
     FixUp: 26c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[191]: System::TMarshal::
-    FixUp: 281  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[1410]: __fastcall System::TMarshal::TMarshal()
+    FixUp: 281  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[1410]: System::TMarshal::operator ...
     FixUp: 296  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[192]: __tpdsc__ System::TMarshal
     FixUp: 2a7  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[1411]: __fastcall System::TMarshal::InString(System::UnicodeString)
     FixUp: 2b6  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[23]: __tpdsc__ System::PWideChar
@@ -11068,7 +11068,7 @@
 021278 LEDATA  Segment: (16951) '__fastcall System::TGUID::IsEmpty()'Offset: 0000  Length: 001D
     0000: 83 38 00 75 12 83 78 04  00 75 0C 83 78 08 00 75   .8.u..x..u..x..u
     0010: 06 83 78 0C 00 74 03 33  C0 C3 B0 01 C3            ..x..t.3.....
-02129D LEDATA  Segment: (16952) '__fastcall System::StoredAttribute::StoredAttribute()'Offset: 0000  Length: 0041
+02129D LEDATA  Segment: (16952) 'System::StoredAttribute::operator ...'Offset: 0000  Length: 0041
     0000: 53 56 84 D2 74 08 83 C4  F0 E8 00 00 00 00 8B DA   SV..t...........
     0010: 8B F0 33 D2 8B C6 E8 00  00 00 00 C6 46 04 01 8D   ..3.........F...
     0020: 46 08 E8 00 00 00 00 8B  C6 84 DB 74 0F E8 00 00   F..........t....
@@ -11076,10 +11076,10 @@
     0040: C3                                                 .
 0212E6 FIXU32
     FixUp: 00a  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[854]: System::__linkproc__ __fastcall ClassCreate(void *, signed char)
-    FixUp: 017  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[811]: __fastcall System::TObject::TObject()
+    FixUp: 017  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[811]: System::TObject::operator ...
     FixUp: 023  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[986]: System::__linkproc__ __fastcall UStrClr(void *)
     FixUp: 02e  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[856]: System::__linkproc__ __fastcall AfterConstruction(System::TObject * const)
-0212FE LEDATA  Segment: (16953) '__fastcall System::StoredAttribute::StoredAttribute(const bool)'Offset: 0000  Length: 004B
+0212FE LEDATA  Segment: (16953) 'System::StoredAttribute::operator ...'Offset: 0000  Length: 004B
     0000: 55 8B EC 51 53 56 84 D2  74 08 83 C4 F0 E8 00 00   U..QSV..t.......
     0010: 00 00 8B D9 88 55 FF 8B  F0 33 D2 8B C6 E8 00 00   .....U...3......
     0020: 00 00 88 5E 04 8D 46 08  E8 00 00 00 00 8B C6 80   ...^..F.........
@@ -11087,10 +11087,10 @@
     0040: 00 83 C4 0C 8B C6 5E 5B  59 5D C3                  ......^[Y].
 021351 FIXU32
     FixUp: 00e  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[854]: System::__linkproc__ __fastcall ClassCreate(void *, signed char)
-    FixUp: 01e  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[811]: __fastcall System::TObject::TObject()
+    FixUp: 01e  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[811]: System::TObject::operator ...
     FixUp: 029  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[986]: System::__linkproc__ __fastcall UStrClr(void *)
     FixUp: 036  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[856]: System::__linkproc__ __fastcall AfterConstruction(System::TObject * const)
-021369 LEDATA  Segment: (16954) '__fastcall System::StoredAttribute::StoredAttribute(System::UnicodeString)'Offset: 0000  Length: 0047
+021369 LEDATA  Segment: (16954) 'System::StoredAttribute::operator ...'Offset: 0000  Length: 0047
     0000: 53 56 57 84 D2 74 08 83  C4 F0 E8 00 00 00 00 8B   SVW..t..........
     0010: F1 8B DA 8B F8 33 D2 8B  C7 E8 00 00 00 00 C6 47   .....3.........G
     0020: 04 01 8D 47 08 8B D6 E8  00 00 00 00 8B C7 84 DB   ...G............
@@ -11098,23 +11098,23 @@
     0040: 0C 8B C7 5F 5E 5B C3                               ..._^[.
 0213B8 FIXU32
     FixUp: 00b  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[854]: System::__linkproc__ __fastcall ClassCreate(void *, signed char)
-    FixUp: 01a  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[811]: __fastcall System::TObject::TObject()
+    FixUp: 01a  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[811]: System::TObject::operator ...
     FixUp: 028  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[1006]: System::__linkproc__ __fastcall UStrAsg(System::UnicodeString&, System::UnicodeString)
     FixUp: 033  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[856]: System::__linkproc__ __fastcall AfterConstruction(System::TObject * const)
-0213D0 LEDATA  Segment: (16955) '__fastcall System::HPPGENAttribute::HPPGENAttribute(System::UnicodeString)'Offset: 0000  Length: 0020
+0213D0 LEDATA  Segment: (16955) 'System::HPPGENAttribute::operator ...'Offset: 0000  Length: 0020
     0000: 84 D2 74 08 83 C4 F0 E8  00 00 00 00 84 D2 74 0F   ..t...........t.
     0010: E8 00 00 00 00 64 8F 05  00 00 00 00 83 C4 0C C3    .....d..........
 0213F8 FIXU32
     FixUp: 008  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[854]: System::__linkproc__ __fastcall ClassCreate(void *, signed char)
     FixUp: 011  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[856]: System::__linkproc__ __fastcall AfterConstruction(System::TObject * const)
-021406 LEDATA  Segment: (16956) '__fastcall System::HPPGENAttribute::HPPGENAttribute(const int, System::UnicodeString)'Offset: 0000  Length: 0026
+021406 LEDATA  Segment: (16956) 'System::HPPGENAttribute::operator ...'Offset: 0000  Length: 0026
     0000: 55 8B EC 84 D2 74 08 83  C4 F0 E8 00 00 00 00 84   U....t..........
     0010: D2 74 0F E8 00 00 00 00  64 8F 05 00 00 00 00 83   .t......d.......
     0020: C4 0C 5D C2 04 00                                  ..]...
 021434 FIXU32
     FixUp: 00b  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[854]: System::__linkproc__ __fastcall ClassCreate(void *, signed char)
     FixUp: 014  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[856]: System::__linkproc__ __fastcall AfterConstruction(System::TObject * const)
-021442 LEDATA  Segment: (16957) '__fastcall System::HFAAttribute::HFAAttribute(const void *, const int)'Offset: 0000  Length: 0048
+021442 LEDATA  Segment: (16957) 'System::HFAAttribute::operator ...'Offset: 0000  Length: 0048
     0000: 55 8B EC 53 56 57 84 D2  74 08 83 C4 F0 E8 00 00   U..SVW..t.......
     0010: 00 00 8B F1 8B DA 8B F8  33 D2 8B C7 E8 00 00 00   ........3.......
     0020: 00 89 77 04 8B 45 08 89  47 08 8B C7 84 DB 74 0F   ..w..E..G.....t.
@@ -11122,16 +11122,16 @@
     0040: C7 5F 5E 5B 5D C2 04 00                            ._^[]...
 021492 FIXU32
     FixUp: 00e  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[854]: System::__linkproc__ __fastcall ClassCreate(void *, signed char)
-    FixUp: 01d  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[811]: __fastcall System::TObject::TObject()
+    FixUp: 01d  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[811]: System::TObject::operator ...
     FixUp: 031  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[856]: System::__linkproc__ __fastcall AfterConstruction(System::TObject * const)
-0214A5 LEDATA  Segment: (16958) '__fastcall System::AlignAttribute::AlignAttribute(int)'Offset: 0000  Length: 003C
+0214A5 LEDATA  Segment: (16958) 'System::AlignAttribute::operator ...'Offset: 0000  Length: 003C
     0000: 53 56 57 84 D2 74 08 83  C4 F0 E8 00 00 00 00 8B   SVW..t..........
     0010: F1 8B DA 8B F8 33 D2 8B  C7 E8 00 00 00 00 89 77   .....3.........w
     0020: 04 8B C7 84 DB 74 0F E8  00 00 00 00 64 8F 05 00   .....t......d...
     0030: 00 00 00 83 C4 0C 8B C7  5F 5E 5B C3               ........_^[.
 0214E9 FIXU32
     FixUp: 00b  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[854]: System::__linkproc__ __fastcall ClassCreate(void *, signed char)
-    FixUp: 01a  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[811]: __fastcall System::TObject::TObject()
+    FixUp: 01a  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[811]: System::TObject::operator ...
     FixUp: 028  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[856]: System::__linkproc__ __fastcall AfterConstruction(System::TObject * const)
 0214FC LEDATA  Segment: (16959) '__fastcall System::Int(const long double)'Offset: 0000  Length: 0029
     0000: 55 8B EC DB 6D 08 83 EC  04 D9 3C 24 D9 7C 24 02   U...m.....<$.|$.
@@ -13580,13 +13580,13 @@
     0000: 8B 48 04 3B 4A 04 72 1F  8B 48 04 3B 4A 04 75 06   .H.;J.r..H.;J.u.
     0010: 8B 08 3B 0A 72 11 8B 48  04 3B 4A 04 75 06 8B 00   ..;.r..H.;J.u...
     0020: 3B 02 74 03 33 C0 C3 B0  01 C3                     ;.t.3.....
-02768C LEDATA  Segment: (17195) '__fastcall System::TObject::TObject()'Offset: 0000  Length: 0020
+02768C LEDATA  Segment: (17195) 'System::TObject::operator ...'Offset: 0000  Length: 0020
     0000: 84 D2 74 08 83 C4 F0 E8  00 00 00 00 84 D2 74 0F   ..t...........t.
     0010: E8 00 00 00 00 64 8F 05  00 00 00 00 83 C4 0C C3    .....d..........
 0276B4 FIXU32
     FixUp: 008  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[854]: System::__linkproc__ __fastcall ClassCreate(void *, signed char)
     FixUp: 011  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[856]: System::__linkproc__ __fastcall AfterConstruction(System::TObject * const)
-0276C2 LEDATA  Segment: (17196) '__fastcall System::TObject::~TObject()'Offset: 0000  Length: 000F
+0276C2 LEDATA  Segment: (17196) 'System::TObject::operator ...'Offset: 0000  Length: 000F
     0000: E8 00 00 00 00 84 D2 7E  05 E8 00 00 00 00 C3      .......~.......
 0276D9 FIXU32
     FixUp: 001  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[857]: System::__linkproc__ __fastcall BeforeDestruction(System::TObject * const, signed char)
@@ -13760,7 +13760,7 @@
 027D1C LEDATA  Segment: (17219) 'System::_17219'Offset: 0000  Length: 000C
     0000: 8B C8 8B C2 B2 01 E8 00  00 00 00 C3               ............
 027D30 FIXU32
-    FixUp: 007  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[1355]: __fastcall System::TClassHelperBase::TClassHelperBase(System::TObject *)
+    FixUp: 007  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[1355]: System::TClassHelperBase::operator ...
 027D39 LEDATA  Segment: (17220) 'System::__linkproc__ __fastcall GetHelperIntf(System::TObject * const, System::TMetaClass *)'Offset: 0000  Length: 0056
     0000: 53 56 57 55 8B F9 8B DA  8B F0 8B 43 AC 85 C0 74   SVWU.......C...t
     0010: 27 83 38 00 7E 22 8D 68  04 8B D5 8B 06 E8 00 00   '.8.~".h........
@@ -18779,10 +18779,10 @@
     FixUp: 01a  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[1285]: System::_17669
     FixUp: 027  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[1284]: System::_17668
     FixUp: 041  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[61]: __tpdsc__ System::VolatileAttribute
-    FixUp: 045  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[811]: __fastcall System::TObject::TObject()
+    FixUp: 045  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[811]: System::TObject::operator ...
     FixUp: 04b  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[9]: __tpdsc__ Cardinal
     FixUp: 062  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[61]: __tpdsc__ System::VolatileAttribute
-    FixUp: 066  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[811]: __fastcall System::TObject::TObject()
+    FixUp: 066  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[811]: System::TObject::operator ...
     FixUp: 06c  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[6]: __tpdsc__ Integer
     FixUp: 082  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[71]: __tpdsc__ System::PMonitor
     FixUp: 097  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: VEI[1285]: System::_17669
@@ -19368,7 +19368,7 @@
     0020: 00 80 0B CA 8B 75 08 8B  C2 F0 0F B1 4E 04 3B D0   .....u......N.;.
     0030: 75 E5 B2 01 8B 45 08 8B  08 FF 51 FC 8B C3 5E 5B   u....E....Q...^[
     0040: 5D C2 04 00                                        ]...
-035ADE LEDATA  Segment: (17734) '__fastcall System::TAggregatedObject::TAggregatedObject(System::DelphiInterface<System::IInterface>)'Offset: 0000  Length: 0023
+035ADE LEDATA  Segment: (17734) 'System::TAggregatedObject::operator ...'Offset: 0000  Length: 0023
     0000: 84 D2 74 08 83 C4 F0 E8  00 00 00 00 89 48 04 84   ..t..........H..
     0010: D2 74 0F E8 00 00 00 00  64 8F 05 00 00 00 00 83   .t......d.......
     0020: C4 0C C3                                           ...
@@ -19390,14 +19390,14 @@
     0020: 80 5B 5D C2 0C 00                                  .[]...
 035B9D FIXU32
     FixUp: 010  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[823]: __fastcall System::TObject::GetInterface(_GUID&, void *)
-035BA6 LEDATA  Segment: (17739) '__fastcall System::TClassHelperBase::TClassHelperBase(System::TObject *)'Offset: 0000  Length: 003C
+035BA6 LEDATA  Segment: (17739) 'System::TClassHelperBase::operator ...'Offset: 0000  Length: 003C
     0000: 53 56 57 84 D2 74 08 83  C4 F0 E8 00 00 00 00 8B   SVW..t..........
     0010: F1 8B DA 8B F8 33 D2 8B  C7 E8 00 00 00 00 89 77   .....3.........w
     0020: 0C 8B C7 84 DB 74 0F E8  00 00 00 00 64 8F 05 00   .....t......d...
     0030: 00 00 00 83 C4 0C 8B C7  5F 5E 5B C3               ........_^[.
 035BEA FIXU32
     FixUp: 00b  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[854]: System::__linkproc__ __fastcall ClassCreate(void *, signed char)
-    FixUp: 01a  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[811]: __fastcall System::TObject::TObject()
+    FixUp: 01a  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[811]: System::TObject::operator ...
     FixUp: 028  Mode: Self Loc: Offset32    Frame: TARGET  Target: VEI[856]: System::__linkproc__ __fastcall AfterConstruction(System::TObject * const)
 035BFD LEDATA  Segment: (17740) '__stdcall System::TNoRefCountObject::QueryInterface(_GUID&, void *)'Offset: 0000  Length: 0026
     0000: 55 8B EC 53 8B 5D 08 8B  4D 10 8B 55 0C 8B C3 E8   U..S.]..M..U....
@@ -19801,9 +19801,9 @@
     FixUp: 001  Mode: Self Loc: Offset32    Frame: TARGET  Target: EI[1510]: GetVersion
     FixUp: 025  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: SI[3]: _BSS
     FixUp: 030  Mode: Seg  Loc: Offset32    Frame: TARGET  Target: SI[3]: _BSS
-036AE0 LEDATA  Segment: (17787) '__fastcall System::TPtrWrapper::TPtrWrapper(int)'Offset: 0000  Length: 0003
+036AE0 LEDATA  Segment: (17787) 'System::TPtrWrapper::operator ...'Offset: 0000  Length: 0003
     0000: 89 10 C3                                           ...
-036AEB LEDATA  Segment: (17788) '__fastcall System::TPtrWrapper::TPtrWrapper(void *)'Offset: 0000  Length: 0003
+036AEB LEDATA  Segment: (17788) 'System::TPtrWrapper::operator ...'Offset: 0000  Length: 0003
     0000: 89 10 C3                                           ...
 036AF6 LEDATA  Segment: (17789) '__fastcall System::TPtrWrapper::ToPointer()'Offset: 0000  Length: 0003
     0000: 8B 00 C3                                           ...
@@ -19817,7 +19817,7 @@
 036B3E LEDATA  Segment: (17793) '__fastcall System::TPtrWrapper::_op_Inequality(System::TPtrWrapper, System::TPtrWrapper)'Offset: 0000  Length: 0017
     0000: 83 C4 F8 89 54 24 04 89  04 24 8B 04 24 3B 44 24   ....T$...$..$;D$
     0010: 04 0F 95 C0 59 5A C3                               ....YZ.
-036B5D LEDATA  Segment: (17794) '__fastcall System::TMarshal::TMarshal()'Offset: 0000  Length: 0027
+036B5D LEDATA  Segment: (17794) 'System::TMarshal::operator ...'Offset: 0000  Length: 0027
     0000: 84 D2 74 08 83 C4 F0 E8  00 00 00 00 B0 02 E8 00   ..t.............
     0010: 00 00 00 84 D2 74 0F E8  00 00 00 00 64 8F 05 00   .....t......d...
     0020: 00 00 00 83 C4 0C C3                               .......

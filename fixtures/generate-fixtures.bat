@@ -37,6 +37,10 @@ call :RequireFile "%BINARIES_DIR%\OMF.Library.Win32.lib"
 if errorlevel 1 exit /b 1
 call :RequireFile "%BINARIES_DIR%\COFF.Object.Win64.obj"
 if errorlevel 1 exit /b 1
+call :RequireFile "%BINARIES_DIR%\COFF.Object.Win64.MinGW.obj"
+if errorlevel 1 exit /b 1
+call :RequireFile "%BINARIES_DIR%\ELF.Object.Win64.zutil.o"
+if errorlevel 1 exit /b 1
 call :RequireFile "%BINARIES_DIR%\AR.Library.Win64.a"
 if errorlevel 1 exit /b 1
 call :RequireFile "%BINARIES_DIR%\DCU.System.Win32.dcu"
@@ -93,6 +97,11 @@ rem These are real archive/COFF inputs. The installed TDUMP64 cannot parse
 rem their Windows members, so fixtures retain its diagnostic output.
 call :Dump "%TDUMP64_EXE%" "%BINARIES_DIR%\AR.Library.Win64.a" "%OUTPUT_DIR%\AR.Library.Win64.invalid-data.tdump" "-lh"
 call :Dump "%TDUMP64_EXE%" "%BINARIES_DIR%\COFF.Object.Win64.obj" "%OUTPUT_DIR%\COFF.Object.Win64.invalid-machine.tdump" "-C" "allow-nonzero" "capture-stderr"
+
+rem Small, valid object files from the installed toolchain provide real COFF
+rem and ELF output for parser coverage.
+call :Dump "%TDUMP64_EXE%" "%BINARIES_DIR%\COFF.Object.Win64.MinGW.obj" "%OUTPUT_DIR%\COFF.Object.Win64.MinGW.tdump" "-C" "allow-nonzero" "capture-stderr"
+call :Dump "%TDUMP64_EXE%" "%BINARIES_DIR%\ELF.Object.Win64.zutil.o" "%OUTPUT_DIR%\ELF.Object.Win64.tdump" "-e" "allow-nonzero" "capture-stderr"
 
 rem Universal Mach-O BPLs exercise FAT and individual Mach-header output.
 call :Dump "%TDUMP64_EXE%" "%BINARIES_DIR%\Mach.Universal.Rad23.dylib" "%OUTPUT_DIR%\Mach.Universal.Rad23.tdump" "-M" "allow-nonzero" "capture-stderr"

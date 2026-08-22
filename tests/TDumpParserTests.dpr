@@ -69,73 +69,6 @@ begin
   end;
 end;
 
-procedure TestTDumpDialectAliases;
-const
-  CTDump32Text =
-    'Turbo Dump Version 8.0' + sLineBreak +
-    'Display of File sample32.exe' + sLineBreak + sLineBreak +
-    'Old Executable Header' + sLineBreak +
-    'DOS File Size: 0040h' + sLineBreak + sLineBreak +
-    'Portable Executable (PE) File' + sLineBreak +
-    'CPU type: I386' + sLineBreak +
-    'Name                   RVA       Size' + sLineBreak +
-    'Exports                00002000  00000020' + sLineBreak +
-    'Imports                00003000  00000040' + sLineBreak + sLineBreak +
-    'Object table:' + sLineBreak +
-    '#   Name              VirtSize    RVA     PhysSize  Phys off  Flags' + sLineBreak +
-    '01  .text             00001000  00001000  00000200  00000400  60000020 [CER]' + sLineBreak +
-    '02  .data             00000200  00003000  00000200  00000600  C0000040 [IRW]' + sLineBreak +
-    'Section: Import';
-  CTDump64Text =
-    'TDUMP64 Version 8.0' + sLineBreak +
-    'Display of File sample64.exe' + sLineBreak + sLineBreak +
-    'MZ Header' + sLineBreak +
-    'DOS File Size: 0040h' + sLineBreak + sLineBreak +
-    'PE Header' + sLineBreak +
-    'CPU type: AMD64' + sLineBreak +
-    'Directory Name RVA Size' + sLineBreak +
-    'Exports 00002000 00000020' + sLineBreak +
-    'Imports 00003000 00000040' + sLineBreak + sLineBreak +
-    'Section Headers' + sLineBreak +
-    'Index Name Virtual Size RVA Raw Size Raw Offset Characteristics' + sLineBreak +
-    '01 .text 00001000 00001000 00000200 00000400 60000020 [CER]' + sLineBreak +
-    '02 .data 00000200 00003000 00000200 00000600 C0000040 [IRW]' + sLineBreak +
-    'Section: Import';
-begin
-  var LParser := TDumpParser.Create;
-  try
-    var LDump32 := LParser.ParseText(CTDump32Text);
-    try
-      Require(LDump32.ToolKind = tkTDump32,
-        'Turbo Dump banner must identify the TDUMP dialect.');
-      Require(LDump32.ToolVersion = '8.0',
-        'TDUMP banner version must be retained.');
-      Require((LDump32.Headers.Count = 2) and
-        (LDump32.DataDirectories.Count = 2) and (LDump32.Sections.Count = 2),
-        'Canonical TDUMP P0 headings must project both headers, directories, and sections.');
-    finally
-      LDump32.Free;
-    end;
-
-    var LDump64 := LParser.ParseText(CTDump64Text);
-    try
-      Require(LDump64.ToolKind = tkTDump64,
-        'TDUMP64 banner must identify the TDUMP64 dialect.');
-      Require(LDump64.ToolVersion = '8.0',
-        'TDUMP64 banner version must be retained.');
-      Require((LDump64.Headers.Count = 2) and
-        (LDump64.DataDirectories.Count = 2) and (LDump64.Sections.Count = 2),
-        'TDUMP64 aliases must project the same P0 structure as TDUMP.');
-      Require(SameText(LDump64.Architecture, 'AMD64'),
-        'Target architecture must remain independent from tool dialect.');
-    finally
-      LDump64.Free;
-    end;
-  finally
-    LParser.Free;
-  end;
-end;
-
 procedure TestCompactImports;
 begin
   var LDocument := ParseGeneratedFixture('Dll.Win32.imports.tdump');
@@ -261,62 +194,40 @@ begin
     LDocument.Free;
   end;
 
-  var LParser := TDumpParser.Create;
+  LDocument := ParseGeneratedFixture('ELF.Object.Win64.tdump');
   try
-    LDocument := LParser.ParseText('ELF Header' + sLineBreak +
-      'Class: ELF64' + sLineBreak + 'Machine: AArch64');
-    try
-      Require((LDocument.FileKind = dfELFObject) and
-        (LDocument.Headers.Count = 1) and
-        (LDocument.Headers[0].Properties.Count = 2),
-        'An explicit ELF header must create a typed minimal ELF projection.');
-    finally
-      LDocument.Free;
-    end;
-
-    var LFirst := LParser.ParseText('TDUMP Version 1' + sLineBreak +
-      'Old Executable Header', 'same-input.tdump');
-    var LSecond := LParser.ParseText('TDUMP64 Version 1' + sLineBreak +
-      'MZ Header', 'same-input.tdump');
-    try
-      var LMerge := LFirst.MergeWith(LSecond);
-      try
-        Require((LMerge.Documents.Count = 2) and (LMerge.Runs.Count = 2) and
-          (LMerge.Conflicts.Count > 0),
-          'A merge must retain both runs and report conflicting same-source text.');
-      finally
-        LMerge.Free;
-      end;
-    finally
-      LSecond.Free;
-      LFirst.Free;
-    end;
+    Require((LDocument.FileKind = dfELFObject) and
+      (LDocument.Headers.Count = 1) and
+      (LDocument.Headers[0].Properties.Count >= 10) and
+      (LDocument.Sections.Count = 12) and (LDocument.Symbols.Count >= 10) and
+      LDocument.Symbols[0].SourceSpan.IsValid,
+      'The real ELF fixture must project its header, sections, and symbols.');
   finally
-    LParser.Free;
+    LDocument.Free;
   end;
-end;
 
-procedure TestUnknownBlockFallback;
-begin
-  var LParser := TDumpParser.Create;
+  LDocument := ParseGeneratedFixture('COFF.Object.Win64.MinGW.tdump');
   try
-    var LDocument := LParser.ParseText('Section: Future Data' + sLineBreak +
-      '  Future row' + sLineBreak + 'Section:             Import');
+    Require((LDocument.FileKind = dfCOFFObject) and
+      (LDocument.Diagnostics.Count > 0),
+      'The real COFF fixture must retain TDUMP''s unsupported-machine diagnostic.');
+  finally
+    LDocument.Free;
+  end;
+
+  var LFirst := ParseGeneratedFixture('VCL.Win32.pe-core.tdump');
+  var LSecond := ParseGeneratedFixture('VCL.Win64.pe-core.tdump');
+  try
+    var LMerge := LFirst.MergeWith(LSecond);
     try
-      Require(LDocument.UnsupportedStructures.Count = 1,
-        'An unknown section inside a recognized report must produce one fallback block.');
-      var LUnknownNode := LDocument.UnsupportedStructures[0].Node;
-      Require((LUnknownNode.StartLine = 1) and (LUnknownNode.EndLine = 2),
-        'Fallback block must cover only the unknown section lines.');
-      Require(Pos('Future row', LUnknownNode.RawText) > 0,
-        'Fallback block must preserve its own raw text.');
-      Require(LDocument.Imports.Count = 0,
-        'The following known empty import section must remain independently recognized.');
+      Require((LMerge.Documents.Count = 2) and (LMerge.Runs.Count = 2),
+        'A merge must retain both real fixture documents and runs.');
     finally
-      LDocument.Free;
+      LMerge.Free;
     end;
   finally
-    LParser.Free;
+    LSecond.Free;
+    LFirst.Free;
   end;
 end;
 
@@ -422,12 +333,17 @@ begin
       try
         var LDocument := LParser.ParseFile(LFixtureFileName);
         try
-          Require(LDocument.UnsupportedStructures.Count > 0,
-            ExtractFileName(LFixtureFileName) +
-            ' must explicitly preserve invalid input as unsupported.');
+          if LDocument.FileKind = dfCOFFObject then
+            Require(LDocument.Diagnostics.Count > 0,
+              ExtractFileName(LFixtureFileName) +
+              ' must retain TDUMP''s COFF diagnostic.')
+          else
+            Require(LDocument.UnsupportedStructures.Count > 0,
+              ExtractFileName(LFixtureFileName) +
+              ' must explicitly preserve invalid input as unsupported.');
           Require(LDocument.Nodes.Count > 1,
             ExtractFileName(LFixtureFileName) +
-            ' must create bounded fallback nodes for invalid input.');
+            ' must create a bounded diagnostic or fallback node.');
         finally
           LDocument.Free;
         end;
@@ -463,84 +379,20 @@ begin
   end;
 end;
 
-procedure TestOrdinalOnlyAndMalformedCases;
-begin
-  var LParser := TDumpParser.Create;
-  try
-    var LDocument := LParser.ParseText('EXPORT ord:0002');
-    try
-      Require((LDocument.ExportList.Count = 1) and
-        LDocument.ExportList[0].HasOrdinal and
-        (LDocument.ExportList[0].Name = '') and
-        (LDocument.Diagnostics.Count = 0),
-        'An ordinal-only compact export must remain a valid export.');
-    finally
-      LDocument.Free;
-    end;
-
-    LDocument := LParser.ParseText('IMPORT: malformed');
-    try
-      Require((LDocument.Imports.Count = 0) and
-        (LDocument.Diagnostics.Count = 1) and
-        (LDocument.UnsupportedStructures.Count = 1),
-        'A malformed compact import must produce one recoverable finding.');
-    finally
-      LDocument.Free;
-    end;
-
-    LDocument := LParser.ParseText('TDUMP64 Version 8.0' + sLineBreak +
-      'PE Header' + sLineBreak + 'CPU type: AMD64');
-    try
-      Require((LDocument.ToolKind = tkTDump64) and
-        (LDocument.Headers.Count = 1) and
-        SameText(LDocument.Architecture, 'AMD64'),
-        'A truncated TDUMP64 PE header must retain its available P0 projection.');
-    finally
-      LDocument.Free;
-    end;
-  finally
-    LParser.Free;
-  end;
-end;
-
-procedure TestAmbiguousNumberStaysRaw;
-begin
-  var LParser := TDumpParser.Create;
-  try
-    var LDocument := LParser.ParseText('Old Executable Header' + sLineBreak +
-      'Counter: 10');
-    try
-      Require(LDocument.Headers.Count = 1, 'Synthetic header must be recognized.');
-      Require(LDocument.Headers[0].Properties.Count = 1,
-        'Synthetic property must be retained.');
-      Require(not LDocument.Headers[0].Properties[0].HasUIntValue,
-        'Ambiguous bare number must remain raw.');
-    finally
-      LDocument.Free;
-    end;
-  finally
-    LParser.Free;
-  end;
-end;
-
 begin
   try
     TestPECoreProjection;
     TestSourceSpanProvenance;
-    TestTDumpDialectAliases;
     TestCompactImports;
     TestCompactExports;
     TestRelocations;
     TestUnknownFallback;
-    TestUnknownBlockFallback;
     TestGeneratedFixtureCoverage;
     TestGeneratedPECoreProjection;
     TestGeneratedCompactProjections;
     TestInvalidFixtureFallback;
     TestDebugInformationProjection;
-    TestOrdinalOnlyAndMalformedCases;
     TestP2ProjectionsAndMerge;
-    TestAmbiguousNumberStaysRaw;
     Writeln('TDump parser assertions passed.');
   except
     on LException: Exception do

@@ -61,6 +61,7 @@ type
   TDumpLine = class;
   TDumpNode = class;
   TDumpBorlandSymbolRecord = class;
+  TDumpMachSection = class;
   TDumpDocument = class;
   TDumpRun = class;
 
@@ -380,6 +381,9 @@ type
     HasOffset: Boolean;
     RawOffset: string;
     RecordKind: string;
+    Name: string;
+    Length: UInt64;
+    HasLength: Boolean;
     StartLine: Integer;
     EndLine: Integer;
     SourceSpan: TDumpSourceSpan;
@@ -412,11 +416,26 @@ type
     Index: Integer;
     Name: string;
     Properties: TList<TDumpProperty>;
+    Sections: TObjectList<TDumpMachSection>;
     StartLine: Integer;
     EndLine: Integer;
     SourceSpan: TDumpSourceSpan;
     constructor Create;
     destructor Destroy; override;
+  end;
+
+  // Represents one section detail nested below a Mach segment load command.
+  TDumpMachSection = class
+  public
+    Name: string;
+    SegmentName: string;
+    Address: UInt64;
+    HasAddress: Boolean;
+    Size: UInt64;
+    HasSize: Boolean;
+    StartLine: Integer;
+    EndLine: Integer;
+    SourceSpan: TDumpSourceSpan;
   end;
 
   // Represents a normalized symbol projected from a Borland S_* record.
@@ -872,6 +891,7 @@ type
     procedure ParseOMF;
     procedure ParseMach;
     procedure ParseELF;
+    procedure ParseCOFF;
     procedure BuildLineCatalog;
     function ClassifyTDumpLine(const ALine: string): TDumpLineKind;
     function IsGenericBlockHeading(const ALine: string): Boolean;
@@ -1371,10 +1391,12 @@ constructor TDumpMachLoadCommand.Create;
 begin
   inherited Create;
   Properties := TList<TDumpProperty>.Create;
+  Sections := TObjectList<TDumpMachSection>.Create(True);
 end;
 
 destructor TDumpMachLoadCommand.Destroy;
 begin
+  Sections.Free;
   Properties.Free;
   inherited;
 end;
@@ -1736,6 +1758,7 @@ begin
     ParseOMF;
     ParseMach;
     ParseELF;
+    ParseCOFF;
     BuildDebugInformation;
     DetectUnsupportedStructures;
     AttachRunProvenance;
@@ -3791,35 +3814,162 @@ begin
 end;
 
 procedure TDumpParser.ParseELF;
+  procedure AddELFTableNode(AKind: TDumpNodeKind; const ATitle: string;
+    AStartLine, AEndLine: Integer);
+  begin
+    if AStartLine <= AEndLine then
+      AddNode(AKind, ATitle, AStartLine + 1, AEndLine + 1);
+  end;
+
+  function NextTableHeading(AStartLine: Integer): Integer;
+  begin
+    Result := FLines.Count;
+    for var LIndex := AStartLine to FLines.Count - 1 do
+      if StartsWithText(Trim(FLines[LIndex]), '---') then
+        Exit(LIndex);
+  end;
+
+  procedure ParseELFSectionRow(const ALine: string; ALineNumber: Integer;
+    ASection: TDumpSection; AContinuation: Boolean);
+  begin
+    var LWork := Trim(ALine);
+    if not AContinuation then
+    begin
+      FirstToken(LWork);
+      ASection.Name := FirstToken(LWork);
+    end;
+    var LType := FirstToken(LWork);
+    var LFlags := FirstToken(LWork);
+    var LAddress := FirstToken(LWork);
+    var LOffset := FirstToken(LWork);
+    var LSize := FirstToken(LWork);
+    if LType <> '' then
+    begin
+      var LProperty: TDumpProperty;
+      LProperty.Name := 'type';
+      LProperty.RawValue := LType;
+      LProperty.TextValue := LType;
+      LProperty.ValueKind := vkText;
+      LProperty.StartLine := ALineNumber;
+      ASection.Properties.Add(LProperty);
+    end;
+    ASection.FlagsText := LFlags;
+    TryParseHexUIntToken(LAddress, ASection.RVA);
+    TryParseHexUIntToken(LOffset, ASection.RawOffset);
+    TryParseHexUIntToken(LSize, ASection.RawSize);
+  end;
+
+  procedure ParseELFSymbolRow(const ALine: string; ALineNumber: Integer);
+  begin
+    var LWork := Trim(ALine);
+    var LIndexText := FirstToken(LWork);
+    var LIndex: UInt64;
+    if not TryParseNumericToken(LIndexText, ncDecimal, LIndex) then
+      Exit;
+    var LName := FirstToken(LWork);
+    var LValue := FirstToken(LWork);
+    FirstToken(LWork); // size
+    var LType := FirstToken(LWork);
+    var LBind := FirstToken(LWork);
+    if LName = '' then
+      Exit;
+    var LSymbol := TDumpSymbol.Create;
+    LSymbol.Name := LName;
+    LSymbol.MangledName := LName;
+    LSymbol.RawText := ALine;
+    LSymbol.StartLine := ALineNumber;
+    LSymbol.HasAddress := TryParseHexUIntToken(LValue, LSymbol.Address);
+    if SameText(LType, 'FUNC') then
+      LSymbol.Kind := skFunction
+    else if SameText(LType, 'OBJECT') then
+      LSymbol.Kind := skData
+    else if SameText(LType, 'SECTION') then
+      LSymbol.Kind := skType;
+    if LBind <> '' then
+      LSymbol.SectionName := LBind;
+    FDocument.Symbols.Add(LSymbol);
+  end;
+
+begin
+  var LHeaderLine := -1;
+  for var LIndex := 0 to FLines.Count - 1 do
+    if ContainsText(FLines[LIndex], 'Elf Header') then
+    begin
+      LHeaderLine := LIndex;
+      Break;
+    end;
+  if LHeaderLine < 0 then
+    Exit;
+
+  FDocument.FileKind := dfELFObject;
+  var LHeaderEnd := NextTableHeading(LHeaderLine + 1) - 1;
+  var LHeader := TDumpHeader.Create;
+  LHeader.Name := 'ELF Header';
+  LHeader.StartLine := LHeaderLine + 1;
+  LHeader.EndLine := LHeaderEnd + 1;
+  FDocument.Headers.Add(LHeader);
+  var LNode := AddNode(nkHeader, LHeader.Name, LHeader.StartLine,
+    LHeader.EndLine);
+  for var LPropertyIndex := LHeaderLine + 1 to LHeaderEnd do
+  begin
+    var LProperty: TDumpProperty;
+    if TryParsePropertyLine(FLines[LPropertyIndex], LPropertyIndex + 1,
+      LProperty) then
+    begin
+      LHeader.Properties.Add(LProperty);
+      LNode.Properties.Add(LProperty);
+    end;
+  end;
+
+  for var LTableStart := LHeaderEnd + 1 to FLines.Count - 1 do
+  begin
+    var LTitle := Trim(FLines[LTableStart]);
+    if not StartsWithText(LTitle, '------------') then
+      Continue;
+    var LTableEnd := NextTableHeading(LTableStart + 1) - 1;
+    if Pos('Section Headers', LTitle) > 0 then
+    begin
+      var LCurrentSection: TDumpSection := nil;
+      for var LRow := LTableStart + 1 to LTableEnd do
+      begin
+        var LRowText := Trim(FLines[LRow]);
+        var LProbe := LRowText;
+        var LIndexText := FirstToken(LProbe);
+        var LSectionIndex: UInt64;
+        if TryParseNumericToken(LIndexText, ncDecimal, LSectionIndex) then
+        begin
+          LCurrentSection := TDumpSection.Create;
+          LCurrentSection.Index := Integer(LSectionIndex);
+          LCurrentSection.StartLine := LRow + 1;
+          ParseELFSectionRow(FLines[LRow], LRow + 1, LCurrentSection, False);
+          FDocument.Sections.Add(LCurrentSection);
+        end
+        else if (LCurrentSection <> nil) and (LRowText <> '') and
+          not StartsWithText(LRowText, 'ndx') then
+          ParseELFSectionRow(FLines[LRow], LRow + 1, LCurrentSection, True);
+      end;
+      AddELFTableNode(nkSections, 'ELF Section Headers', LTableStart, LTableEnd);
+    end
+    else if (Pos('Symbol Table ', LTitle) > 0) and
+      (Pos('sorted', LowerCase(LTitle)) = 0) then
+    begin
+      for var LRow := LTableStart + 1 to LTableEnd do
+        if not StartsWithText(Trim(FLines[LRow]), 'ndx') then
+          ParseELFSymbolRow(FLines[LRow], LRow + 1);
+      AddELFTableNode(nkSymbols, 'ELF Symbol Table', LTableStart, LTableEnd);
+    end;
+  end;
+end;
+
+procedure TDumpParser.ParseCOFF;
 begin
   for var LIndex := 0 to FLines.Count - 1 do
-    if StartsWithText(Trim(FLines[LIndex]), 'ELF Header') then
+    if StartsWithText(Trim(FLines[LIndex]), 'ERROR: Invalid machine type') then
     begin
-      var LEndLine := FLines.Count - 1;
-      for var LEndIndex := LIndex + 1 to FLines.Count - 1 do
-        if StartsWithText(Trim(FLines[LEndIndex]), 'Section Headers') then
-        begin
-          LEndLine := LEndIndex - 1;
-          Break;
-        end;
-      var LHeader := TDumpHeader.Create;
-      LHeader.Name := 'ELF Header';
-      LHeader.StartLine := LIndex + 1;
-      LHeader.EndLine := LEndLine + 1;
-      FDocument.Headers.Add(LHeader);
-      FDocument.FileKind := dfELFObject;
-      var LNode := AddNode(nkHeader, LHeader.Name, LHeader.StartLine,
-        LHeader.EndLine);
-      for var LPropertyIndex := LIndex + 1 to LEndLine do
-      begin
-        var LProperty: TDumpProperty;
-        if TryParsePropertyLine(FLines[LPropertyIndex], LPropertyIndex + 1,
-          LProperty) then
-        begin
-          LHeader.Properties.Add(LProperty);
-          LNode.Properties.Add(LProperty);
-        end;
-      end;
+      FDocument.FileKind := dfCOFFObject;
+      AddDiagnostic(dsError, LIndex + 1,
+        'TDUMP could not decode the COFF machine type.', FLines[LIndex]);
+      AddNode(nkObjectRecord, 'COFF diagnostic', LIndex + 1, LIndex + 1);
       Exit;
     end;
 end;

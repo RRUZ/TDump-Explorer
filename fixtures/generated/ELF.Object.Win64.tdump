@@ -1,0 +1,132 @@
+  Display of File c:\dev\tdump-explorer\binaries\elf.object.win64.zutil.o
+
+Elf 64-bit LSB executable File
+
+
+------------ Elf Header -----------
+ident                         7fELF ELFCLASS64 ELFDATA2LSB ver:1 pad:0
+type                          ET_REL
+machine                       EM_X86_64
+version                       EV_CURRENT
+entry                         00000000
+phoff                         00000000
+shoff                         00000720
+flags                         00000000
+ehsize                        00000040
+phentsize                     00000000
+phnum                         00000000
+shentsize                     00000040
+shnum                         0000000D
+shstrndx                      00000001
+
+
+
+------------ Section Headers ----------- (13 entries)
+ndx  name      type      flgs addr      offset    size      link info algn entsz
+1    .strtab   STRTAB         0         660       BD        0    0    1    0    
+2    .text     PROGBITS  AX   0         40        7D        0    0    10   0    
+3    .rela.text 
+               RELA           0         3A8       60        12   2    8    24   
+4    .rodata.str1.1 
+               PROGBITS  A    0         BD        7B        0    0    1    1    
+5    .data.rel.ro 
+               PROGBITS  WA   0         140       50        0    0    10   0    
+6    .rela.data.rel.ro 
+               RELA           0         408       F0        12   5    8    24   
+7    .comment  PROGBITS       0         190       63        0    0    1    1    
+8    .note.GNU-stack 
+               PROGBITS       0         1F3       0         0    0    1    0    
+9    .xdata    PROGBITS  A    0         1F4       28        0    0    4    0    
+10   .pdata    PROGBITS  A    0         21C       3C        0    0    4    0    
+11   .rela.pdata 
+               RELA           0         4F8       168       12   10   8    24   
+12   .symtab   SYMTAB         0         258       150       1    6    8    24   
+
+
+------------ Program Headers ----------- (0 entries)
+ndx  type      offset    vaddr     paddr     filesz    memsz     flgs algn 
+
+
+------------ Symbol Table .symtab ----------- (14 entries)
+ndx  name                value     size      type      bind      othr sect 
+1    zutil.c             0         0         FILE      LOCAL     0    ABS       
+2    .L.str.9            75        6         OBJECT    LOCAL     0    4    
+3                        0         0         SECTION   LOCAL     0    2    
+4                        0         0         SECTION   LOCAL     0    4    
+5                        0         0         SECTION   LOCAL     0    9    
+6    free                0         0         NOTYPE    GLOBAL    0    UNDEF     
+7    malloc              0         0         NOTYPE    GLOBAL    0    UNDEF     
+8    zError              20        29        FUNC      GLOBAL    0    2    
+9    z_errmsg            0         50        OBJECT    GLOBAL    0    5    
+10   zcalloc             50        11        FUNC      GLOBAL    0    2    
+11   zcfree              70        D         FUNC      GLOBAL    0    2    
+12   zlibCompileFlags    10        B         FUNC      GLOBAL    0    2    
+13   zlibVersion         0         D         FUNC      GLOBAL    0    2    
+
+
+
+------- Symbol Table sorted by address .symtab ------- (14 entries)
+ndx  name                value     size      type      bind      othr sect 
+0                        0         0         NOTYPE    LOCAL     0    UNDEF     
+1    zutil.c             0         0         FILE      LOCAL     0    ABS       
+13   zlibVersion         0         D         FUNC      GLOBAL    0    2    
+3                        0         0         SECTION   LOCAL     0    2    
+4                        0         0         SECTION   LOCAL     0    4    
+5                        0         0         SECTION   LOCAL     0    9    
+6    free                0         0         NOTYPE    GLOBAL    0    UNDEF     
+7    malloc              0         0         NOTYPE    GLOBAL    0    UNDEF     
+9    z_errmsg            0         50        OBJECT    GLOBAL    0    5    
+12   zlibCompileFlags    10        B         FUNC      GLOBAL    0    2    
+8    zError              20        29        FUNC      GLOBAL    0    2    
+10   zcalloc             50        11        FUNC      GLOBAL    0    2    
+11   zcfree              70        D         FUNC      GLOBAL    0    2    
+2    .L.str.9            75        6         OBJECT    LOCAL     0    4    
+
+
+
+------------ Relocations for section .rela.text ----------- (4 entries)
+ndx  type                offset    (addend)  value     sym  addend    name                
+0    R_X86_64_PC32       7         0         75        2    FFFFFFFC  .L.str.9            
+1    R_X86_64_PC32       3F        0         0         9    FFFFFFFC  z_errmsg            
+2    R_X86_64_PC32       5D        0         0         7    FFFFFFFC  malloc              
+3    R_X86_64_PC32       79        0         0         6    FFFFFFFC  free                
+
+
+
+------------ Relocations for section .rela.data.rel.ro ----------- (10 entries)
+ndx  type                offset    (addend)  value     sym  addend    name                
+0    R_X86_64_64         0         0         0         4    0                             
+1    R_X86_64_64         8         0         0         4    10                            
+2    R_X86_64_64         10        0         0         4    1B                            
+3    R_X86_64_64         18        0         0         4    1C                            
+4    R_X86_64_64         20        0         0         4    27                            
+5    R_X86_64_64         28        0         0         4    34                            
+6    R_X86_64_64         30        0         0         4    3F                            
+7    R_X86_64_64         38        0         0         4    53                            
+8    R_X86_64_64         40        0         0         4    60                            
+9    R_X86_64_64         48        0         0         4    1B                            
+
+
+
+------------ Relocations for section .rela.pdata ----------- (15 entries)
+ndx  type                offset    (addend)  value     sym  addend    name                
+0    R_X86_64_32         0         0         0         3    0                             
+1    R_X86_64_32         4         0         0         3    D                             
+2    R_X86_64_32         8         0         0         5    0                             
+3    R_X86_64_32         C         0         0         3    10                            
+4    R_X86_64_32         10        0         0         3    1B                            
+5    R_X86_64_32         14        0         0         5    8                             
+6    R_X86_64_32         18        0         0         3    20                            
+7    R_X86_64_32         1C        0         0         3    49                            
+8    R_X86_64_32         20        0         0         5    10                            
+9    R_X86_64_32         24        0         0         3    50                            
+10   R_X86_64_32         28        0         0         3    61                            
+11   R_X86_64_32         2C        0         0         5    18                            
+12   R_X86_64_32         30        0         0         3    70                            
+13   R_X86_64_32         34        0         0         3    7D                            
+14   R_X86_64_32         38        0         0         5    20                            
+
+
+
+------------ Debug Info ----------- 
+ (no debug information found or format not recognized)

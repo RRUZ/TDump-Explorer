@@ -40,7 +40,7 @@ end;
 
 procedure DumpSections(const ADocument: TDumpDocument);
 begin
-  Writeln('Object Table Sections: ', ADocument.Sections.Count);
+  Writeln('Typed sections: ', ADocument.Sections.Count);
   for var LIndex := 0 to ADocument.Sections.Count - 1 do
   begin
     var LSection := ADocument.Sections[LIndex];
@@ -154,8 +154,8 @@ end;
 
 procedure DumpSymbols(const ADocument: TDumpDocument);
 begin
-  // Symbols are cross-references to the raw subsection records already shown.
-  Writeln('Borland typed-symbol index: ', ADocument.Symbols.Count);
+  // Symbols may originate in Borland debug records or native object metadata.
+  Writeln('Typed symbol index: ', ADocument.Symbols.Count);
   Writeln;
 end;
 
