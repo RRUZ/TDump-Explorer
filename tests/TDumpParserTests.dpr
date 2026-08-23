@@ -9,6 +9,8 @@ uses
 
 const
   CGeneratedFixtureDirectory = 'C:\dev\TDump-Explorer\fixtures\generated';
+  CTurboDumpBannerFixture =
+    'C:\dev\TDump-Explorer\fixtures\PlainVanilla.Delphi.Package.bpl.tdump';
 
 procedure Require(ACondition: Boolean; const AMessage: string);
 begin
@@ -22,6 +24,64 @@ begin
   try
     Result := LParser.ParseFile(TPath.Combine(CGeneratedFixtureDirectory,
       AFileName));
+  finally
+    LParser.Free;
+  end;
+end;
+
+procedure TestTDumpReportRecognition;
+begin
+  var LFixtureFiles := TDirectory.GetFiles(CGeneratedFixtureDirectory,
+    '*.tdump', TSearchOption.soAllDirectories);
+  Require(Length(LFixtureFiles) > 0,
+    'Generated TDUMP fixtures must be available for report recognition.');
+  for var LFixtureFileName in LFixtureFiles do
+    Require(IsTDumpReport(TFile.ReadAllText(LFixtureFileName,
+      TEncoding.Default)), ExtractFileName(LFixtureFileName) +
+      ' must be recognized as TDUMP output.');
+
+  Require(not IsTDumpReport('Display of File sample.exe'),
+    'A display line without TDUMP payload must not be accepted.');
+  Require(not IsTDumpReport('This is an unrelated text file.'),
+    'Unrelated text must not be accepted as TDUMP output.');
+end;
+
+procedure TestTDumpBinaryFileRecognition;
+const
+  CSupportedBinaryNames: array[0..11] of string = ('sample.exe', 'sample.dll',
+    'sample.bpl', 'sample.dpl', 'sample.obj', 'sample.lib', 'sample.dcu',
+    'sample.elf', 'sample.ar', 'sample.o', 'sample.a', 'sample.so');
+begin
+  for var LFileName in CSupportedBinaryNames do
+    Require(IsTDumpBinaryFile(LFileName), LFileName +
+      ' must be recognized as a TDUMP binary input.');
+  Require(IsTDumpBinaryFile('DCU.System.Win32.DCU'),
+    'Known TDUMP binary extensions must be case-insensitive.');
+  Require(not IsTDumpBinaryFile('report.tdump'),
+    'TDUMP report text must not be classified as binary input.');
+  Require(not IsTDumpBinaryFile('notes.txt'),
+    'Unrelated text must not be classified as binary input.');
+end;
+
+procedure TestTurboDumpMetadata;
+begin
+  var LParser := TDumpParser.Create;
+  try
+    var LDocument := LParser.ParseFile(CTurboDumpBannerFixture);
+    try
+      Require(LDocument.TurboDumpHeader =
+        'Turbo Dump  Version 6.6.2.0 Copyright (c) 1988-2022 Embarcadero Technologies, Inc.',
+        'The raw Turbo Dump banner must be retained.');
+      Require(LDocument.TurboDumpHeaderLine = 1,
+        'The Turbo Dump banner source line must be retained.');
+      Require(LDocument.ToolVersion = '6.6.2.0',
+        'The Turbo Dump version must exclude the copyright text.');
+      Require((LDocument.PrimaryRun.TurboDumpHeader = LDocument.TurboDumpHeader) and
+        (LDocument.PrimaryRun.ToolVersion = LDocument.ToolVersion),
+        'The primary run must retain the Turbo Dump metadata.');
+    finally
+      LDocument.Free;
+    end;
   finally
     LParser.Free;
   end;
@@ -381,6 +441,9 @@ end;
 
 begin
   try
+    TestTDumpReportRecognition;
+    TestTDumpBinaryFileRecognition;
+    TestTurboDumpMetadata;
     TestPECoreProjection;
     TestSourceSpanProvenance;
     TestCompactImports;

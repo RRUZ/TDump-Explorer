@@ -21,6 +21,9 @@ uses
   System.Classes,
   System.Generics.Collections;
 
+function IsTDumpReport(const AText: string): Boolean;
+function IsTDumpBinaryFile(const AFileName: string): Boolean;
+
 type
   TDumpToolKind = (tkUnknown, tkTDump32, tkTDump64);
   TDumpFileKind = (dfUnknown, dfDOS, dfNE, dfLE, dfPE, dfOMFObject,
@@ -81,6 +84,8 @@ type
     Document: TDumpDocument;
     SourceFileName: string;
     ToolKind: TDumpToolKind;
+    TurboDumpHeader: string;
+    TurboDumpHeaderLine: Integer;
     ToolVersion: string;
     CommandLine: string;
   end;
@@ -810,6 +815,8 @@ type
   public
     SourceFileName: string;
     ToolKind: TDumpToolKind;
+    TurboDumpHeader: string;
+    TurboDumpHeaderLine: Integer;
     ToolVersion: string;
     CommandLine: string;
     FileKind: TDumpFileKind;
@@ -1040,6 +1047,74 @@ begin
   var LHeading := NormalizeTDumpHeading(ALine);
   Result := (LHeading = 'object table') or (LHeading = 'object table header') or
     (LHeading = 'section table') or (LHeading = 'section headers');
+end;
+
+function IsTDumpReport(const AText: string): Boolean;
+  function IsDecimalOffsetLine(const ALine: string): Boolean;
+  begin
+    var LColonPosition := Pos(':', ALine);
+    if LColonPosition <= 1 then
+      Exit(False);
+    for var LIndex := 1 to LColonPosition - 1 do
+      if not CharInSet(ALine[LIndex], ['0'..'9', ' ', #9]) then
+        Exit(False);
+    Result := True;
+  end;
+
+  function IsRecognizedPayloadLine(const ALine: string): Boolean;
+  begin
+    var LUpperLine := UpperCase(ALine);
+    Result := IsOldExecutableHeaderHeading(ALine) or
+      IsPortableExecutableHeaderHeading(ALine) or IsObjectTableHeading(ALine) or
+      StartsWithText(ALine, 'Resources:') or StartsWithText(ALine, 'Section:') or
+      StartsWithText(ALine, 'IMPORT:') or StartsWithText(ALine, 'EXPORT ') or
+      StartsWithText(ALine, 'FAT Binary') or StartsWithText(ALine, 'Elf ') or
+      StartsWithText(ALine, 'ERROR: Invalid machine type') or
+      StartsWithText(ALine, 'Invalid data - Aborting dump') or
+      StartsWithText(ALine, 'Unable to read file header') or
+      (Pos('THEADR', LUpperLine) > 0) or (Pos('MSLIBR', LUpperLine) > 0) or
+      IsDecimalOffsetLine(ALine);
+  end;
+
+begin
+  var LHasBanner := False;
+  var LHasDisplayLine := False;
+  var LHasRecognizedPayload := False;
+  var LLines := TStringList.Create;
+  try
+    LLines.Text := AText;
+    for var LLine in LLines do
+    begin
+      var LTrimmedLine := Trim(LLine);
+      if LTrimmedLine = '' then
+        Continue;
+      LHasBanner := LHasBanner or StartsWithText(LTrimmedLine, 'Turbo Dump') or
+        StartsWithText(LTrimmedLine, 'TDUMP');
+      if StartsWithText(LTrimmedLine, 'Display of File') then
+        LHasDisplayLine := Trim(Copy(LTrimmedLine,
+          Length('Display of File') + 1, MaxInt)) <> '';
+      LHasRecognizedPayload := LHasRecognizedPayload or
+        IsRecognizedPayloadLine(LTrimmedLine);
+    end;
+    if LHasBanner then
+      Result := LHasRecognizedPayload
+    else
+      Result := LHasDisplayLine and LHasRecognizedPayload;
+  finally
+    LLines.Free;
+  end;
+end;
+
+function IsTDumpBinaryFile(const AFileName: string): Boolean;
+const
+  CBinaryExtensions: array[0..11] of string = ('.exe', '.dll', '.bpl',
+    '.dpl', '.obj', '.lib', '.dcu', '.elf', '.ar', '.o', '.a', '.so');
+begin
+  var LExtension := LowerCase(ExtractFileExt(AFileName));
+  for var LBinaryExtension in CBinaryExtensions do
+    if LExtension = LBinaryExtension then
+      Exit(True);
+  Result := False;
 end;
 
 function IsDataDirectoryColumnHeading(const ALine: string): Boolean;
@@ -1805,6 +1880,8 @@ procedure TDumpParser.AttachRunProvenance;
 begin
   var LRun := FDocument.PrimaryRun;
   LRun.ToolKind := FDocument.ToolKind;
+  LRun.TurboDumpHeader := FDocument.TurboDumpHeader;
+  LRun.TurboDumpHeaderLine := FDocument.TurboDumpHeaderLine;
   LRun.ToolVersion := FDocument.ToolVersion;
   LRun.CommandLine := FDocument.CommandLine;
 
@@ -2112,33 +2189,41 @@ end;
 
 procedure TDumpParser.ParseMetadata;
 begin
-  var LLine: string;
-  var LVersionPos: Integer;
   var LDisplayPrefix := 'Display of File ';
   var LMetadataLineCount := FLines.Count;
-  if LMetadataLineCount > 8 then
-    LMetadataLineCount := 8;
+  if LMetadataLineCount > 32 then
+    LMetadataLineCount := 32;
   for var LIndex := 0 to LMetadataLineCount - 1 do
   begin
-    LLine := Trim(FLines[LIndex]);
+    var LLine := Trim(FLines[LIndex]);
     var LNormalizedLine := NormalizeTDumpHeading(LLine);
     if (Pos('tdump64', LNormalizedLine) > 0) or
       (Pos('turbo dump 64', LNormalizedLine) > 0) then
     begin
       FDocument.ToolKind := tkTDump64;
-      LVersionPos := Pos('version', LowerCase(LLine));
+      FDocument.TurboDumpHeader := LLine;
+      FDocument.TurboDumpHeaderLine := LIndex + 1;
+      var LVersionPos := Pos('version', LowerCase(LLine));
       if LVersionPos > 0 then
-        FDocument.ToolVersion := Trim(Copy(LLine,
+      begin
+        var LVersionText := Trim(Copy(LLine,
           LVersionPos + Length('version'), MaxInt));
+        FDocument.ToolVersion := FirstToken(LVersionText);
+      end;
     end
     else if (Pos('turbo dump', LNormalizedLine) > 0) or
       StartsWithText(LLine, 'TDUMP') then
     begin
       FDocument.ToolKind := tkTDump32;
-      LVersionPos := Pos('version', LowerCase(LLine));
+      FDocument.TurboDumpHeader := LLine;
+      FDocument.TurboDumpHeaderLine := LIndex + 1;
+      var LVersionPos := Pos('version', LowerCase(LLine));
       if LVersionPos > 0 then
-        FDocument.ToolVersion := Trim(Copy(LLine,
+      begin
+        var LVersionText := Trim(Copy(LLine,
           LVersionPos + Length('version'), MaxInt));
+        FDocument.ToolVersion := FirstToken(LVersionText);
+      end;
     end;
     if StartsWithText(LLine, LDisplayPrefix) then
       FDocument.CommandLine := LLine;

@@ -38,9 +38,12 @@ type
   // RunAndParse returns a result that owns both captured text and its document.
   TDumpRunner = class
   private
+    FOnProgress: TDumpParserProgressEvent;
     function Execute(const AInputFileName, AToolPath: string;
       AToolKind: TDumpToolKind; const AOptions: string): TDumpRunResult;
   public
+    property OnProgress: TDumpParserProgressEvent read FOnProgress
+      write FOnProgress;
     function Run(const AInputFileName, AToolPath: string;
       AToolKind: TDumpToolKind; const AOptions: string = ''): TDumpRunResult;
     function RunAndParse(const AInputFileName, AToolPath: string;
@@ -171,6 +174,7 @@ begin
   try
     var LParser := TDumpParser.Create;
     try
+      LParser.OnProgress := FOnProgress;
       Result.Document := LParser.ParseText(Result.OutputText,
         Result.InputFileName);
     finally

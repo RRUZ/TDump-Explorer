@@ -4,17 +4,18 @@ program TDumpRunnerConsole;
 
 uses
   System.SysUtils,
+  System.IOUtils,
   TDump.Explorer.Finder in '..\source\common\TDump.Explorer.Finder.pas',
   TDump.Explorer.Parser in '..\source\parser\TDump.Explorer.Parser.pas',
   TDump.Explorer.Runner in '..\source\common\TDump.Explorer.Runner.pas';
 
 const
-  CDefaultInputFile = 'C:\dev\TDump-Explorer\binaries\Package.Win64.bpl';
+  CDefaultInputFile = '..\binaries\Package.Win64.bpl';
 
 procedure WriteUsage;
 begin
-  Writeln('Usage: TDumpRunnerConsole [input-file] [32|64] [tdump-options]');
-  Writeln('Example: TDumpRunnerConsole C:\dev\TDump-Explorer\binaries\VCL.Win64.exe 64 -e -ed');
+  Writeln('Usage: TDumpRunnerConsole [input-file] [32|64] [tdump-options|--] [output-file] [parse|no-parse]');
+  Writeln('Example: TDumpRunnerConsole C:\dev\TDump-Explorer\binaries\VCL.Win64.exe 64 -e -ed report.tdump no-parse');
 end;
 
 procedure WriteDocumentSummary(const ADocument: TDumpDocument);
@@ -64,6 +65,25 @@ begin
     var LOptions := '-e -ed';
     if ParamCount >= 3 then
       LOptions := ParamStr(3);
+    if LOptions = '--' then
+      LOptions := '';
+    var LOutputFileName := '';
+    if ParamCount >= 4 then
+      LOutputFileName := ParamStr(4);
+    var LParseResult := True;
+    if ParamCount >= 5 then
+    begin
+      if SameText(ParamStr(5), 'parse') then
+        LParseResult := True
+      else if SameText(ParamStr(5), 'no-parse') then
+        LParseResult := False
+      else
+      begin
+        WriteUsage;
+        ExitCode := 1;
+        Exit;
+      end;
+    end;
 
     var LFinder := TDumpFinder.Create;
     try
@@ -100,14 +120,28 @@ begin
 
         var LRunner := TDumpRunner.Create;
         try
-          var LRun := LRunner.RunAndParse(LInputFileName, LToolPath, LToolKind,
-            LOptions);
+          var LRun: TDumpRunResult;
+          if LParseResult then
+            LRun := LRunner.RunAndParse(LInputFileName, LToolPath, LToolKind,
+              LOptions)
+          else
+            LRun := LRunner.Run(LInputFileName, LToolPath, LToolKind, LOptions);
           try
+            if LOutputFileName <> '' then
+            begin
+              TFile.WriteAllText(LOutputFileName, LRun.OutputText,
+                TEncoding.Default);
+              Writeln('Output: ', ExpandFileName(LOutputFileName));
+            end;
             Writeln('Input: ', LRun.InputFileName);
             Writeln('Tool: ', LRun.ToolPath);
             Writeln('Exit code: ', LRun.ExitCode);
             Writeln('Captured characters: ', Length(LRun.OutputText));
-            WriteDocumentSummary(LRun.Document);
+            if LRun.Document <> nil then
+              WriteDocumentSummary(LRun.Document)
+            else
+              Writeln('Parsing: skipped');
+            ExitCode := Integer(LRun.ExitCode);
           finally
             LRun.Free;
           end;
@@ -120,7 +154,8 @@ begin
     finally
       LFinder.Free;
     end;
-    Readln;
+    if LOutputFileName = '' then
+      Readln;
   except
     on LException: Exception do
     begin
