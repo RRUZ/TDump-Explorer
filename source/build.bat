@@ -9,6 +9,8 @@ set "CONSOLE_SOURCE=%PROJECT_ROOT%\tests\TDumpParserConsole.dpr"
 set "CONSOLE_EXE=%PROJECT_ROOT%\tests\TDumpParserConsole.exe"
 set "TESTS_SOURCE=%PROJECT_ROOT%\tests\TDumpParserTests.dpr"
 set "TESTS_EXE=%PROJECT_ROOT%\tests\TDumpParserTests.exe"
+set "TINY_PARSER_TESTS_SOURCE=%PROJECT_ROOT%\tests\TDumpTinyParserTests.dpr"
+set "TINY_PARSER_TESTS_EXE=%PROJECT_ROOT%\tests\TDumpTinyParserTests.exe"
 set "RUNNER_SOURCE=%PROJECT_ROOT%\tests\TDumpRunnerConsole.dpr"
 set "RUNNER_EXE=%PROJECT_ROOT%\tests\TDumpRunnerConsole.exe"
 set "FINDER_SOURCE=%PROJECT_ROOT%\tests\TDumpFinderConsole.dpr"
@@ -26,6 +28,7 @@ if /I "%~1"=="run" goto RUN
 if /I "%~1"=="runner" goto RUNNER
 if /I "%~1"=="finder" goto FINDER
 if /I "%~1"=="test" goto TEST
+if /I "%~1"=="tinyparser" goto TINY_PARSER
 if /I "%~1"=="profile" goto PROFILE
 if /I "%~1"=="relations" goto RELATIONS
 goto USAGE
@@ -289,6 +292,48 @@ echo Running parser assertion suite...
 "%TESTS_EXE%"
 exit /b 0
 
+:BUILD_TINY_PARSER_TESTS
+call :INIT_RAD_STUDIO
+if errorlevel 1 exit /b 1
+
+if not exist "%TINY_PARSER_TESTS_SOURCE%" (
+  echo Tiny parser assertion source was not found:
+  echo   %TINY_PARSER_TESTS_SOURCE%
+  exit /b 1
+)
+
+echo Building TDumpTinyParserTests ^(Win32 Debug^)...
+set "INTERMEDIATE_DIR=%INTERMEDIATE_ROOT%\%RANDOM%%RANDOM%"
+if not exist "%INTERMEDIATE_DIR%" mkdir "%INTERMEDIATE_DIR%"
+if not exist "%INTERMEDIATE_DIR%" (
+  echo Unable to create the intermediate output directory:
+  echo   %INTERMEDIATE_DIR%
+  exit /b 1
+)
+pushd "%PROJECT_ROOT%\tests"
+if errorlevel 1 exit /b 1
+dcc32.exe -B -Q -N"%INTERMEDIATE_DIR%" "TDumpTinyParserTests.dpr"
+set "BUILD_RESULT=%ERRORLEVEL%"
+popd
+if not "%BUILD_RESULT%"=="0" exit /b %BUILD_RESULT%
+
+if not exist "%TINY_PARSER_TESTS_EXE%" (
+  echo Build completed, but the expected tiny parser executable was not found:
+  echo   %TINY_PARSER_TESTS_EXE%
+  exit /b 1
+)
+
+echo Build succeeded: %TINY_PARSER_TESTS_EXE%
+exit /b 0
+
+:TINY_PARSER
+call :BUILD_TINY_PARSER_TESTS
+if errorlevel 1 exit /b 1
+
+echo Running tiny parser assertion suite...
+"%TINY_PARSER_TESTS_EXE%"
+exit /b %ERRORLEVEL%
+
 :PROFILE
 call :BUILD_PROFILER
 if errorlevel 1 exit /b 1
@@ -321,13 +366,14 @@ if not exist "%FIXTURE%" (
 exit /b %ERRORLEVEL%
 
 :USAGE
-echo Usage: build.bat [build^|run [fixture]^|runner [input-file] [32^|64] [tdump-options]^|finder^|test^|profile [fixture-directory] [iterations]^|relations [fixture]]
+echo Usage: build.bat [build^|run [fixture]^|runner [input-file] [32^|64] [tdump-options]^|finder^|test^|tinyparser^|profile [fixture-directory] [iterations]^|relations [fixture]]
 echo.
 echo   build  Build the Win32 Debug console harness ^(default^).
 echo   run    Build, then run the console harness with an optional fixture.
 echo   runner Build, run, capture, and parse one binary using the newest installed TDUMP.
 echo   finder Enumerate installed TDUMP tools and print the recommended default.
 echo   test   Build, then run non-interactive smoke tests for registered fixtures.
+echo   tinyparser  Build and run the tiny tokenizer and highlighter assertion suite.
 echo   profile Build and profile every *.tdump under fixtures, optionally using a
 echo           fixture directory and positive iteration count.
 echo   relations Build and exercise the cross-reference relation layer against an

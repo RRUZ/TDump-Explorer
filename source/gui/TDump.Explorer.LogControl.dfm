@@ -1,0 +1,51 @@
+object LogControl: TLogControl
+  Left = 0
+  Top = 0
+  Width = 640
+  Height = 480
+  TabOrder = 0
+  object ControlList1: TControlList
+    Left = 0
+    Top = 41
+    Width = 640
+    Height = 439
+    Align = alClient
+    ItemHeight = 20
+    ItemMargins.Left = 0
+    ItemMargins.Top = 0
+    ItemMargins.Right = 0
+    ItemMargins.Bottom = 0
+    ItemSelectionOptions.HotColorAlpha = 0
+    ItemSelectionOptions.SelectedColorAlpha = 0
+    ItemSelectionOptions.FocusedColorAlpha = 0
+    ItemSelectionOptions.SelectedFontColor = clHighlightText
+    ItemSelectionOptions.FocusedFontColor = clHighlightText
+    ItemSelectionOptions.UseFontColorForLabels = True
+    ParentColor = False
+    TabOrder = 0
+  end
+  object Panel1: TPanel
+    Left = 0
+    Top = 0
+    Width = 640
+    Height = 41
+    Align = alTop
+    BevelOuter = bvNone
+    TabOrder = 1
+    object SearchFilterBox: TSearchBox
+      AlignWithMargins = True
+      Left = 467
+      Top = 8
+      Width = 169
+      Height = 25
+      Margins.Left = 4
+      Margins.Top = 8
+      Margins.Right = 4
+      Margins.Bottom = 8
+      Align = alRight
+      TabOrder = 0
+      ExplicitLeft = 471
+      ExplicitTop = 5
+    end
+  end
+end

@@ -26,6 +26,7 @@ type
 
   TDumpAsciiDisplay = (tadDefault, tad8Bit, tad7Bit);
   TDumpHexOffsetMode = (thomDefault, thomRelative, thomAbsolute);
+  TDumpRunnerCancellationCheck = reference to function: Boolean;
 
   // Typed command-line surface for every TDUMP 6.6.2.0 switch.  String
   // fields contain the suffix accepted by TDUMP (without the leading dash).
@@ -108,6 +109,8 @@ type
     ToolKind: TDumpToolKind;
     Options: string;
     ExitCode: Cardinal;
+    ExecutionMilliseconds: Int64;
+    ParsingMilliseconds: Int64;
     OutputText: string;
     Document: TDumpDocument;
     destructor Destroy; override;
@@ -117,12 +120,14 @@ type
   // RunAndParse returns a result that owns both captured text and its document.
   TDumpRunner = class
   private
+    FOnCancellationCheck: TDumpRunnerCancellationCheck;
     FOnProgress: TDumpParserProgressEvent;
     function Execute(const AInputFileName, AToolPath: string;
       AToolKind: TDumpToolKind; const AOptions, AListFileName: string):
       TDumpRunResult;
     procedure ParseResult(const AResult: TDumpRunResult;
       AToolKind: TDumpToolKind);
+    function IsCancellationRequested: Boolean;
   public
     class function GetOptionProfile(const AInputFileName: string):
       TDumpOptionProfile; static;
@@ -132,6 +137,10 @@ type
       static;
     property OnProgress: TDumpParserProgressEvent read FOnProgress
       write FOnProgress;
+    // Called on the executing thread. Return True to stop the TDUMP process
+    // or parser at its next cancellation check.
+    property OnCancellationCheck: TDumpRunnerCancellationCheck
+      read FOnCancellationCheck write FOnCancellationCheck;
     // Uses the extension-based default profile.  Use the overload with
     // AOptions to pass any supported TDUMP command-line parameters verbatim.
     function Run(const AInputFileName, AToolPath: string;
@@ -158,6 +167,7 @@ implementation
 
 uses
   System.Classes,
+  System.Diagnostics,
   System.IOUtils,
   System.SysUtils,
   Winapi.Windows;
@@ -166,6 +176,11 @@ function QuoteCommandLineArgument(const AValue: string): string;
 begin
   // Tool and input paths are quoted so fixed paths with spaces are accepted.
   Result := '"' + StringReplace(AValue, '"', '\"', [rfReplaceAll]) + '"';
+end;
+
+function TDumpRunner.IsCancellationRequested: Boolean;
+begin
+  Result := Assigned(FOnCancellationCheck) and FOnCancellationCheck();
 end;
 
 procedure RaiseLastError(const AAction: string);
@@ -480,14 +495,30 @@ begin
           if not CreateProcess(nil, PChar(LCommandLine), nil, nil, True,
             CREATE_NO_WINDOW, nil, nil, LStartupInfo, LProcessInformation) then
             RaiseLastError('Starting TDUMP');
+          var LExecutionStopwatch := TStopwatch.StartNew;
           try
-            if WaitForSingleObject(LProcessInformation.hProcess, INFINITE) =
-              WAIT_FAILED then
-              RaiseLastError('Waiting for TDUMP');
+            while True do
+            begin
+              if IsCancellationRequested then
+              begin
+                TerminateProcess(LProcessInformation.hProcess, ERROR_CANCELLED);
+                WaitForSingleObject(LProcessInformation.hProcess, INFINITE);
+                raise EAbort.Create('TDUMP analysis was cancelled.');
+              end;
+              case WaitForSingleObject(LProcessInformation.hProcess, 50) of
+                WAIT_OBJECT_0:
+                  Break;
+                WAIT_FAILED:
+                  RaiseLastError('Waiting for TDUMP');
+              end;
+            end;
             if not GetExitCodeProcess(LProcessInformation.hProcess,
               Result.ExitCode) then
               RaiseLastError('Reading the TDUMP exit code');
           finally
+            LExecutionStopwatch.Stop;
+            Result.ExecutionMilliseconds :=
+              LExecutionStopwatch.ElapsedMilliseconds;
             CloseHandle(LProcessInformation.hThread);
             CloseHandle(LProcessInformation.hProcess);
           end;
@@ -542,9 +573,18 @@ end;
 procedure TDumpRunner.ParseResult(const AResult: TDumpRunResult;
   AToolKind: TDumpToolKind);
 begin
+  var LParseStopwatch := TStopwatch.StartNew;
   var LParser := TDumpParser.Create;
   try
-    LParser.OnProgress := FOnProgress;
+    LParser.OnProgress :=
+      procedure(APhase: TDumpParserProgressPhase; ACompletedLines,
+        ATotalLines: Integer)
+      begin
+        if IsCancellationRequested then
+          raise EAbort.Create('TDUMP parsing was cancelled.');
+        if Assigned(FOnProgress) then
+          FOnProgress(APhase, ACompletedLines, ATotalLines);
+      end;
     AResult.Document := LParser.ParseText(AResult.OutputText,
       AResult.InputFileName);
     if AResult.Document.ToolKind = tkUnknown then
@@ -553,6 +593,8 @@ begin
       AResult.Document.PrimaryRun.ToolKind := AToolKind;
     end;
   finally
+    LParseStopwatch.Stop;
+    AResult.ParsingMilliseconds := LParseStopwatch.ElapsedMilliseconds;
     LParser.Free;
   end;
 end;

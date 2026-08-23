@@ -4,34 +4,66 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
-  System.IOUtils, System.StrUtils, System.TypInfo, Vcl.Graphics, Vcl.Controls, Vcl.Forms,
+  System.Diagnostics, System.Generics.Collections, System.IOUtils, System.StrUtils,
+  System.Threading,
+  System.TypInfo, Vcl.Graphics, Vcl.Controls, Vcl.Forms,
   Vcl.Dialogs, Vcl.StdCtrls, Winapi.ShellAPI, TDump.Explorer.Finder,
   TDump.Explorer.Parser, TDump.Explorer.Phosphor.Font, TDump.Explorer.Runner,
-  Vcl.ComCtrls;
+  TDump.Explorer.Frame, Vcl.ComCtrls, TDump.Explorer.LogControl;
+
+type
+  TAnalysisKind = (akBinary, akReport);
+
+  TAnalysisRequest = class
+  public
+    FileName: string;
+    Kind: TAnalysisKind;
+    ParsingStarted: Boolean;
+    ReloadRequested: Boolean;
+    Discarded: Boolean;
+    TabSheet: TTabSheet;
+    Frame: TFrame1;
+  end;
+
+const
+  CWMAnalysisProgress = WM_APP + $241;
+  CWMAnalysisCompleted = WM_APP + $242;
 
 type
   TFrmMain = class(TForm)
-    Memo1: TMemo;
-    ProgressBar1: TProgressBar;
+    PageControl1: TPageControl;
+    LogControl1: TLogControl;
   private
+    FAnalysisId: Integer;
+    FAnalysisTask: ITask;
+    FActiveRequest: TAnalysisRequest;
+    FClosing: Boolean;
+    FPendingFiles: TQueue<TAnalysisRequest>;
     FPhosphorIcon: TPhosphorIcon;
-    procedure AnalyzeBinaryFile(const AFileName: string);
-    procedure AnalyzeReportFile(const AFileName: string);
+    procedure BeginAnalysis(ARequest: TAnalysisRequest);
+    procedure CompleteAnalysis(AAnalysisId: Integer; const ASummary: string;
+      ASucceeded: Boolean; AFileSize, ATotalMilliseconds,
+      AExecutionMilliseconds, AParsingMilliseconds: Int64;
+      AReportLines, ATDumpExitCode, ADiagnosticCount: Integer;
+      const ATDumpParameters: string);
+    procedure DrainAnalysisMessages;
+    function CreateAnalysisRequest(const AFileName: string;
+      AKind: TAnalysisKind): TAnalysisRequest;
     function IsTextFile(const AFileName: string): Boolean;
     procedure PhosphorIconClick(Sender: TObject);
     procedure ProcessDroppedFile(const AFileName: string);
-    procedure StartParserProgress;
-    procedure StopParserProgress;
-    procedure ShowDocumentSummary(const ATitle: string;
-      const ADocument: TDumpDocument; const ATDumpParameters: string = '');
-    procedure UpdateParserProgress(APhase: TDumpParserProgressPhase;
-      ACompletedLines, ATotalLines: Integer);
+    procedure StartNextAnalysis;
+    procedure WMAnalysisCompleted(var AMessage: TMessage);
+      message CWMAnalysisCompleted;
+    procedure WMAnalysisProgress(var AMessage: TMessage);
+      message CWMAnalysisProgress;
     procedure WMDropFiles(var AMessage: TWMDropFiles); message WM_DROPFILES;
   protected
     procedure CreateWnd; override;
     procedure DestroyWnd; override;
   public
     constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
     procedure OpenInputFile(const AFileName: string);
   end;
 
@@ -45,8 +77,183 @@ implementation
 const
   CTextProbeSize = 8192;
 
-procedure TFrmMain.AnalyzeBinaryFile(const AFileName: string);
+type
+  TAnalysisProgressUpdate = class
+  public
+    AnalysisId: Integer;
+    Phase: TDumpParserProgressPhase;
+    CompletedLines: Integer;
+    TotalLines: Integer;
+  end;
+
+  TAnalysisCompletion = class
+  public
+    AnalysisId: Integer;
+    Succeeded: Boolean;
+    Summary: string;
+    FileSize: Int64;
+    TotalMilliseconds: Int64;
+    ExecutionMilliseconds: Int64;
+    ParsingMilliseconds: Int64;
+    ReportLines: Integer;
+    TDumpExitCode: Integer;
+    DiagnosticCount: Integer;
+    TDumpParameters: string;
+  end;
+
+procedure CheckCurrentTaskCancellation;
 begin
+  var LTask := TTask.CurrentTask;
+  if LTask <> nil then
+    LTask.CheckCanceled;
+end;
+
+function IsCurrentTaskCancellationRequested: Boolean;
+begin
+  try
+    CheckCurrentTaskCancellation;
+    Result := False;
+  except
+    on EOperationCancelled do
+      Result := True;
+  end;
+end;
+
+function BuildDocumentSummary(const ATitle: string;
+  const ADocument: TDumpDocument; const ATDumpParameters: string = ''): string;
+begin
+  var LLines := TStringList.Create;
+  try
+    LLines.Add(ATitle);
+    LLines.Add('Source: ' + ADocument.SourceFileName);
+    if ADocument.TurboDumpHeader <> '' then
+      LLines.Add('TDUMP header: ' + ADocument.TurboDumpHeader);
+    LLines.Add('Tool: ' + GetEnumName(TypeInfo(TDumpToolKind),
+      Ord(ADocument.ToolKind)));
+    if ATDumpParameters <> '' then
+      LLines.Add('TDUMP parameters: ' + ATDumpParameters);
+    if ADocument.ToolVersion <> '' then
+      LLines.Add('TDUMP version: ' + ADocument.ToolVersion);
+    LLines.Add('File kind: ' + GetEnumName(TypeInfo(TDumpFileKind),
+      Ord(ADocument.FileKind)));
+    LLines.Add('Architecture: ' + ADocument.Architecture);
+    LLines.Add(Format('Report lines: %d', [ADocument.Lines.Count]));
+    LLines.Add('');
+    LLines.Add(Format('Headers: %d', [ADocument.Headers.Count]));
+    for var LHeader in ADocument.Headers do
+    begin
+      LLines.Add(Format('  %s (lines %d..%d)', [LHeader.Name,
+        LHeader.StartLine, LHeader.EndLine]));
+      for var LPropertyIndex := 0 to LHeader.Properties.Count - 1 do
+      begin
+        if LPropertyIndex = 12 then
+        begin
+          LLines.Add('    ...');
+          Break;
+        end;
+        var LProperty := LHeader.Properties[LPropertyIndex];
+        LLines.Add(Format('    %s = %s', [LProperty.Name,
+          LProperty.RawValue]));
+      end;
+    end;
+
+    LLines.Add('');
+    LLines.Add(Format('Sections: %d', [ADocument.Sections.Count]));
+    LLines.Add(Format('Import modules: %d', [ADocument.Imports.Count]));
+    LLines.Add(Format('Exports: %d', [ADocument.ExportList.Count]));
+    LLines.Add(Format('Resources: %d', [ADocument.Resources.Count]));
+    LLines.Add(Format('Diagnostics: %d', [ADocument.Diagnostics.Count]));
+    for var LDiagnosticIndex := 0 to ADocument.Diagnostics.Count - 1 do
+    begin
+      if LDiagnosticIndex = 12 then
+      begin
+        LLines.Add('  ...');
+        Break;
+      end;
+      var LDiagnostic := ADocument.Diagnostics[LDiagnosticIndex];
+      var LDiagnosticText := LDiagnostic.RawLine;
+      if LDiagnosticText = '' then
+        LDiagnosticText := LDiagnostic.Message;
+      LLines.Add(Format('  Line %d: %s', [LDiagnostic.LineNumber,
+        LDiagnosticText]));
+    end;
+    Result := LLines.Text;
+  finally
+    LLines.Free;
+  end;
+end;
+
+function FormatFileSize(AFileSize: Int64): string;
+begin
+  if AFileSize >= 1024 * 1024 then
+    Result := Format('%.2f MiB', [AFileSize / (1024 * 1024)])
+  else if AFileSize >= 1024 then
+    Result := Format('%.2f KiB', [AFileSize / 1024])
+  else
+    Result := Format('%d bytes', [AFileSize]);
+end;
+
+function FormatProfile(AFileSize, ATotalMilliseconds, AExecutionMilliseconds,
+  AParsingMilliseconds: Int64; AReportLines: Integer): string;
+begin
+  var LSpeed := 'n/a';
+  if (AReportLines > 0) and (AParsingMilliseconds > 0) then
+    LSpeed := Format('%s lines/s', [FormatFloat('#,##0',
+      AReportLines * 1000.0 / AParsingMilliseconds)]);
+  Result := Format('Profile: size %s | total %.3f s | TDUMP %.3f s | parse %.3f s | %s lines | %s',
+    [FormatFileSize(AFileSize), ATotalMilliseconds / 1000.0,
+      AExecutionMilliseconds / 1000.0, AParsingMilliseconds / 1000.0,
+      FormatFloat('#,##0', AReportLines), LSpeed]);
+end;
+
+procedure PostAnalysisProgress(AWindowHandle: HWND; AAnalysisId: Integer;
+  APhase: TDumpParserProgressPhase; ACompletedLines, ATotalLines: Integer);
+begin
+  var LUpdate := TAnalysisProgressUpdate.Create;
+  LUpdate.AnalysisId := AAnalysisId;
+  LUpdate.Phase := APhase;
+  LUpdate.CompletedLines := ACompletedLines;
+  LUpdate.TotalLines := ATotalLines;
+  if not PostMessage(AWindowHandle, CWMAnalysisProgress, 0,
+    LPARAM(LUpdate)) then
+    LUpdate.Free;
+end;
+
+procedure PostAnalysisCompletion(AWindowHandle: HWND; AAnalysisId: Integer;
+  ASucceeded: Boolean; const ASummary: string; AFileSize,
+  ATotalMilliseconds, AExecutionMilliseconds, AParsingMilliseconds: Int64;
+  AReportLines, ATDumpExitCode, ADiagnosticCount: Integer;
+  const ATDumpParameters: string);
+begin
+  var LCompletion := TAnalysisCompletion.Create;
+  LCompletion.AnalysisId := AAnalysisId;
+  LCompletion.Succeeded := ASucceeded;
+  LCompletion.Summary := ASummary;
+  LCompletion.FileSize := AFileSize;
+  LCompletion.TotalMilliseconds := ATotalMilliseconds;
+  LCompletion.ExecutionMilliseconds := AExecutionMilliseconds;
+  LCompletion.ParsingMilliseconds := AParsingMilliseconds;
+  LCompletion.ReportLines := AReportLines;
+  LCompletion.TDumpExitCode := ATDumpExitCode;
+  LCompletion.DiagnosticCount := ADiagnosticCount;
+  LCompletion.TDumpParameters := ATDumpParameters;
+  if not PostMessage(AWindowHandle, CWMAnalysisCompleted, 0,
+    LPARAM(LCompletion)) then
+    LCompletion.Free;
+end;
+
+function BuildBinaryAnalysis(const AFileName: string; AWindowHandle: HWND;
+  AAnalysisId: Integer; out AExecutionMilliseconds,
+  AParsingMilliseconds: Int64;
+  out AReportLines, ATDumpExitCode, ADiagnosticCount: Integer;
+  out ATDumpParameters: string): string;
+begin
+  AExecutionMilliseconds := 0;
+  AParsingMilliseconds := 0;
+  AReportLines := 0;
+  ATDumpExitCode := 0;
+  ADiagnosticCount := 0;
+  ATDumpParameters := '';
   var LFinder := TDumpFinder.Create;
   try
     var LInstallations := LFinder.Find;
@@ -65,22 +272,28 @@ begin
 
       var LRunner := TDumpRunner.Create;
       try
+        LRunner.OnCancellationCheck := IsCurrentTaskCancellationRequested;
         LRunner.OnProgress :=
           procedure(APhase: TDumpParserProgressPhase; ACompletedLines,
             ATotalLines: Integer)
           begin
-            UpdateParserProgress(APhase, ACompletedLines, ATotalLines);
+            PostAnalysisProgress(AWindowHandle, AAnalysisId, APhase,
+              ACompletedLines, ATotalLines);
           end;
-        StartParserProgress;
         var LRun := LRunner.RunAndParse(AFileName, LToolPath, LToolKind);
         try
-          ShowDocumentSummary(Format('TDUMP analysis (exit code %d)',
+          AExecutionMilliseconds := LRun.ExecutionMilliseconds;
+          AParsingMilliseconds := LRun.ParsingMilliseconds;
+          AReportLines := LRun.Document.Lines.Count;
+          ATDumpExitCode := LRun.ExitCode;
+          ADiagnosticCount := LRun.Document.Diagnostics.Count;
+          ATDumpParameters := LRun.Options;
+          Result := BuildDocumentSummary(Format('TDUMP analysis (exit code %d)',
             [LRun.ExitCode]), LRun.Document, LRun.Options);
         finally
           LRun.Free;
         end;
       finally
-        StopParserProgress;
         LRunner.Free;
       end;
     finally
@@ -91,12 +304,22 @@ begin
   end;
 end;
 
-procedure TFrmMain.AnalyzeReportFile(const AFileName: string);
+function BuildReportAnalysis(const AFileName: string; AWindowHandle: HWND;
+  AAnalysisId: Integer; out AExecutionMilliseconds,
+  AParsingMilliseconds: Int64;
+  out AReportLines, ATDumpExitCode, ADiagnosticCount: Integer;
+  out ATDumpParameters: string): string;
 begin
+  AExecutionMilliseconds := 0;
+  AParsingMilliseconds := 0;
+  AReportLines := 0;
+  ATDumpExitCode := 0;
+  ADiagnosticCount := 0;
+  ATDumpParameters := '';
   var LText := TFile.ReadAllText(AFileName, TEncoding.Default);
   if not IsTDumpReport(LText) then
   begin
-    Memo1.Lines.Text := Format('%s is text, but it is not a TDUMP report.',
+    Result := Format('%s is text, but it is not a TDUMP report.',
       [AFileName]);
     Exit;
   end;
@@ -107,17 +330,22 @@ begin
       procedure(APhase: TDumpParserProgressPhase; ACompletedLines,
         ATotalLines: Integer)
       begin
-        UpdateParserProgress(APhase, ACompletedLines, ATotalLines);
+        CheckCurrentTaskCancellation;
+        PostAnalysisProgress(AWindowHandle, AAnalysisId, APhase,
+          ACompletedLines, ATotalLines);
       end;
-    StartParserProgress;
+    var LParseStopwatch := TStopwatch.StartNew;
     var LDocument := LParser.ParseText(LText, AFileName);
     try
-      ShowDocumentSummary('TDUMP report parsed', LDocument);
+      LParseStopwatch.Stop;
+      AParsingMilliseconds := LParseStopwatch.ElapsedMilliseconds;
+      AReportLines := LDocument.Lines.Count;
+      ADiagnosticCount := LDocument.Diagnostics.Count;
+      Result := BuildDocumentSummary('TDUMP report parsed', LDocument);
     finally
       LDocument.Free;
     end;
   finally
-    StopParserProgress;
     LParser.Free;
   end;
 end;
@@ -125,6 +353,7 @@ end;
 constructor TFrmMain.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  FPendingFiles := TQueue<TAnalysisRequest>.Create;
   {
   FPhosphorIcon := TPhosphorIcon.Create(Self);
   FPhosphorIcon.Parent := Self;
@@ -134,6 +363,134 @@ begin
   FPhosphorIcon.Weight := pfwRegular;
   FPhosphorIcon.OnClick := PhosphorIconClick;
   }
+end;
+
+procedure TFrmMain.BeginAnalysis(ARequest: TAnalysisRequest);
+begin
+  FActiveRequest := ARequest;
+  Inc(FAnalysisId);
+  var LAnalysisId := FAnalysisId;
+  var LInputFileName := ARequest.FileName;
+  var LKind := ARequest.Kind;
+  var LWindowHandle := Handle;
+  ARequest.Frame.SetStatus('Running: ' + LInputFileName);
+  LogControl1.Add('Running: ' + LInputFileName);
+  FAnalysisTask := TTask.Run(
+    procedure
+    begin
+      try
+        var LSummary := '';
+        var LFileSize := TFile.GetSize(LInputFileName);
+        var LExecutionMilliseconds: Int64 := 0;
+        var LParsingMilliseconds: Int64 := 0;
+        var LReportLines := 0;
+        var LTdumpExitCode := 0;
+        var LDiagnosticCount := 0;
+        var LTdumpParameters := '';
+        var LTotalStopwatch := TStopwatch.StartNew;
+        case LKind of
+          akBinary:
+            LSummary := BuildBinaryAnalysis(LInputFileName, LWindowHandle,
+              LAnalysisId, LExecutionMilliseconds, LParsingMilliseconds,
+              LReportLines, LTdumpExitCode, LDiagnosticCount,
+              LTdumpParameters);
+          akReport:
+            LSummary := BuildReportAnalysis(LInputFileName, LWindowHandle,
+              LAnalysisId, LExecutionMilliseconds, LParsingMilliseconds,
+              LReportLines, LTdumpExitCode, LDiagnosticCount,
+              LTdumpParameters);
+        end;
+        LTotalStopwatch.Stop;
+        PostAnalysisCompletion(LWindowHandle, LAnalysisId, True, LSummary,
+          LFileSize, LTotalStopwatch.ElapsedMilliseconds,
+          LExecutionMilliseconds, LParsingMilliseconds, LReportLines,
+          LTdumpExitCode, LDiagnosticCount, LTdumpParameters);
+      except
+        on LException: Exception do
+          PostAnalysisCompletion(LWindowHandle, LAnalysisId, False,
+            Format('Unable to process %s'#13#10'%s: %s', [LInputFileName,
+              LException.ClassName, LException.Message]), 0, 0, 0, 0, 0,
+            0, 0, '');
+      end;
+    end);
+end;
+
+procedure TFrmMain.CompleteAnalysis(AAnalysisId: Integer;
+  const ASummary: string; ASucceeded: Boolean; AFileSize,
+  ATotalMilliseconds, AExecutionMilliseconds, AParsingMilliseconds: Int64;
+  AReportLines, ATDumpExitCode, ADiagnosticCount: Integer;
+  const ATDumpParameters: string);
+begin
+  if FClosing or (AAnalysisId <> FAnalysisId) then
+    Exit;
+
+  FAnalysisTask := nil;
+  if FActiveRequest.ReloadRequested then
+  begin
+    var LFileName := FActiveRequest.FileName;
+    LogControl1.Add('Reloading: ' + LFileName, letWarning);
+    FActiveRequest.TabSheet.Free;
+    FActiveRequest.Free;
+    FActiveRequest := nil;
+    ProcessDroppedFile(LFileName);
+    Exit;
+  end;
+  if FActiveRequest.Kind = akBinary then
+  begin
+    var LTDumpParameters := ATDumpParameters;
+    if LTDumpParameters = '' then
+      LTDumpParameters := '(none)';
+    LogControl1.Add('TDUMP parameters: ' + LTDumpParameters);
+  end
+  else
+    LogControl1.Add('TDUMP parameters: unavailable (pre-generated report)');
+  if not ASucceeded then
+    LogControl1.Add('Failed: ' + FActiveRequest.FileName, letError);
+  if ASucceeded and (FActiveRequest.Kind = akBinary) then
+  begin
+    if ATDumpExitCode <> 0 then
+      LogControl1.Add(Format('TDUMP failed (exit code %d): %s',
+        [ATDumpExitCode, FActiveRequest.FileName]), letError)
+    else if ADiagnosticCount > 0 then
+      LogControl1.Add(Format('TDUMP completed with %d diagnostic(s): %s',
+        [ADiagnosticCount, FActiveRequest.FileName]), letWarning)
+    else
+      LogControl1.Add('TDUMP completed successfully: ' +
+        FActiveRequest.FileName, letSuccess);
+  end
+  else if ASucceeded then
+    LogControl1.Add('Completed: ' + FActiveRequest.FileName, letSuccess);
+  LogControl1.Add(FormatProfile(AFileSize, ATotalMilliseconds,
+    AExecutionMilliseconds, AParsingMilliseconds, AReportLines), letProfile);
+  FActiveRequest.Frame.ShowSummary(ASummary);
+  FActiveRequest.Free;
+  FActiveRequest := nil;
+  StartNextAnalysis;
+end;
+
+destructor TFrmMain.Destroy;
+begin
+  FClosing := True;
+  if FAnalysisTask <> nil then
+  begin
+    FAnalysisTask.Cancel;
+    FAnalysisTask.Wait;
+    FAnalysisTask := nil;
+  end;
+  DrainAnalysisMessages;
+  FActiveRequest.Free;
+  while FPendingFiles.Count > 0 do
+    FPendingFiles.Dequeue.Free;
+  FPendingFiles.Free;
+  inherited;
+end;
+
+procedure TFrmMain.DrainAnalysisMessages;
+begin
+  var LMessage: TMsg;
+  while PeekMessage(LMessage, Handle, CWMAnalysisProgress,
+    CWMAnalysisCompleted, PM_REMOVE) do
+    DispatchMessage(LMessage);
 end;
 
 procedure TFrmMain.CreateWnd;
@@ -193,114 +550,134 @@ begin
   ProcessDroppedFile(AFileName);
 end;
 
+function TFrmMain.CreateAnalysisRequest(const AFileName: string;
+  AKind: TAnalysisKind): TAnalysisRequest;
+begin
+  Result := TAnalysisRequest.Create;
+  Result.FileName := AFileName;
+  Result.Kind := AKind;
+  Result.TabSheet := TTabSheet.Create(PageControl1);
+  Result.TabSheet.PageControl := PageControl1;
+  Result.TabSheet.Hint := AFileName;
+  Result.TabSheet.Caption := ExtractFileName(AFileName);
+  if Result.TabSheet.Caption = '' then
+    Result.TabSheet.Caption := AFileName;
+  Result.Frame := TFrame1.Create(Result.TabSheet);
+  Result.Frame.Parent := Result.TabSheet;
+  Result.Frame.Align := alClient;
+  Result.Frame.SetStatus('Opening: ' + AFileName);
+  PageControl1.ActivePage := Result.TabSheet;
+end;
+
 procedure TFrmMain.ProcessDroppedFile(const AFileName: string);
 begin
-  Memo1.Lines.Text := 'Processing: ' + AFileName;
+  var LExpandedFileName := ExpandFileName(AFileName);
+  if (FActiveRequest <> nil) and SameText(FActiveRequest.FileName,
+    LExpandedFileName) then
+  begin
+    if not FActiveRequest.ReloadRequested then
+    begin
+      FActiveRequest.ReloadRequested := True;
+      FActiveRequest.Frame.SetStatus('Reloading: ' + LExpandedFileName);
+      LogControl1.Add('Reload requested: ' + LExpandedFileName, letWarning);
+      FAnalysisTask.Cancel;
+      if FAnalysisTask.Status = TTaskStatus.Canceled then
+        CompleteAnalysis(FAnalysisId, '', False, 0, 0, 0, 0, 0, 0, 0, '');
+    end;
+    Exit;
+  end;
+
+  for var LPendingRequest in FPendingFiles do
+    if SameText(LPendingRequest.FileName, LExpandedFileName) then
+    begin
+      LPendingRequest.Discarded := True;
+      LPendingRequest.TabSheet.Free;
+    end;
+  for var LPageIndex := PageControl1.PageCount - 1 downto 0 do
+    if SameText(PageControl1.Pages[LPageIndex].Hint, LExpandedFileName) then
+      PageControl1.Pages[LPageIndex].Free;
+
+  var LRequest := CreateAnalysisRequest(LExpandedFileName, akReport);
+  LogControl1.Add('Opening: ' + LExpandedFileName);
   try
-    if IsTDumpBinaryFile(AFileName) or not IsTextFile(AFileName) then
-      AnalyzeBinaryFile(AFileName)
+    if IsTDumpBinaryFile(LExpandedFileName) or not IsTextFile(LExpandedFileName) then
+      LRequest.Kind := akBinary
     else
-      AnalyzeReportFile(AFileName);
+      LRequest.Kind := akReport;
   except
     on LException: Exception do
-      Memo1.Lines.Text := Format('Unable to process %s'#13#10'%s: %s',
+    begin
+      var LErrorText := Format('Unable to process %s'#13#10'%s: %s',
         [AFileName, LException.ClassName, LException.Message]);
+      LRequest.Frame.ShowSummary(LErrorText);
+      LogControl1.Add(LErrorText, letError);
+      LRequest.Free;
+      StartNextAnalysis;
+      Exit;
+    end;
+  end;
+
+  if FAnalysisTask <> nil then
+  begin
+    FPendingFiles.Enqueue(LRequest);
+    LRequest.Frame.SetStatus('Queued: ' + LExpandedFileName);
+    LogControl1.Add('Queued: ' + LExpandedFileName);
+    Exit;
+  end;
+
+  BeginAnalysis(LRequest);
+end;
+
+procedure TFrmMain.StartNextAnalysis;
+begin
+  if FClosing or (FAnalysisTask <> nil) then
+    Exit;
+  while FPendingFiles.Count > 0 do
+  begin
+    var LRequest := FPendingFiles.Dequeue;
+    if LRequest.Discarded then
+    begin
+      LRequest.Free;
+      Continue;
+    end;
+    BeginAnalysis(LRequest);
+    Exit;
   end;
 end;
 
-procedure TFrmMain.StartParserProgress;
+procedure TFrmMain.WMAnalysisCompleted(var AMessage: TMessage);
 begin
-  ProgressBar1.Min := 0;
-  ProgressBar1.Max := 100;
-  ProgressBar1.Position := 0;
-  ProgressBar1.Update;
-end;
-
-procedure TFrmMain.StopParserProgress;
-begin
-  ProgressBar1.Position := ProgressBar1.Max;
-  ProgressBar1.Update;
-end;
-
-procedure TFrmMain.ShowDocumentSummary(const ATitle: string;
-  const ADocument: TDumpDocument; const ATDumpParameters: string);
-begin
-  Memo1.Lines.BeginUpdate;
+  var LCompletion := TAnalysisCompletion(AMessage.LParam);
   try
-    Memo1.Clear;
-    Memo1.Lines.Add(ATitle);
-    Memo1.Lines.Add('Source: ' + ADocument.SourceFileName);
-    if ADocument.TurboDumpHeader <> '' then
-      Memo1.Lines.Add('TDUMP header: ' + ADocument.TurboDumpHeader);
-    Memo1.Lines.Add('Tool: ' + GetEnumName(TypeInfo(TDumpToolKind),
-      Ord(ADocument.ToolKind)));
-    if ATDumpParameters <> '' then
-      Memo1.Lines.Add('TDUMP parameters: ' + ATDumpParameters);
-    if ADocument.ToolVersion <> '' then
-      Memo1.Lines.Add('TDUMP version: ' + ADocument.ToolVersion);
-    Memo1.Lines.Add('File kind: ' + GetEnumName(TypeInfo(TDumpFileKind),
-      Ord(ADocument.FileKind)));
-    Memo1.Lines.Add('Architecture: ' + ADocument.Architecture);
-    Memo1.Lines.Add(Format('Report lines: %d', [ADocument.Lines.Count]));
-    Memo1.Lines.Add('');
-    Memo1.Lines.Add(Format('Headers: %d', [ADocument.Headers.Count]));
+    CompleteAnalysis(LCompletion.AnalysisId, LCompletion.Summary,
+      LCompletion.Succeeded, LCompletion.FileSize,
+      LCompletion.TotalMilliseconds, LCompletion.ExecutionMilliseconds,
+      LCompletion.ParsingMilliseconds, LCompletion.ReportLines,
+      LCompletion.TDumpExitCode, LCompletion.DiagnosticCount,
+      LCompletion.TDumpParameters);
+  finally
+    LCompletion.Free;
+  end;
+end;
 
-    for var LHeader in ADocument.Headers do
+procedure TFrmMain.WMAnalysisProgress(var AMessage: TMessage);
+begin
+  var LUpdate := TAnalysisProgressUpdate(AMessage.LParam);
+  try
+    if not FClosing and (LUpdate.AnalysisId = FAnalysisId) and
+      (FActiveRequest <> nil) then
     begin
-      Memo1.Lines.Add(Format('  %s (lines %d..%d)', [LHeader.Name,
-        LHeader.StartLine, LHeader.EndLine]));
-      for var LPropertyIndex := 0 to LHeader.Properties.Count - 1 do
+      if not FActiveRequest.ParsingStarted then
       begin
-        if LPropertyIndex = 12 then
-        begin
-          Memo1.Lines.Add('    ...');
-          Break;
-        end;
-        var LProperty := LHeader.Properties[LPropertyIndex];
-        Memo1.Lines.Add(Format('    %s = %s', [LProperty.Name,
-          LProperty.RawValue]));
+        FActiveRequest.ParsingStarted := True;
+        LogControl1.Add('Parsing: ' + FActiveRequest.FileName);
       end;
-    end;
-
-    Memo1.Lines.Add('');
-    Memo1.Lines.Add(Format('Sections: %d', [ADocument.Sections.Count]));
-    Memo1.Lines.Add(Format('Import modules: %d', [ADocument.Imports.Count]));
-    Memo1.Lines.Add(Format('Exports: %d', [ADocument.ExportList.Count]));
-    Memo1.Lines.Add(Format('Resources: %d', [ADocument.Resources.Count]));
-    Memo1.Lines.Add(Format('Diagnostics: %d', [ADocument.Diagnostics.Count]));
-    for var LDiagnosticIndex := 0 to ADocument.Diagnostics.Count - 1 do
-    begin
-      if LDiagnosticIndex = 12 then
-      begin
-        Memo1.Lines.Add('  ...');
-        Break;
-      end;
-      var LDiagnostic := ADocument.Diagnostics[LDiagnosticIndex];
-      var LDiagnosticText := LDiagnostic.RawLine;
-      if LDiagnosticText = '' then
-        LDiagnosticText := LDiagnostic.Message;
-      Memo1.Lines.Add(Format('  Line %d: %s', [LDiagnostic.LineNumber,
-        LDiagnosticText]));
+      FActiveRequest.Frame.SetProgress(LUpdate.CompletedLines,
+        LUpdate.TotalLines);
     end;
   finally
-    Memo1.Lines.EndUpdate;
+    LUpdate.Free;
   end;
-end;
-
-procedure TFrmMain.UpdateParserProgress(APhase: TDumpParserProgressPhase;
-  ACompletedLines, ATotalLines: Integer);
-begin
-  if ATotalLines <= 0 then
-    Exit;
-
-  ProgressBar1.Max := ATotalLines;
-  var LPosition := ACompletedLines;
-  if LPosition < ProgressBar1.Min then
-    LPosition := ProgressBar1.Min
-  else if LPosition > ProgressBar1.Max then
-    LPosition := ProgressBar1.Max;
-  ProgressBar1.Position := LPosition;
-  ProgressBar1.Update;
 end;
 
 procedure TFrmMain.WMDropFiles(var AMessage: TWMDropFiles);
