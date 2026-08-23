@@ -27,8 +27,8 @@ function IsTDumpBinaryFile(const AFileName: string): Boolean;
 type
   TDumpToolKind = (tkUnknown, tkTDump32, tkTDump64);
   TDumpFileKind = (dfUnknown, dfDOS, dfNE, dfLE, dfPE, dfOMFObject,
-    dfCOFFObject, dfOMFLibrary, dfELFObject, dfELFArchive, dfMach, dfRawHex,
-    dfASCII);
+    dfCOFFObject, dfOMFLibrary, dfDelphiUnit, dfELFObject, dfELFArchive,
+    dfMach, dfRawHex, dfASCII);
   TDumpNodeKind = (nkDocument, nkHeader, nkDataDirectory, nkSections,
     nkImports, nkExports, nkResources, nkRelocations, nkDebug, nkSymbols,
     nkLines, nkLibrary, nkLibraryMember, nkObjectRecord, nkStrings,
@@ -885,6 +885,7 @@ type
     procedure ReportProgress(APhase: TDumpParserProgressPhase;
       ACompletedLines: Integer);
     procedure ParseMetadata;
+    procedure ParseToolDiagnostics;
     procedure ParseOldExecutableHeader;
     procedure ParsePortableExecutableHeader;
     procedure ParseObjectTable;
@@ -897,7 +898,9 @@ type
     procedure ParseStrings;
     procedure ParseOMF;
     procedure ParseMach;
+    procedure ParseRawMachHexDump;
     procedure ParseELF;
+    procedure ParseDelphiUnit;
     procedure ParseCOFF;
     procedure BuildLineCatalog;
     function ClassifyTDumpLine(const ALine: string): TDumpLineKind;
@@ -1049,6 +1052,17 @@ begin
     (LHeading = 'section table') or (LHeading = 'section headers');
 end;
 
+function IsHexDumpLine(const ALine: string): Boolean;
+begin
+  var LColonPosition := Pos(':', ALine);
+  if LColonPosition <= 1 then
+    Exit(False);
+  for var LIndex := 1 to LColonPosition - 1 do
+    if not CharInSet(ALine[LIndex], ['0'..'9', 'A'..'F', 'a'..'f', ' ', #9]) then
+      Exit(False);
+  Result := True;
+end;
+
 function IsTDumpReport(const AText: string): Boolean;
   function IsDecimalOffsetLine(const ALine: string): Boolean;
   begin
@@ -1057,6 +1071,17 @@ function IsTDumpReport(const AText: string): Boolean;
       Exit(False);
     for var LIndex := 1 to LColonPosition - 1 do
       if not CharInSet(ALine[LIndex], ['0'..'9', ' ', #9]) then
+        Exit(False);
+    Result := True;
+  end;
+
+  function IsHexDumpLine(const ALine: string): Boolean;
+  begin
+    var LColonPosition := Pos(':', ALine);
+    if LColonPosition <= 1 then
+      Exit(False);
+    for var LIndex := 1 to LColonPosition - 1 do
+      if not CharInSet(ALine[LIndex], ['0'..'9', 'A'..'F', 'a'..'f', ' ', #9]) then
         Exit(False);
     Result := True;
   end;
@@ -1072,8 +1097,9 @@ function IsTDumpReport(const AText: string): Boolean;
       StartsWithText(ALine, 'ERROR: Invalid machine type') or
       StartsWithText(ALine, 'Invalid data - Aborting dump') or
       StartsWithText(ALine, 'Unable to read file header') or
+      StartsWithText(ALine, 'Invalid unit magic number') or
       (Pos('THEADR', LUpperLine) > 0) or (Pos('MSLIBR', LUpperLine) > 0) or
-      IsDecimalOffsetLine(ALine);
+      IsDecimalOffsetLine(ALine) or IsHexDumpLine(ALine);
   end;
 
 begin
@@ -1821,6 +1847,7 @@ begin
 
     ReportProgress(ppSemanticModel, 0);
     ParseMetadata;
+    ParseToolDiagnostics;
     ParseOldExecutableHeader;
     ParsePortableExecutableHeader;
     ParseObjectTable;
@@ -1832,7 +1859,9 @@ begin
     ParseStrings;
     ParseOMF;
     ParseMach;
+    ParseRawMachHexDump;
     ParseELF;
+    ParseDelphiUnit;
     ParseCOFF;
     BuildDebugInformation;
     DetectUnsupportedStructures;
@@ -3898,6 +3927,86 @@ begin
       FLines.Count);
 end;
 
+procedure TDumpParser.ParseRawMachHexDump;
+  function TryReadHexPrefix(out APrefix: TBytes;
+    out AStartLine: Integer): Boolean;
+  begin
+    SetLength(APrefix, 0);
+    AStartLine := 0;
+    for var LIndex := 0 to FLines.Count - 1 do
+    begin
+      var LLine := Trim(FLines[LIndex]);
+      var LColonPosition := Pos(':', LLine);
+      if not IsHexDumpLine(LLine) then
+        Continue;
+
+      var LWork := Trim(Copy(LLine, LColonPosition + 1, MaxInt));
+      while LWork <> '' do
+      begin
+        var LToken := FirstToken(LWork);
+        if Length(LToken) <> 2 then
+          Break;
+        var LByteValue: Integer;
+        if not TryStrToInt('$' + LToken, LByteValue) then
+          Break;
+        SetLength(APrefix, Length(APrefix) + 1);
+        APrefix[High(APrefix)] := LByteValue;
+        if Length(APrefix) >= 4 then
+        begin
+          AStartLine := LIndex + 1;
+          Exit(True);
+        end;
+      end;
+    end;
+    Result := False;
+  end;
+
+  function IsMachMagic(const APrefix: TBytes): Boolean;
+  begin
+    Result := (Length(APrefix) >= 4) and
+      (((APrefix[0] = $CA) and (APrefix[1] = $FE) and
+        (APrefix[2] = $BA) and CharInSet(Char(APrefix[3]), [#$BE, #$BF])) or
+       ((APrefix[0] = $BE) and (APrefix[1] = $BA) and
+        (APrefix[2] = $FE) and CharInSet(Char(APrefix[3]), [#$CA, #$CB])) or
+       ((APrefix[0] = $FE) and (APrefix[1] = $ED) and
+        (APrefix[2] = $FA) and CharInSet(Char(APrefix[3]), [#$CE, #$CF])) or
+       (CharInSet(Char(APrefix[0]), [#$CE, #$CF]) and (APrefix[1] = $FA) and
+        (APrefix[2] = $ED) and (APrefix[3] = $FE)));
+  end;
+
+begin
+  if FDocument.FileKind = dfMach then
+    Exit;
+
+  var LPrefix: TBytes;
+  var LStartLine: Integer;
+  if not TryReadHexPrefix(LPrefix, LStartLine) or not IsMachMagic(LPrefix) then
+    Exit;
+
+  FDocument.FileKind := dfMach;
+  if (LPrefix[0] = $CA) or (LPrefix[0] = $BE) then
+    FDocument.Architecture := 'Mach FAT binary'
+  else
+    FDocument.Architecture := 'Mach-O binary';
+
+  var LMagic := IntToHex(LPrefix[0], 2) + IntToHex(LPrefix[1], 2) +
+    IntToHex(LPrefix[2], 2) + IntToHex(LPrefix[3], 2);
+  var LHeader := TDumpHeader.Create;
+  LHeader.Name := 'Mach Header (raw hex dump)';
+  LHeader.StartLine := LStartLine;
+  LHeader.EndLine := LStartLine;
+  var LProperty: TDumpProperty;
+  FillChar(LProperty, SizeOf(LProperty), 0);
+  LProperty.Name := 'Magic';
+  LProperty.RawValue := LMagic;
+  LProperty.TextValue := LMagic;
+  LProperty.ValueKind := vkText;
+  LProperty.StartLine := LStartLine;
+  LHeader.Properties.Add(LProperty);
+  FDocument.Headers.Add(LHeader);
+  AddNode(nkHexDump, 'Mach raw hex dump', LStartLine, FLines.Count);
+end;
+
 procedure TDumpParser.ParseELF;
   procedure AddELFTableNode(AKind: TDumpNodeKind; const ATitle: string;
     AStartLine, AEndLine: Integer);
@@ -4052,11 +4161,103 @@ begin
     if StartsWithText(Trim(FLines[LIndex]), 'ERROR: Invalid machine type') then
     begin
       FDocument.FileKind := dfCOFFObject;
-      AddDiagnostic(dsError, LIndex + 1,
-        'TDUMP could not decode the COFF machine type.', FLines[LIndex]);
       AddNode(nkObjectRecord, 'COFF diagnostic', LIndex + 1, LIndex + 1);
       Exit;
     end;
+end;
+
+procedure TDumpParser.ParseDelphiUnit;
+begin
+  if SameText(ExtractFileExt(FDocument.SourceFileName), '.dcu') and
+    (FDocument.Diagnostics.Count > 0) then
+  begin
+    FDocument.FileKind := dfDelphiUnit;
+    AddNode(nkObjectRecord, 'Delphi unit diagnostic',
+      FDocument.Diagnostics[0].LineNumber, FDocument.Diagnostics[0].LineNumber);
+    Exit;
+  end;
+
+  for var LIndex := 0 to FLines.Count - 1 do
+  begin
+    var LLine := Trim(FLines[LIndex]);
+    if StartsWithText(LLine, 'Unable to read file header') or
+      StartsWithText(LLine, 'Invalid unit magic number') then
+    begin
+      FDocument.FileKind := dfDelphiUnit;
+      AddNode(nkObjectRecord, 'Delphi unit diagnostic', LIndex + 1,
+        LIndex + 1);
+      Exit;
+    end;
+  end;
+end;
+
+procedure TDumpParser.ParseToolDiagnostics;
+  function HasDiagnosticAtLine(ALineNumber: Integer): Boolean;
+  begin
+    for var LDiagnostic in FDocument.Diagnostics do
+      if LDiagnostic.LineNumber = ALineNumber then
+        Exit(True);
+    Result := False;
+  end;
+
+  function IsExplicitDiagnostic(const ALine: string): Boolean;
+  begin
+    Result := StartsWithText(ALine, 'ERROR:') or
+      StartsWithText(ALine, 'WARNING:') or StartsWithText(ALine, 'FATAL:') or
+      StartsWithText(ALine, 'Unable to ') or StartsWithText(ALine, 'Invalid ') or
+      StartsWithText(ALine, 'Cannot ') or StartsWithText(ALine, 'Can''t ') or
+      StartsWithText(ALine, 'Failed ') or ContainsText(ALine, 'aborting dump');
+  end;
+
+  function IsStructuredTDumpContent(const ALine: string): Boolean;
+  begin
+    Result := IsOldExecutableHeaderHeading(ALine) or
+      IsPortableExecutableHeaderHeading(ALine) or IsObjectTableHeading(ALine) or
+      StartsWithText(ALine, 'Section:') or StartsWithText(ALine, 'Resources:') or
+      StartsWithText(ALine, 'IMPORT:') or StartsWithText(ALine, 'EXPORT ') or
+      StartsWithText(ALine, 'FAT Binary') or StartsWithText(ALine, 'Elf ') or
+      (Pos('THEADR', UpperCase(ALine)) > 0) or
+      (Pos('MSLIBR', UpperCase(ALine)) > 0);
+  end;
+
+  procedure AddToolDiagnostic(ALineNumber: Integer; const ALine: string);
+  begin
+    if not HasDiagnosticAtLine(ALineNumber) then
+      AddDiagnostic(dsError, ALineNumber, 'TDUMP tool diagnostic.', ALine);
+  end;
+
+begin
+  var LContentLineNumbers := TList<Integer>.Create;
+  try
+    var LHasDisplayLine := False;
+    var LHasStructuredContent := False;
+    for var LIndex := 0 to FLines.Count - 1 do
+    begin
+      var LLine := Trim(FLines[LIndex]);
+      if LLine = '' then
+        Continue;
+      if StartsWithText(LLine, 'Display of File') then
+      begin
+        LHasDisplayLine := True;
+        Continue;
+      end;
+      if StartsWithText(LLine, 'Turbo Dump') or StartsWithText(LLine, 'TDUMP') then
+        Continue;
+
+      LContentLineNumbers.Add(LIndex);
+      LHasStructuredContent := LHasStructuredContent or
+        IsStructuredTDumpContent(LLine);
+      if IsExplicitDiagnostic(LLine) then
+        AddToolDiagnostic(LIndex + 1, LLine);
+    end;
+
+    if LHasDisplayLine and not LHasStructuredContent and
+      (LContentLineNumbers.Count <= 2) then
+      for var LLineIndex in LContentLineNumbers do
+        AddToolDiagnostic(LLineIndex + 1, Trim(FLines[LLineIndex]));
+  finally
+    LContentLineNumbers.Free;
+  end;
 end;
 
 function TDumpParser.IsKnownTopLevelHeading(const ALine: string): Boolean;

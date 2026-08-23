@@ -5,7 +5,9 @@ program TDumpParserTests;
 uses
   System.SysUtils,
   System.IOUtils,
-  TDump.Explorer.Parser in '..\source\parser\TDump.Explorer.Parser.pas';
+  System.StrUtils,
+  TDump.Explorer.Parser in '..\source\parser\TDump.Explorer.Parser.pas',
+  TDump.Explorer.Runner in '..\source\common\TDump.Explorer.Runner.pas';
 
 const
   CGeneratedFixtureDirectory = 'C:\dev\TDump-Explorer\fixtures\generated';
@@ -61,6 +63,126 @@ begin
     'TDUMP report text must not be classified as binary input.');
   Require(not IsTDumpBinaryFile('notes.txt'),
     'Unrelated text must not be classified as binary input.');
+end;
+
+procedure TestRunnerOptionProfiles;
+begin
+  Require(TDumpRunner.GetBestOptionText('sample.exe') = '-e -ed -ns',
+    'PE executables must use the executable profile.');
+  Require(TDumpRunner.GetBestOptionText('sample.obj') = '-o -ns',
+    'Object files must use the object profile.');
+  Require(TDumpRunner.GetBestOptionText('sample.lib') = '-l -ns',
+    'OMF libraries must use the library profile.');
+  Require(TDumpRunner.GetBestOptionText('sample.elf') = '-e -ns',
+    'ELF files must use the executable profile.');
+  Require(TDumpRunner.GetBestOptionText('sample.ar') = '-lh -ns',
+    'Archive files must list their members.');
+  Require(TDumpRunner.GetBestOptionText('Mach.Universal.Rad37.dylib') =
+    '-M -ns',
+    'Mach binaries must use TDUMP''s Mach profile.');
+  Require(TDumpRunner.GetBestOptionText('sample.dcu') = '-ns',
+    'Delphi units must let TDUMP select its native DCU reader.');
+  Require(TDumpRunner.GetBestOptionText('report.txt') = '-ns',
+    'Unknown extensions must preserve TDUMP''s automatic behavior.');
+end;
+
+procedure TestTypedRunnerOptions;
+begin
+  var LOptions := TDumpCommandOptions.Default;
+  LOptions.DisplayHexadecimal := True;
+  LOptions.HexOffsetMode := thomAbsolute;
+  LOptions.HexStartOffset := '0x20';
+  LOptions.ExecutableExportsOnly := True;
+  LOptions.ExecutableImports := 'KERNEL32';
+  LOptions.DisplayStrings := True;
+  LOptions.StringMinimumLength := 6;
+  LOptions.StringSearch := 'TDUMP';
+  LOptions.ELFMemberDumpEnabled := True;
+  LOptions.ELFMemberDump := 'member.o';
+  Require(LOptions.ToText =
+    '-ha=0x20 -ee -em=KERNEL32 -s6=TDUMP -lm=member.o -ns',
+    'Typed runner options must preserve TDUMP switch spellings and values.');
+
+  LOptions := TDumpCommandOptions.Default;
+  LOptions.AsciiDisplay := tad7Bit;
+  LOptions.DisplayHexadecimal := True;
+  try
+    LOptions.ToText;
+    Require(False, 'Conflicting TDUMP display modes must be rejected.');
+  except
+    on EArgumentException do
+      ;
+  end;
+end;
+
+procedure TestDelphiUnitDiagnostics;
+const
+  CDCUFixtures: array[0..1] of string = ('DCU.System.Win32.invalid-magic.tdump',
+    'DCU.Win32.invalid-magic.tdump');
+begin
+  for var LFixtureName in CDCUFixtures do
+  begin
+    var LDocument := ParseGeneratedFixture(LFixtureName);
+    try
+      Require(LDocument.FileKind = dfDelphiUnit,
+        LFixtureName + ' must be classified as a Delphi unit diagnostic.');
+      Require((LDocument.Diagnostics.Count = 1) and
+        ContainsText(LDocument.Diagnostics[0].RawLine,
+          'Unable to read file header'), LFixtureName +
+          ' must retain TDUMP''s original DCU header error.');
+    finally
+      LDocument.Free;
+    end;
+  end;
+end;
+
+procedure TestShortToolDiagnosticCapture;
+begin
+  const CToolOutput = 'Display of File sample.dcu' + sLineBreak +
+    'A TDUMP-specific diagnostic message.';
+  var LParser := TDumpParser.Create;
+  try
+    var LDocument := LParser.ParseText(CToolOutput, 'sample.dcu');
+    try
+      Require((LDocument.FileKind = dfDelphiUnit) and
+        (LDocument.Diagnostics.Count = 1),
+        'A short DCU TDUMP result must retain its tool diagnostic.');
+      Require(LDocument.Diagnostics[0].RawLine =
+        'A TDUMP-specific diagnostic message.',
+        'A short TDUMP result must preserve the complete tool message.');
+    finally
+      LDocument.Free;
+    end;
+  finally
+    LParser.Free;
+  end;
+end;
+
+procedure TestRawMachHexDump;
+begin
+  const CMachHexDump =
+    'Turbo Dump  Version 6.6.2.0 Copyright (c) Embarcadero Technologies, Inc.' +
+    sLineBreak + 'Display of File mach.universal.dylib' + sLineBreak +
+    '000000: CA FE BA BE 00 00 00 02  01 00 00 07 00 00 00 03';
+  Require(IsTDumpReport(CMachHexDump),
+    'A redirected TDUMP Mach hex dump must be recognized as a report.');
+
+  var LParser := TDumpParser.Create;
+  try
+    var LDocument := LParser.ParseText(CMachHexDump,
+      'mach.universal.dylib.txt');
+    try
+      Require((LDocument.FileKind = dfMach) and
+        (LDocument.Architecture = 'Mach FAT binary') and
+        (LDocument.Headers.Count = 1) and
+        (LDocument.Headers[0].Properties[0].RawValue = 'CAFEBABE'),
+        'A raw Mach FAT hex dump must project its format and magic header.');
+    finally
+      LDocument.Free;
+    end;
+  finally
+    LParser.Free;
+  end;
 end;
 
 procedure TestTurboDumpMetadata;
@@ -393,7 +515,7 @@ begin
       try
         var LDocument := LParser.ParseFile(LFixtureFileName);
         try
-          if LDocument.FileKind = dfCOFFObject then
+          if LDocument.FileKind in [dfCOFFObject, dfDelphiUnit] then
             Require(LDocument.Diagnostics.Count > 0,
               ExtractFileName(LFixtureFileName) +
               ' must retain TDUMP''s COFF diagnostic.')
@@ -443,6 +565,11 @@ begin
   try
     TestTDumpReportRecognition;
     TestTDumpBinaryFileRecognition;
+    TestRunnerOptionProfiles;
+    TestTypedRunnerOptions;
+    TestDelphiUnitDiagnostics;
+    TestShortToolDiagnosticCapture;
+    TestRawMachHexDump;
     TestTurboDumpMetadata;
     TestPECoreProjection;
     TestSourceSpanProvenance;

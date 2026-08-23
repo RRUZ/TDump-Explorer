@@ -23,7 +23,7 @@ type
     procedure StartParserProgress;
     procedure StopParserProgress;
     procedure ShowDocumentSummary(const ATitle: string;
-      const ADocument: TDumpDocument);
+      const ADocument: TDumpDocument; const ATDumpParameters: string = '');
     procedure UpdateParserProgress(APhase: TDumpParserProgressPhase;
       ACompletedLines, ATotalLines: Integer);
     procedure WMDropFiles(var AMessage: TWMDropFiles); message WM_DROPFILES;
@@ -32,6 +32,7 @@ type
     procedure DestroyWnd; override;
   public
     constructor Create(AOwner: TComponent); override;
+    procedure OpenInputFile(const AFileName: string);
   end;
 
 var
@@ -71,11 +72,10 @@ begin
             UpdateParserProgress(APhase, ACompletedLines, ATotalLines);
           end;
         StartParserProgress;
-        var LRun := LRunner.RunAndParse(AFileName, LToolPath, LToolKind,
-          {'-e -ed'}'');
+        var LRun := LRunner.RunAndParse(AFileName, LToolPath, LToolKind);
         try
           ShowDocumentSummary(Format('TDUMP analysis (exit code %d)',
-            [LRun.ExitCode]), LRun.Document);
+            [LRun.ExitCode]), LRun.Document, LRun.Options);
         finally
           LRun.Free;
         end;
@@ -188,6 +188,11 @@ begin
   end;
 end;
 
+procedure TFrmMain.OpenInputFile(const AFileName: string);
+begin
+  ProcessDroppedFile(AFileName);
+end;
+
 procedure TFrmMain.ProcessDroppedFile(const AFileName: string);
 begin
   Memo1.Lines.Text := 'Processing: ' + AFileName;
@@ -218,7 +223,7 @@ begin
 end;
 
 procedure TFrmMain.ShowDocumentSummary(const ATitle: string;
-  const ADocument: TDumpDocument);
+  const ADocument: TDumpDocument; const ATDumpParameters: string);
 begin
   Memo1.Lines.BeginUpdate;
   try
@@ -229,6 +234,8 @@ begin
       Memo1.Lines.Add('TDUMP header: ' + ADocument.TurboDumpHeader);
     Memo1.Lines.Add('Tool: ' + GetEnumName(TypeInfo(TDumpToolKind),
       Ord(ADocument.ToolKind)));
+    if ATDumpParameters <> '' then
+      Memo1.Lines.Add('TDUMP parameters: ' + ATDumpParameters);
     if ADocument.ToolVersion <> '' then
       Memo1.Lines.Add('TDUMP version: ' + ADocument.ToolVersion);
     Memo1.Lines.Add('File kind: ' + GetEnumName(TypeInfo(TDumpFileKind),
@@ -261,6 +268,20 @@ begin
     Memo1.Lines.Add(Format('Exports: %d', [ADocument.ExportList.Count]));
     Memo1.Lines.Add(Format('Resources: %d', [ADocument.Resources.Count]));
     Memo1.Lines.Add(Format('Diagnostics: %d', [ADocument.Diagnostics.Count]));
+    for var LDiagnosticIndex := 0 to ADocument.Diagnostics.Count - 1 do
+    begin
+      if LDiagnosticIndex = 12 then
+      begin
+        Memo1.Lines.Add('  ...');
+        Break;
+      end;
+      var LDiagnostic := ADocument.Diagnostics[LDiagnosticIndex];
+      var LDiagnosticText := LDiagnostic.RawLine;
+      if LDiagnosticText = '' then
+        LDiagnosticText := LDiagnostic.Message;
+      Memo1.Lines.Add(Format('  Line %d: %s', [LDiagnostic.LineNumber,
+        LDiagnosticText]));
+    end;
   finally
     Memo1.Lines.EndUpdate;
   end;

@@ -62,8 +62,9 @@ begin
       end;
     end;
 
-    var LOptions := '-e -ed';
-    if ParamCount >= 3 then
+    var LUseBestOptions := ParamCount < 3;
+    var LOptions := '';
+    if not LUseBestOptions then
       LOptions := ParamStr(3);
     if LOptions = '--' then
       LOptions := '';
@@ -122,10 +123,20 @@ begin
         try
           var LRun: TDumpRunResult;
           if LParseResult then
-            LRun := LRunner.RunAndParse(LInputFileName, LToolPath, LToolKind,
-              LOptions)
+          begin
+            if LUseBestOptions then
+              LRun := LRunner.RunAndParse(LInputFileName, LToolPath, LToolKind)
+            else
+              LRun := LRunner.RunAndParse(LInputFileName, LToolPath, LToolKind,
+                LOptions);
+          end
           else
-            LRun := LRunner.Run(LInputFileName, LToolPath, LToolKind, LOptions);
+          begin
+            if LUseBestOptions then
+              LRun := LRunner.Run(LInputFileName, LToolPath, LToolKind)
+            else
+              LRun := LRunner.Run(LInputFileName, LToolPath, LToolKind, LOptions);
+          end;
           try
             if LOutputFileName <> '' then
             begin
@@ -135,6 +146,7 @@ begin
             end;
             Writeln('Input: ', LRun.InputFileName);
             Writeln('Tool: ', LRun.ToolPath);
+            Writeln('Options: ', LRun.Options);
             Writeln('Exit code: ', LRun.ExitCode);
             Writeln('Captured characters: ', Length(LRun.OutputText));
             if LRun.Document <> nil then
