@@ -28,7 +28,7 @@ type
   TDumpToolKind = (tkUnknown, tkTDump32, tkTDump64);
   TDumpFileKind = (dfUnknown, dfDOS, dfNE, dfLE, dfPE, dfOMFObject,
     dfCOFFObject, dfOMFLibrary, dfDelphiUnit, dfELFObject, dfELFArchive,
-    dfMach, dfRawHex, dfASCII);
+    dfARArchive, dfMach, dfRawHex, dfASCII);
   TDumpNodeKind = (nkDocument, nkHeader, nkDataDirectory, nkSections,
     nkImports, nkExports, nkResources, nkRelocations, nkDebug, nkSymbols,
     nkLines, nkLibrary, nkLibraryMember, nkObjectRecord, nkStrings,
@@ -408,6 +408,9 @@ type
     EndLine: Integer;
     SourceSpan: TDumpSourceSpan;
     RawText: string;
+    Details: TList<TDumpProperty>;
+    constructor Create;
+    destructor Destroy; override;
   end;
 
   // Identifies one OMF library member introduced by a THEADR record.
@@ -416,6 +419,54 @@ type
     Name: string;
     StartLine: Integer;
     EndLine: Integer;
+    SourceSpan: TDumpSourceSpan;
+  end;
+
+  // Captures MSLIBR's library-index metadata without retaining duplicate raw text.
+  TDumpOMFLibraryIndex = class
+  public
+    FileOffset: UInt64;
+    HasFileOffset: Boolean;
+    RawFileOffset: string;
+    BlockCount: Integer;
+    HasBlockCount: Boolean;
+    PageSize: Integer;
+    HasPageSize: Boolean;
+    StartLine: Integer;
+    EndLine: Integer;
+    SourceSpan: TDumpSourceSpan;
+  end;
+
+  // Represents one member header in a Unix AR archive dump.
+  TDumpArchiveMember = class
+  public
+    Index: Integer;
+    Name: string;
+    Offset: UInt64;
+    HasOffset: Boolean;
+    RawOffset: string;
+    Size: UInt64;
+    HasSize: Boolean;
+    RawSize: string;
+    Mode: string;
+    UserId: string;
+    GroupId: string;
+    Timestamp: string;
+    StartLine: Integer;
+    SourceSpan: TDumpSourceSpan;
+  end;
+
+  // Represents one symbol exported by a Unix AR archive member.
+  TDumpArchiveSymbol = class
+  public
+    Index: Integer;
+    Name: string;
+    MemberIndex: Integer;
+    HasMemberIndex: Boolean;
+    MemberName: string;
+    RawMemberOffset: string;
+    RawMemberSize: string;
+    StartLine: Integer;
     SourceSpan: TDumpSourceSpan;
   end;
 
@@ -501,6 +552,34 @@ type
     SymbolIndex: string;
     Addend: string;
     Name: string;
+    StartLine: Integer;
+    EndLine: Integer;
+    SourceSpan: TDumpSourceSpan;
+  end;
+
+  // Represents one row from TDUMP's ELF dynamic-section table.
+  TDumpELFDynamicEntry = class
+  public
+    Index: Integer;
+    Tag: string;
+    Value: string;
+    StartLine: Integer;
+    EndLine: Integer;
+    SourceSpan: TDumpSourceSpan;
+  end;
+
+  // Represents one row from TDUMP's ELF Program Headers table.
+  TDumpELFProgramHeader = class
+  public
+    Index: Integer;
+    HeaderType: string;
+    Offset: string;
+    VirtualAddress: string;
+    PhysicalAddress: string;
+    FileSize: string;
+    MemorySize: string;
+    Flags: string;
+    Alignment: string;
     StartLine: Integer;
     EndLine: Integer;
     SourceSpan: TDumpSourceSpan;
@@ -645,6 +724,16 @@ type
     EndAddress: UInt64;
     RawEndAddress: string;
     HasEndAddress: Boolean;
+    // TDUMP emits a narrower Debug: range after a procedure's generated-code
+    // range. Keep it distinct so address consumers retain the entry address.
+    DebugSegment: UInt64;
+    RawDebugSegment: string;
+    DebugAddress: UInt64;
+    RawDebugAddress: string;
+    HasDebugAddress: Boolean;
+    DebugEndAddress: UInt64;
+    RawDebugEndAddress: string;
+    HasDebugEndAddress: Boolean;
     ParentOffset: UInt64;
     EndOffset: UInt64;
     NextOffset: UInt64;
@@ -902,11 +991,17 @@ type
     Strings: TObjectList<TDumpStringEntry>;
     ObjectRecords: TObjectList<TDumpObjectRecord>;
     LibraryMembers: TObjectList<TDumpLibraryMember>;
+    OMFLibraryIndex: TDumpOMFLibraryIndex;
+    ArchiveMembers: TObjectList<TDumpArchiveMember>;
+    ArchiveSymbols: TObjectList<TDumpArchiveSymbol>;
     MachArchitectures: TObjectList<TDumpMachArchitecture>;
     MachLoadCommands: TObjectList<TDumpMachLoadCommand>;
+    MachDynamicSymbolTableCommand: TDumpMachLoadCommand;
     MachSymbols: TObjectList<TDumpMachSymbol>;
     MachDynamicImports: TObjectList<TDumpMachDynamicSymbol>;
     MachIndirectSymbols: TObjectList<TDumpMachDynamicSymbol>;
+    ELFProgramHeaders: TObjectList<TDumpELFProgramHeader>;
+    ELFDynamicEntries: TObjectList<TDumpELFDynamicEntry>;
     ELFRelocations: TObjectList<TDumpELFRelocation>;
     Symbols: TObjectList<TDumpSymbol>;
     SymbolSubsections: TList<TDumpSymbolSubsection>;
@@ -965,6 +1060,7 @@ type
     procedure BuildDebugInformation;
     procedure ParseStrings;
     procedure ParseOMF;
+    procedure ParseARArchive;
     procedure ParseMach;
     procedure ParseRawMachHexDump;
     procedure ParseELF;
@@ -1162,6 +1258,7 @@ function IsTDumpReport(const AText: string): Boolean;
       StartsWithText(ALine, 'Resources:') or StartsWithText(ALine, 'Section:') or
       StartsWithText(ALine, 'IMPORT:') or StartsWithText(ALine, 'EXPORT ') or
       StartsWithText(ALine, 'FAT Binary') or StartsWithText(ALine, 'Elf ') or
+      (StartsWithText(ALine, 'Ar ') and ContainsText(ALine, 'archive file')) or
       StartsWithText(ALine, 'ERROR: Invalid machine type') or
       StartsWithText(ALine, 'Invalid data - Aborting dump') or
       StartsWithText(ALine, 'Unable to read file header') or
@@ -1633,6 +1730,20 @@ begin
   inherited;
 end;
 
+{ TDumpObjectRecord }
+
+constructor TDumpObjectRecord.Create;
+begin
+  inherited Create;
+  Details := TList<TDumpProperty>.Create;
+end;
+
+destructor TDumpObjectRecord.Destroy;
+begin
+  Details.Free;
+  inherited;
+end;
+
 { TDumpDocument }
 
 constructor TDumpDocument.Create;
@@ -1657,11 +1768,17 @@ begin
   Strings := TObjectList<TDumpStringEntry>.Create(True);
   ObjectRecords := TObjectList<TDumpObjectRecord>.Create(True);
   LibraryMembers := TObjectList<TDumpLibraryMember>.Create(True);
+  OMFLibraryIndex := nil;
+  ArchiveMembers := TObjectList<TDumpArchiveMember>.Create(True);
+  ArchiveSymbols := TObjectList<TDumpArchiveSymbol>.Create(True);
   MachArchitectures := TObjectList<TDumpMachArchitecture>.Create(True);
   MachLoadCommands := TObjectList<TDumpMachLoadCommand>.Create(True);
+  MachDynamicSymbolTableCommand := nil;
   MachSymbols := TObjectList<TDumpMachSymbol>.Create(True);
   MachDynamicImports := TObjectList<TDumpMachDynamicSymbol>.Create(True);
   MachIndirectSymbols := TObjectList<TDumpMachDynamicSymbol>.Create(True);
+  ELFProgramHeaders := TObjectList<TDumpELFProgramHeader>.Create(True);
+  ELFDynamicEntries := TObjectList<TDumpELFDynamicEntry>.Create(True);
   ELFRelocations := TObjectList<TDumpELFRelocation>.Create(True);
   Symbols := TObjectList<TDumpSymbol>.Create(True);
   SymbolSubsections := TList<TDumpSymbolSubsection>.Create;
@@ -1699,11 +1816,16 @@ begin
   SymbolSubsections.Free;
   Symbols.Free;
   ELFRelocations.Free;
+  ELFDynamicEntries.Free;
+  ELFProgramHeaders.Free;
   MachIndirectSymbols.Free;
   MachDynamicImports.Free;
   MachSymbols.Free;
   MachLoadCommands.Free;
   MachArchitectures.Free;
+  ArchiveSymbols.Free;
+  ArchiveMembers.Free;
+  OMFLibraryIndex.Free;
   LibraryMembers.Free;
   ObjectRecords.Free;
   Strings.Free;
@@ -1965,6 +2087,7 @@ begin
     ParseBorlandSymbolTable;
     ParseStrings;
     ParseOMF;
+    ParseARArchive;
     ParseMach;
     ParseRawMachHexDump;
     ParseELF;
@@ -2107,6 +2230,26 @@ begin
     LMember.SourceSpan.StartLine := LMember.StartLine;
     LMember.SourceSpan.EndLine := LMember.EndLine;
   end;
+  if FDocument.OMFLibraryIndex <> nil then
+  begin
+    FDocument.OMFLibraryIndex.SourceSpan.Run := LRun;
+    FDocument.OMFLibraryIndex.SourceSpan.StartLine :=
+      FDocument.OMFLibraryIndex.StartLine;
+    FDocument.OMFLibraryIndex.SourceSpan.EndLine :=
+      FDocument.OMFLibraryIndex.EndLine;
+  end;
+  for var LMember in FDocument.ArchiveMembers do
+  begin
+    LMember.SourceSpan.Run := LRun;
+    LMember.SourceSpan.StartLine := LMember.StartLine;
+    LMember.SourceSpan.EndLine := LMember.StartLine;
+  end;
+  for var LSymbol in FDocument.ArchiveSymbols do
+  begin
+    LSymbol.SourceSpan.Run := LRun;
+    LSymbol.SourceSpan.StartLine := LSymbol.StartLine;
+    LSymbol.SourceSpan.EndLine := LSymbol.StartLine;
+  end;
   for var LArchitecture in FDocument.MachArchitectures do
   begin
     LArchitecture.SourceSpan.Run := LRun;
@@ -2148,6 +2291,18 @@ begin
     LRelocation.SourceSpan.Run := LRun;
     LRelocation.SourceSpan.StartLine := LRelocation.StartLine;
     LRelocation.SourceSpan.EndLine := LRelocation.EndLine;
+  end;
+  for var LEntry in FDocument.ELFDynamicEntries do
+  begin
+    LEntry.SourceSpan.Run := LRun;
+    LEntry.SourceSpan.StartLine := LEntry.StartLine;
+    LEntry.SourceSpan.EndLine := LEntry.EndLine;
+  end;
+  for var LHeader in FDocument.ELFProgramHeaders do
+  begin
+    LHeader.SourceSpan.Run := LRun;
+    LHeader.SourceSpan.StartLine := LHeader.StartLine;
+    LHeader.SourceSpan.EndLine := LHeader.EndLine;
   end;
   for var LSymbol in FDocument.Symbols do
   begin
@@ -3099,16 +3254,19 @@ begin
       LResourceStack.Last.EndLine := LIndex + 1;
       LNodeStack.Last.Properties.Add(LProperty);
       LNodeStack.Last.EndLine := LIndex + 1;
-      if SameText(LProperty.Name, 'Size') and LProperty.HasUIntValue then
+      var LHexValue: UInt64;
+      if SameText(LProperty.Name, 'Size') and TryParseHexUIntToken(
+        FirstToken(LProperty.RawValue), LHexValue) then
       begin
-        LResourceStack.Last.Size := LProperty.UIntValue;
+        LResourceStack.Last.Size := LHexValue;
         LResourceStack.Last.HasSize := True;
       end
-      else if SameText(LProperty.Name, 'Offset') and LProperty.HasUIntValue then
+      else if SameText(LProperty.Name, 'Offset') and TryParseHexUIntToken(
+        FirstToken(LProperty.RawValue), LHexValue) then
       begin
-        LResourceStack.Last.RVA := LProperty.UIntValue;
+        LResourceStack.Last.RVA := LHexValue;
         LResourceStack.Last.HasRVA := True;
-        LResourceStack.Last.DataOffset := LProperty.UIntValue;
+        LResourceStack.Last.DataOffset := LHexValue;
         LResourceStack.Last.HasDataOffset := True;
         if SameText(LResourceStack.Last.ResourceType, 'Unknown') and
           LResourceStack.Last.HasId then
@@ -3117,14 +3275,16 @@ begin
           LResourceStack.Last.Language := LResourceStack.Last.RawLanguage;
         end;
       end
-      else if SameText(LProperty.Name, 'Code Page') and LProperty.HasUIntValue then
+      else if SameText(LProperty.Name, 'Code Page') and TryParseHexUIntToken(
+        FirstToken(LProperty.RawValue), LHexValue) then
       begin
-        LResourceStack.Last.CodePage := LProperty.UIntValue;
+        LResourceStack.Last.CodePage := LHexValue;
         LResourceStack.Last.HasCodePage := True;
       end
-      else if SameText(LProperty.Name, 'Reserved') and LProperty.HasUIntValue then
+      else if SameText(LProperty.Name, 'Reserved') and TryParseHexUIntToken(
+        FirstToken(LProperty.RawValue), LHexValue) then
       begin
-        LResourceStack.Last.Reserved := LProperty.UIntValue;
+        LResourceStack.Last.Reserved := LHexValue;
         LResourceStack.Last.HasReserved := True;
       end;
     end;
@@ -3964,6 +4124,48 @@ begin
   else
     FDocument.FileKind := dfOMFObject;
 
+  if LIsLibrary then
+    for var LIndex := 0 to LStartLine - 1 do
+      if ContainsText(FLines[LIndex], 'MSLIBR Index begins at file offset') then
+      begin
+        var LLibraryIndex := TDumpOMFLibraryIndex.Create;
+        LLibraryIndex.StartLine := LIndex + 1;
+        LLibraryIndex.EndLine := LIndex + 1;
+        var LOffsetText := Trim(Copy(FLines[LIndex],
+          Pos('file offset', LowerCase(FLines[LIndex])) +
+          Length('file offset'), MaxInt));
+        LOffsetText := FirstToken(LOffsetText);
+        if EndsText('.', LOffsetText) then
+          Delete(LOffsetText, Length(LOffsetText), 1);
+        LLibraryIndex.RawFileOffset := LOffsetText;
+        LLibraryIndex.HasFileOffset := TryParseHexUIntToken(LOffsetText,
+          LLibraryIndex.FileOffset);
+        var LBlockText := Trim(Copy(FLines[LIndex],
+          Pos('Index is', FLines[LIndex]) + Length('Index is'), MaxInt));
+        LBlockText := FirstToken(LBlockText);
+        LLibraryIndex.HasBlockCount := TryStrToInt(LBlockText,
+          LLibraryIndex.BlockCount);
+        if LIndex + 1 < FLines.Count then
+        begin
+          var LPageLine := Trim(FLines[LIndex + 1]);
+          var LPageMarker := 'Library Page size is';
+          var LPagePosition := Pos(LowerCase(LPageMarker), LowerCase(LPageLine));
+          if LPagePosition > 0 then
+          begin
+            var LPageText := Trim(Copy(LPageLine,
+              LPagePosition + Length(LPageMarker), MaxInt));
+            LPageText := FirstToken(LPageText);
+            LLibraryIndex.HasPageSize := TryStrToInt(LPageText,
+              LLibraryIndex.PageSize);
+            LLibraryIndex.EndLine := LIndex + 2;
+          end;
+        end;
+        FDocument.OMFLibraryIndex := LLibraryIndex;
+        AddNode(nkLibrary, 'OMF library index', LLibraryIndex.StartLine,
+          LLibraryIndex.EndLine);
+        Break;
+      end;
+
   var LCurrentMember: TDumpLibraryMember := nil;
   for var LIndex := LStartLine to FLines.Count - 1 do
   begin
@@ -4010,12 +4212,227 @@ begin
         LRawText.Append(FLines[LLineIndex]);
       end;
       LRecord.RawText := LRawText.ToString;
+      for var LLineIndex := LRecord.StartLine to LLastLineIndex do
+      begin
+        var LDetailText := Trim(FLines[LLineIndex]);
+        if LDetailText = '' then
+          Continue;
+        var LDetail: TDumpProperty;
+        if not TryParsePropertyLine(LDetailText, LLineIndex + 1, LDetail) then
+        begin
+          LDetail.Name := 'Detail';
+          LDetail.RawValue := LDetailText;
+          LDetail.TextValue := LDetailText;
+          LDetail.ValueKind := vkText;
+          LDetail.StartLine := LLineIndex + 1;
+        end;
+        LRecord.Details.Add(LDetail);
+      end;
     finally
       LRawText.Free;
     end;
   end;
   if FDocument.ObjectRecords.Count > 0 then
     AddNode(nkObjectRecord, 'OMF records', LStartLine + 1, FLines.Count);
+end;
+
+procedure TDumpParser.ParseARArchive;
+  function IsArchiveBanner(const ALine: string): Boolean;
+  begin
+    Result := StartsWithText(Trim(ALine), 'Ar ') and
+      ContainsText(ALine, 'archive file');
+  end;
+
+  function TryParseArchiveMember(const ALine: string; ALineNumber: Integer;
+    out AMember: TDumpArchiveMember): Boolean;
+  begin
+    AMember := nil;
+    var LWork := Trim(ALine);
+    var LIndexText := FirstToken(LWork);
+    var LIndex: Integer;
+    if not TryStrToInt(LIndexText, LIndex) then
+      Exit(False);
+    var LName := FirstToken(LWork);
+    var LRawOffset := FirstToken(LWork);
+    var LRawSize := FirstToken(LWork);
+    var LMode := FirstToken(LWork);
+    var LUserId := FirstToken(LWork);
+    var LGroupId := FirstToken(LWork);
+    if (LName = '') or (LRawOffset = '') or (LRawSize = '') or
+      (LMode = '') or (LUserId = '') or (LGroupId = '') then
+      Exit(False);
+
+    AMember := TDumpArchiveMember.Create;
+    AMember.Index := LIndex;
+    AMember.Name := LName;
+    AMember.RawOffset := LRawOffset;
+    AMember.HasOffset := TryParseHexUIntToken(LRawOffset, AMember.Offset);
+    AMember.RawSize := LRawSize;
+    AMember.HasSize := TryParseHexUIntToken(LRawSize, AMember.Size);
+    AMember.Mode := LMode;
+    AMember.UserId := LUserId;
+    AMember.GroupId := LGroupId;
+    AMember.Timestamp := Trim(LWork);
+    AMember.StartLine := ALineNumber;
+    Result := True;
+  end;
+
+  function TryParseArchiveSymbol(const ALine: string; ALineNumber: Integer;
+    const ACurrentMember: TDumpArchiveMember;
+    out ASymbol: TDumpArchiveSymbol): Boolean;
+  begin
+    ASymbol := nil;
+    var LWork := Trim(ALine);
+    var LIndexText := FirstToken(LWork);
+    var LIndex: Integer;
+    if not TryStrToInt(LIndexText, LIndex) then
+      Exit(False);
+    var LName := FirstToken(LWork);
+    if (LName = '') or (LWork <> '') then
+      Exit(False);
+
+    ASymbol := TDumpArchiveSymbol.Create;
+    ASymbol.Index := LIndex;
+    ASymbol.Name := LName;
+    ASymbol.StartLine := ALineNumber;
+    if ACurrentMember <> nil then
+    begin
+      ASymbol.MemberIndex := ACurrentMember.Index;
+      ASymbol.HasMemberIndex := True;
+      ASymbol.MemberName := ACurrentMember.Name;
+      ASymbol.RawMemberOffset := ACurrentMember.RawOffset;
+      ASymbol.RawMemberSize := ACurrentMember.RawSize;
+    end;
+    Result := True;
+  end;
+
+  procedure UpdateCurrentSymbolMember(const ALine: string;
+    out AMemberIndex: Integer; out AHasMemberIndex: Boolean;
+    out AMemberName, ARawOffset, ARawSize: string);
+  begin
+    AMemberIndex := 0;
+    AHasMemberIndex := False;
+    AMemberName := '';
+    ARawOffset := '';
+    ARawSize := '';
+    var LWork := Trim(ALine);
+    if not StartsWithText(LWork, 'member #') then
+      Exit;
+    Delete(LWork, 1, Length('member #'));
+    var LIndexText := FirstToken(LWork);
+    if not TryStrToInt(LIndexText, AMemberIndex) then
+      Exit;
+    AMemberName := FirstToken(LWork);
+    if AMemberName = '' then
+      Exit;
+    var LOffsetLabel := FirstToken(LWork);
+    var LSizeLabel := FirstToken(LWork);
+    if StartsWithText(LOffsetLabel, 'offs=') then
+      ARawOffset := Copy(LOffsetLabel, Length('offs=') + 1, MaxInt);
+    if StartsWithText(LSizeLabel, 'size=') then
+      ARawSize := Copy(LSizeLabel, Length('size=') + 1, MaxInt);
+    AHasMemberIndex := True;
+  end;
+
+begin
+  var LArchiveBannerLine := -1;
+  for var LIndex := 0 to FLines.Count - 1 do
+    if IsArchiveBanner(FLines[LIndex]) then
+    begin
+      LArchiveBannerLine := LIndex;
+      Break;
+    end;
+  if LArchiveBannerLine < 0 then
+    Exit;
+
+  FDocument.FileKind := dfARArchive;
+  AddNode(nkLibrary, 'AR archive', LArchiveBannerLine + 1, FLines.Count);
+  var LInMembers := False;
+  var LInSymbols := False;
+  var LMemberStartLine := -1;
+  var LMemberEndLine := -1;
+  var LSymbolStartLine := -1;
+  var LSymbolEndLine := -1;
+  var LCurrentMemberIndex := 0;
+  var LHasCurrentMember := False;
+  var LCurrentMemberName := '';
+  var LCurrentMemberOffset := '';
+  var LCurrentMemberSize := '';
+  var LCurrentMember: TDumpArchiveMember := nil;
+
+  for var LIndex := LArchiveBannerLine + 1 to FLines.Count - 1 do
+  begin
+    var LLine := Trim(FLines[LIndex]);
+    if ContainsText(LLine, 'Member Headers') then
+    begin
+      LInMembers := True;
+      LInSymbols := False;
+      Continue;
+    end;
+    if StartsWithText(LLine, 'Symbols') or
+      ContainsText(LLine, ' Symbols ') then
+    begin
+      LInMembers := False;
+      LInSymbols := True;
+      Continue;
+    end;
+
+    if LInMembers then
+    begin
+      var LMember: TDumpArchiveMember;
+      if TryParseArchiveMember(FLines[LIndex], LIndex + 1, LMember) then
+      begin
+        FDocument.ArchiveMembers.Add(LMember);
+        LCurrentMember := LMember;
+        if LMemberStartLine < 0 then
+          LMemberStartLine := LIndex;
+        LMemberEndLine := LIndex;
+      end;
+      Continue;
+    end;
+
+    if LInSymbols then
+    begin
+      UpdateCurrentSymbolMember(FLines[LIndex], LCurrentMemberIndex,
+        LHasCurrentMember, LCurrentMemberName, LCurrentMemberOffset,
+        LCurrentMemberSize);
+      if LHasCurrentMember then
+      begin
+        LCurrentMember := nil;
+        for var LMember in FDocument.ArchiveMembers do
+          if LMember.Index = LCurrentMemberIndex then
+          begin
+            LCurrentMember := LMember;
+            Break;
+          end;
+      end;
+
+      var LSymbol: TDumpArchiveSymbol;
+      if TryParseArchiveSymbol(FLines[LIndex], LIndex + 1, LCurrentMember,
+        LSymbol) then
+      begin
+        if LCurrentMember = nil then
+        begin
+          LSymbol.MemberIndex := LCurrentMemberIndex;
+          LSymbol.HasMemberIndex := LHasCurrentMember;
+          LSymbol.MemberName := LCurrentMemberName;
+          LSymbol.RawMemberOffset := LCurrentMemberOffset;
+          LSymbol.RawMemberSize := LCurrentMemberSize;
+        end;
+        FDocument.ArchiveSymbols.Add(LSymbol);
+        if LSymbolStartLine < 0 then
+          LSymbolStartLine := LIndex;
+        LSymbolEndLine := LIndex;
+      end;
+    end;
+  end;
+
+  if LMemberStartLine >= 0 then
+    AddNode(nkLibrary, 'AR archive members', LMemberStartLine + 1,
+      LMemberEndLine + 1);
+  if LSymbolStartLine >= 0 then
+    AddNode(nkSymbols, 'AR archive symbols', LSymbolStartLine + 1,
+      LSymbolEndLine + 1);
 end;
 
 procedure TDumpParser.ParseMach;
@@ -4198,6 +4615,8 @@ begin
       LCurrentCommand.StartLine := LIndex + 1;
       LCurrentCommand.EndLine := FLines.Count;
       FDocument.MachLoadCommands.Add(LCurrentCommand);
+      if SameText(LCurrentCommand.Name, 'LC_DYSYMTAB') then
+        FDocument.MachDynamicSymbolTableCommand := LCurrentCommand;
       Continue;
     end;
     if LCurrentCommand <> nil then
@@ -4542,6 +4961,53 @@ procedure TDumpParser.ParseELF;
       FDocument.ELFRelocations.Add(LRelocation);
   end;
 
+  procedure ParseELFProgramHeaderRow(const ALine: string;
+    ALineNumber: Integer);
+  begin
+    var LWork := Trim(ALine);
+    var LIndexText := FirstToken(LWork);
+    var LIndex: UInt64;
+    if not TryParseNumericToken(LIndexText, ncDecimal, LIndex) then
+      Exit;
+
+    var LHeader := TDumpELFProgramHeader.Create;
+    LHeader.Index := Integer(LIndex);
+    LHeader.HeaderType := FirstToken(LWork);
+    LHeader.Offset := FirstToken(LWork);
+    LHeader.VirtualAddress := FirstToken(LWork);
+    LHeader.PhysicalAddress := FirstToken(LWork);
+    LHeader.FileSize := FirstToken(LWork);
+    LHeader.MemorySize := FirstToken(LWork);
+    LHeader.Flags := FirstToken(LWork);
+    LHeader.Alignment := Trim(LWork);
+    LHeader.StartLine := ALineNumber;
+    LHeader.EndLine := ALineNumber;
+    if LHeader.HeaderType = '' then
+      LHeader.Free
+    else
+      FDocument.ELFProgramHeaders.Add(LHeader);
+  end;
+
+  procedure ParseELFDynamicRow(const ALine: string; ALineNumber: Integer);
+  begin
+    var LWork := Trim(ALine);
+    var LIndexText := FirstToken(LWork);
+    var LIndex: UInt64;
+    if not TryParseNumericToken(LIndexText, ncDecimal, LIndex) then
+      Exit;
+
+    var LEntry := TDumpELFDynamicEntry.Create;
+    LEntry.Index := Integer(LIndex);
+    LEntry.Tag := FirstToken(LWork);
+    LEntry.Value := Trim(LWork);
+    LEntry.StartLine := ALineNumber;
+    LEntry.EndLine := ALineNumber;
+    if LEntry.Tag = '' then
+      LEntry.Free
+    else
+      FDocument.ELFDynamicEntries.Add(LEntry);
+  end;
+
 begin
   var LHeaderLine := -1;
   for var LIndex := 0 to FLines.Count - 1 do
@@ -4602,6 +5068,13 @@ begin
       end;
       AddELFTableNode(nkSections, 'ELF Section Headers', LTableStart, LTableEnd);
     end
+    else if Pos('Program Headers', LTitle) > 0 then
+    begin
+      for var LRow := LTableStart + 1 to LTableEnd do
+        if not StartsWithText(Trim(FLines[LRow]), 'ndx') then
+          ParseELFProgramHeaderRow(FLines[LRow], LRow + 1);
+      AddELFTableNode(nkHeader, 'ELF Program Headers', LTableStart, LTableEnd);
+    end
     else if (Pos('Symbol Table ', LTitle) > 0) and
       (Pos('sorted', LowerCase(LTitle)) = 0) then
     begin
@@ -4609,6 +5082,13 @@ begin
         if not StartsWithText(Trim(FLines[LRow]), 'ndx') then
           ParseELFSymbolRow(FLines[LRow], LRow + 1);
       AddELFTableNode(nkSymbols, 'ELF Symbol Table', LTableStart, LTableEnd);
+    end
+    else if Pos('Dynamics for section ', LTitle) > 0 then
+    begin
+      for var LRow := LTableStart + 1 to LTableEnd do
+        if not StartsWithText(Trim(FLines[LRow]), 'ndx') then
+          ParseELFDynamicRow(FLines[LRow], LRow + 1);
+      AddELFTableNode(nkSymbols, 'ELF Dynamic Section', LTableStart, LTableEnd);
     end
     else if Pos('Relocations for section ', LTitle) > 0 then
     begin
@@ -4686,6 +5166,7 @@ procedure TDumpParser.ParseToolDiagnostics;
       StartsWithText(ALine, 'Section:') or StartsWithText(ALine, 'Resources:') or
       StartsWithText(ALine, 'IMPORT:') or StartsWithText(ALine, 'EXPORT ') or
       StartsWithText(ALine, 'FAT Binary') or StartsWithText(ALine, 'Elf ') or
+      (StartsWithText(ALine, 'Ar ') and ContainsText(ALine, 'archive file')) or
       (Pos('THEADR', UpperCase(ALine)) > 0) or
       (Pos('MSLIBR', UpperCase(ALine)) > 0);
   end;
@@ -4737,7 +5218,8 @@ begin
     SameText(LLine, 'New Executable (NE) File') or
     SameText(LLine, 'Linear Executable (LE) File') or
     IsObjectTableHeading(LLine) or SameText(LLine, 'Resources:') or
-    StartsWithText(LLine, 'Section:');
+    StartsWithText(LLine, 'Section:') or
+    (StartsWithText(LLine, 'Ar ') and ContainsText(LLine, 'archive file'));
 end;
 
 function TDumpParser.TryParsePropertyLine(const ALine: string;
@@ -4796,6 +5278,9 @@ begin
   AProperty.ValueKind := PropertyValueKind(LNameText);
 
   if ((Pos('flags', LowerCase(LNameText)) > 0) and TryParseHexUIntToken(LFirst, LValue)) or
+    ((AProperty.ValueKind = vkRVA) or (AProperty.ValueKind = vkFileOffset) or
+      (AProperty.ValueKind = vkAddress) or (AProperty.ValueKind = vkSize)) and
+      TryParseHexUIntToken(LFirst, LValue) or
     TryParseUIntToken(LFirst, LValue) then
   begin
     AProperty.UIntValue := LValue;
@@ -5370,8 +5855,10 @@ procedure TDumpParser.ParseBorlandSymbolRecordDetails(
     var LTypeText := ValueForLabel(ALine, 'Type:');
     if LTypeText = '' then
       LTypeText := ValueForLabel(ALine, 'type:');
-    if TryParseHexUIntToken(LTypeText, ARecord.TypeIndex) then
+    var LTypeIndex: UInt64;
+    if TryParseHexUIntToken(LTypeText, LTypeIndex) then
     begin
+      ARecord.TypeIndex := LTypeIndex;
       ARecord.RawTypeIndex := LTypeText;
       ARecord.HasTypeIndex := True;
       AddProperty('Type', LTypeText);
@@ -5408,6 +5895,7 @@ procedure TDumpParser.ParseBorlandSymbolRecordDetails(
   procedure ReadAddress;
   begin
     var LText := Trim(ALine);
+    var LIsDebugRange := StartsWithText(LText, 'Debug:');
     var LSearchStart := 1;
     while LSearchStart <= Length(LText) do
     begin
@@ -5431,6 +5919,21 @@ procedure TDumpParser.ParseBorlandSymbolRecordDetails(
       if TryParseHexUIntToken(LSegmentText, LSegment) and
         TryParseHexUIntToken(LAddressText, LAddress) then
       begin
+        if LIsDebugRange then
+        begin
+          ARecord.DebugSegment := LSegment;
+          ARecord.RawDebugSegment := LSegmentText;
+          ARecord.DebugAddress := LAddress;
+          ARecord.RawDebugAddress := LAddressText;
+          ARecord.HasDebugAddress := True;
+          if TryParseHexUIntToken(LEndAddressText, ARecord.DebugEndAddress) then
+          begin
+            ARecord.RawDebugEndAddress := LEndAddressText;
+            ARecord.HasDebugEndAddress := True;
+          end;
+          AddProperty('Debug address', LSegmentText + ':' + LRangeText);
+          Exit;
+        end;
         ARecord.Segment := LSegment;
         ARecord.RawSegment := LSegmentText;
         ARecord.Address := LAddress;
@@ -6076,6 +6579,9 @@ begin
   else if Pos('file offset', LName) > 0 then
     Result := vkFileOffset
   else if Pos('address', LName) > 0 then
+    Result := vkAddress
+  else if (Pos('image base', LName) > 0) or (Pos('code base', LName) > 0) or
+    (Pos('data base', LName) > 0) then
     Result := vkAddress
   else if Pos('size', LName) > 0 then
     Result := vkSize

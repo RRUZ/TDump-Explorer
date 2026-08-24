@@ -9,6 +9,7 @@ uses
   DUnitX.TestFramework,
   DUnitX.Loggers.Xml.NUnit,
   TDump.Explorer.Parser in '..\source\parser\TDump.Explorer.Parser.pas',
+  TDump.Explorer.Relations in '..\source\common\TDump.Explorer.Relations.pas',
   TDump.Explorer.Runner in '..\source\common\TDump.Explorer.Runner.pas';
 
 const
@@ -45,6 +46,9 @@ type
     [Test] procedure GeneratedDocumentIntegrity;
     [Test] procedure GeneratedNativeFormatCoverage;
     [Test] procedure GeneratedBorlandDebugCoverage;
+    [Test] procedure RelationGraph;
+    [Test] procedure ARArchiveProjection;
+    [Test] procedure ELFProgramHeadersProjection;
   end;
 
 procedure Require(ACondition: Boolean; const AMessage: string);
@@ -144,8 +148,10 @@ begin
     'OMF libraries must use the library profile.');
   Require(TDumpRunner.GetBestOptionText('sample.elf') = '-e -ns',
     'ELF files must use the executable profile.');
-  Require(TDumpRunner.GetBestOptionText('sample.ar') = '-lh -ns',
-    'Archive files must list their members.');
+  Require(TDumpRunner.GetBestOptionText('sample.ar') = '-ns',
+    'AR archives must use TDUMP''s default archive dump.');
+  Require(TDumpRunner.GetBestOptionText('sample.a') = '-ns',
+    'Unix .a archives must not receive ELF-only TDUMP switches.');
   Require(TDumpRunner.GetBestOptionText('Mach.Universal.Rad37.dylib') =
     '-M -ns',
     'Mach binaries must use TDUMP''s Mach profile.');
@@ -432,19 +438,31 @@ begin
       (LDocument.ObjectRecords.Count > 100) and
       SameText(LDocument.ObjectRecords[0].RecordKind, 'THEADR') and
       SameText(LDocument.ObjectRecords[0].Name, 'System.pas') and
-      ContainsText(LDocument.ObjectRecords[0].RawText, 'THEADR'),
-      'OMF object fixture must project its typed, source-backed record stream.');
+      ContainsText(LDocument.ObjectRecords[0].RawText, 'THEADR') and
+      (LDocument.ObjectRecords[1].Details.Count > 0) and
+      SameText(LDocument.ObjectRecords[1].Details[0].Name, 'Translator'),
+      'OMF object fixture must project typed record-body details.');
   finally
     LDocument.Free;
   end;
 
   LDocument := ParseGeneratedFixture('OMF.Library.Win32.tdump');
   try
-    Require((LDocument.FileKind = dfOMFLibrary) and
-      (LDocument.ObjectRecords.Count > 20) and
-      (LDocument.LibraryMembers.Count > 0) and
+    Require(LDocument.FileKind = dfOMFLibrary,
+      'OMF library fixture must retain its library classification.');
+    Require(LDocument.ObjectRecords.Count > 20,
+      'OMF library fixture must project its record stream.');
+    Require((LDocument.LibraryMembers.Count > 0) and
       (LDocument.LibraryMembers[0].Name <> ''),
-      'OMF library fixture must project records and THEADR library members.');
+      'OMF library fixture must project named members.');
+    Require(LDocument.OMFLibraryIndex <> nil,
+      'OMF library fixture must project its MSLIBR index.');
+    Require(LDocument.OMFLibraryIndex.HasFileOffset,
+      'OMF library index must retain its file offset.');
+    Require(LDocument.OMFLibraryIndex.HasBlockCount,
+      'OMF library index must retain its block count.');
+    Require(LDocument.OMFLibraryIndex.HasPageSize,
+      'OMF library index must retain its page size.');
   finally
     LDocument.Free;
   end;
@@ -475,6 +493,10 @@ begin
       LDocument.MachDynamicImports[0].SourceSpan.IsValid and
       LDocument.MachIndirectSymbols[0].SourceSpan.IsValid,
       'Mach fixture must project Dynamic Symbol Table imports and indirect symbols.');
+    Require((LDocument.MachDynamicSymbolTableCommand <> nil) and
+      SameText(LDocument.MachDynamicSymbolTableCommand.Name, 'LC_DYSYMTAB') and
+      (LDocument.MachDynamicSymbolTableCommand.Properties.Count > 0),
+      'Mach fixture must retain LC_DYSYMTAB metadata separately from its rows.');
     Require(LDocument.MachLoadCommands[0].SourceSpan.IsValid,
       'Mach load commands must preserve their source spans.');
   finally
@@ -762,6 +784,186 @@ begin
   end;
 end;
 
+procedure TestRelationGraph;
+begin
+  var LParser := TDumpParser.Create;
+  try
+    var LDocument := LParser.ParseFile(CTurboDumpBannerFixture);
+    try
+      var LBuilder := TDumpRelationBuilder.Create;
+      try
+        var LGraph := LBuilder.Build(LDocument);
+        try
+          Require((LGraph.SourceProcedureRelations.Count = 32) and
+            (LGraph.ProcedureReferenceRelations.Count = 11) and
+            (LGraph.ProcedureTypeRelations.Count = 35) and
+            (LGraph.ExportTargetRelations.Count = 9) and
+            (LGraph.ExportAliasGroups.Count = 3) and
+            (LGraph.ProcedureScopeRelations.Count = 35) and
+            (LGraph.DataDefinitionRelations.Count = 6) and
+            (LGraph.ResourceLocationRelations.Count = 4),
+            'The package fixture must retain its complete relation graph.');
+
+          var LDelayProcedure: TDumpAlignSymbolRecord := nil;
+          for var LRelation in LGraph.SourceProcedureRelations do
+            if EndsText('delayLoadHelper2$qqrv',
+              LRelation.ProcedureRecord.ResolvedName) then
+            begin
+              LDelayProcedure := LRelation.ProcedureRecord;
+              Require(EndsText('delayhlp.cpp', LRelation.SourceFile.Name) and
+                (LRelation.FirstSourceLine = 223) and
+                (LRelation.LastSourceLine = 420) and
+                (LRelation.StartLocation.RVA = $1758) and
+                (LRelation.StartLocation.VirtualAddress = $401758) and
+                (LRelation.StartLocation.FileOffset = $B58),
+                'delayLoadHelper2 must retain its source and PE coordinates.');
+              Break;
+            end;
+          Require(LDelayProcedure <> nil,
+            'delayLoadHelper2 must be linked to its source range.');
+
+          var LDelayTypeFound := False;
+          var LDelayScopeFound := False;
+          for var LTypeRelation in LGraph.ProcedureTypeRelations do
+            if LTypeRelation.ProcedureRecord = LDelayProcedure then
+            begin
+              LDelayTypeFound := (LTypeRelation.TypeIndex = $1034) and
+                (LTypeRelation.TypeRecord <> nil);
+              Break;
+            end;
+          for var LScopeRelation in LGraph.ProcedureScopeRelations do
+            if LScopeRelation.ProcedureRecord = LDelayProcedure then
+            begin
+              LDelayScopeFound := (LScopeRelation.EndRecord <> nil) and
+                (LScopeRelation.EndRecord.Kind = bsrkEnd);
+              Break;
+            end;
+          Require(LDelayTypeFound and LDelayScopeFound,
+            'delayLoadHelper2 must retain its type and lexical-scope links.');
+
+          var LProcedureExportCount := 0;
+          var LReferenceExportCount := 0;
+          for var LRelation in LGraph.ExportTargetRelations do
+          begin
+            Require(LRelation.Location.HasRVA,
+              'Every package export must resolve to PE coordinates.');
+            if LRelation.ProcedureRecord <> nil then
+              Inc(LProcedureExportCount);
+            if LRelation.ProcedureReference <> nil then
+              Inc(LReferenceExportCount);
+          end;
+          Require((LProcedureExportCount = 7) and (LReferenceExportCount = 1),
+            'Package exports must preserve direct and reference-only targets.');
+
+          for var LRelation in LGraph.ResourceLocationRelations do
+            Require((LRelation.Location.Section <> nil) and
+              SameText(LRelation.Location.Section.Name, '.rsrc') and
+              LRelation.Location.HasFileOffset,
+              'Every package resource leaf must resolve to raw .rsrc bytes.');
+
+          var LBssDataFound := False;
+          for var LRelation in LGraph.DataDefinitionRelations do
+            if EndsText('ModuleIsLib', LRelation.DefinitionRecord.ResolvedName) then
+            begin
+              LBssDataFound := (LRelation.Location.Section <> nil) and
+                SameText(LRelation.Location.Section.Name, '.bss') and
+                LRelation.Location.HasRVA and
+                not LRelation.Location.HasFileOffset;
+              Break;
+            end;
+          Require(LBssDataFound,
+            'BSS global data must resolve virtually without a raw-file offset.');
+        finally
+          LGraph.Free;
+        end;
+      finally
+        LBuilder.Free;
+      end;
+    finally
+      LDocument.Free;
+    end;
+  finally
+    LParser.Free;
+  end;
+end;
+
+procedure TestARArchiveProjection;
+const
+  CARArchiveText =
+    'Turbo Dump  Version 6.6.2.0 Copyright (c) Embarcadero Technologies, Inc.' +
+    sLineBreak + 'Display of File sqlite.a' + sLineBreak + sLineBreak +
+    'Ar 32-bit unix archive file' + sLineBreak + sLineBreak +
+    '------------ Member Headers -----------' + sLineBreak +
+    'ndx   member       offs      size      mode      uid   gid   time' +
+    sLineBreak +
+    '0     sqlite3.o    153A      2798      0         0     0     Sep 12 13:41:00 2012' +
+    sLineBreak + sLineBreak +
+    '------------ Symbols ----------- (2 entries)' + sLineBreak +
+    'ndx   name' + sLineBreak +
+    '---------------------------------------------------' + sLineBreak +
+    'member #0    sqlite3.o    offs=153A      size=2798' + sLineBreak +
+    '---------------------------------------------------' + sLineBreak +
+    '0     sqlite3_aggregate_context' + sLineBreak +
+    '1     sqlite3_aggregate_count';
+begin
+  Require(IsTDumpReport(CARArchiveText),
+    'A TDUMP AR archive report must be recognized as report text.');
+  var LParser := TDumpParser.Create;
+  try
+    var LDocument := LParser.ParseText(CARArchiveText, 'sqlite.a');
+    try
+      Require((LDocument.FileKind = dfARArchive) and
+        (LDocument.ArchiveMembers.Count = 1) and
+        (LDocument.ArchiveSymbols.Count = 2),
+        'An AR archive report must project member headers and symbols.');
+      Require((LDocument.ArchiveMembers[0].Name = 'sqlite3.o') and
+        LDocument.ArchiveMembers[0].HasOffset and
+        (LDocument.ArchiveMembers[0].Offset = $153A) and
+        LDocument.ArchiveMembers[0].HasSize and
+        (LDocument.ArchiveMembers[0].Size = $2798),
+        'AR member metadata must preserve hexadecimal offset and size values.');
+      Require((LDocument.ArchiveSymbols[0].Name =
+        'sqlite3_aggregate_context') and
+        (LDocument.ArchiveSymbols[0].MemberName = 'sqlite3.o') and
+        LDocument.ArchiveSymbols[0].SourceSpan.IsValid and
+        (LDocument.Diagnostics.Count = 0) and
+        (LDocument.UnsupportedStructures.Count = 0),
+        'AR symbols must retain their member association and source provenance.');
+    finally
+      LDocument.Free;
+    end;
+  finally
+    LParser.Free;
+  end;
+end;
+
+procedure TestELFProgramHeadersProjection;
+begin
+  var LDocument := ParseGeneratedFixture(
+    'ELF.SharedLibrary.InterBase15.program-headers.tdump');
+  try
+    var LDynamicRelocationCount := 0;
+    var LProcedureLinkageRelocationCount := 0;
+    for var LRelocation in LDocument.ELFRelocations do
+      if SameText(LRelocation.SectionName, '.rela.dyn') then
+        Inc(LDynamicRelocationCount)
+      else if SameText(LRelocation.SectionName, '.rela.plt') then
+        Inc(LProcedureLinkageRelocationCount);
+    Require((LDocument.FileKind = dfELFObject) and
+      (LDocument.ELFProgramHeaders.Count = 7) and
+      SameText(LDocument.ELFProgramHeaders[0].HeaderType, 'LOAD') and
+      LDocument.ELFProgramHeaders[0].SourceSpan.IsValid and
+      (LDocument.ELFDynamicEntries.Count = 31) and
+      SameText(LDocument.ELFDynamicEntries[0].Tag, 'NEEDED') and
+      LDocument.ELFDynamicEntries[0].SourceSpan.IsValid and
+      (LDynamicRelocationCount = 27667) and
+      (LProcedureLinkageRelocationCount = 5788),
+      'The real InterBase ELF shared-library fixture must retain program headers, dynamic entries, and relocation-table sections.');
+  finally
+    LDocument.Free;
+  end;
+end;
+
 procedure TParserFixture.ReportRecognition;
 begin
   TestTDumpReportRecognition;
@@ -875,6 +1077,21 @@ end;
 procedure TParserFixture.GeneratedBorlandDebugCoverage;
 begin
   TestGeneratedBorlandDebugCoverage;
+end;
+
+procedure TParserFixture.RelationGraph;
+begin
+  TestRelationGraph;
+end;
+
+procedure TParserFixture.ARArchiveProjection;
+begin
+  TestARArchiveProjection;
+end;
+
+procedure TParserFixture.ELFProgramHeadersProjection;
+begin
+  TestELFProgramHeadersProjection;
 end;
 
 begin

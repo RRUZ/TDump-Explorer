@@ -424,7 +424,9 @@ begin
     topELF:
       Result.Executable := True;
     topArchive:
-      Result.ELFMemberList := True;
+      begin
+        // -lh applies only to ELF libraries; AR archives use TDUMP's default dump.
+      end;
     topMach:
       Result.MachFile := True;
   end;

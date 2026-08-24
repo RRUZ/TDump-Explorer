@@ -21,9 +21,11 @@ type
     tdkBorlandGlobalTypeRecord, tdkMachHeader, tdkMachArchitectures,
     tdkMachArchitecture, tdkMachLoadCommands, tdkMachLoadCommand,
     tdkMachSection, tdkMachSymbolTable, tdkELFSectionHeaders,
-    tdkELFSymbolTable, tdkELFRelocations, tdkOMFRecords, tdkOMFRecord,
-    tdkOMFLibraryMembers, tdkRelocations, tdkRelocationBlock, tdkStrings, tdkMachDynamicImports,
-    tdkMachIndirectSymbols, tdkDiagnostics);
+    tdkELFProgramHeaders, tdkELFSymbolTable, tdkELFDynamicSection,
+    tdkELFRelocations, tdkOMFRecords, tdkOMFRecord,
+    tdkOMFLibraryMembers, tdkOMFLibraryIndex, tdkRelocations, tdkRelocationBlock, tdkStrings, tdkMachDynamicImports,
+    tdkMachIndirectSymbols, tdkMachDynamicSymbolMetadata, tdkArchiveMembers, tdkArchiveSymbols,
+    tdkDiagnostics);
 
   PTreeItemData = ^TTreeItemData;
   TTreeItemData = record
@@ -42,6 +44,7 @@ type
     MachSection: TDumpMachSection;
     ObjectRecord: TDumpObjectRecord;
     RelocationBlock: TDumpRelocationBlock;
+    ELFRelocationSectionName: string;
   end;
 
   TFrame1 = class(TFrame)
@@ -84,14 +87,19 @@ type
     procedure ShowDataDirectoriesDetails;
     procedure ShowObjectTableDetails;
     procedure ShowELFSectionHeadersDetails;
+    procedure ShowELFProgramHeadersDetails;
     procedure ShowELFSymbolTableDetails;
-    procedure ShowELFRelocationsDetails;
+    procedure ShowELFDynamicSectionDetails;
+    procedure ShowELFRelocationsDetails(const ASectionName: string);
     procedure ShowRelocationsDetails;
     procedure ShowRelocationBlockDetails(ABlock: TDumpRelocationBlock);
     procedure ShowStringsDetails;
     procedure ShowOMFRecordsDetails;
     procedure ShowOMFLibraryMembersDetails;
+    procedure ShowOMFLibraryIndexDetails;
     procedure ShowOMFRecordDetails(ARecord: TDumpObjectRecord);
+    procedure ShowArchiveMembersDetails;
+    procedure ShowArchiveSymbolsDetails;
     procedure ShowImportDirectoryDetails;
     procedure ShowImportModuleDetails(AImportModuleIndex: Integer);
     procedure ShowExportDirectoryDetails;
@@ -110,6 +118,7 @@ type
     procedure ShowMachSectionDetails(ASection: TDumpMachSection);
     procedure ShowMachSymbolTableDetails;
     procedure ShowMachDynamicSymbolsDetails(ADetailKind: TTreeDetailKind);
+    procedure ShowMachDynamicSymbolMetadataDetails;
     procedure ShowDiagnosticsDetails;
     procedure ActivateNode(ANode: PVirtualNode);
     procedure TreeFreeNode(Sender: TBaseVirtualTree; Node: PVirtualNode);
@@ -268,6 +277,7 @@ begin
     dfDelphiUnit: Result := 'Delphi Unit';
     dfELFObject: Result := 'ELF Object';
     dfELFArchive: Result := 'ELF Archive';
+    dfARArchive: Result := 'AR Archive';
     dfMach: Result := 'Mach Image';
     dfRawHex: Result := 'Hex Dump';
     dfASCII: Result := 'ASCII Text';
@@ -326,8 +336,12 @@ begin
         LCard.Caption := 'ELF Header';
       tdkELFSectionHeaders:
         LCard.Caption := 'ELF Section Headers';
+      tdkELFProgramHeaders:
+        LCard.Caption := 'ELF Program Headers';
       tdkELFSymbolTable:
         LCard.Caption := 'ELF Symbol Table';
+      tdkELFDynamicSection:
+        LCard.Caption := 'ELF Dynamic Section';
       tdkELFRelocations:
         LCard.Caption := 'ELF Relocations';
       tdkRelocations:
@@ -342,10 +356,18 @@ begin
         LCard.Caption := 'OMF Record';
       tdkOMFLibraryMembers:
         LCard.Caption := 'OMF Library Members';
+      tdkOMFLibraryIndex:
+        LCard.Caption := 'OMF Library Index';
+      tdkArchiveMembers:
+        LCard.Caption := 'AR Archive Members';
+      tdkArchiveSymbols:
+        LCard.Caption := 'AR Archive Symbols';
       tdkMachDynamicImports:
         LCard.Caption := 'Mach Dynamic Imports';
       tdkMachIndirectSymbols:
         LCard.Caption := 'Mach Indirect Symbols';
+      tdkMachDynamicSymbolMetadata:
+        LCard.Caption := 'Mach Dynamic Symbol Table';
       tdkDiagnostics:
         LCard.Caption := 'Diagnostics';
     end;
@@ -579,6 +601,32 @@ begin
   CardPanel1.ActiveCard := FHighlighterCards[ADetailKind];
 end;
 
+procedure TFrame1.ShowMachDynamicSymbolMetadataDetails;
+begin
+  if (FDocument = nil) or (FDocument.MachDynamicSymbolTableCommand = nil) then
+    Exit;
+
+  var LCommand := FDocument.MachDynamicSymbolTableCommand;
+  var LControl := EnsureHighlighterDetailControl(tdkMachDynamicSymbolMetadata);
+  LControl.ParserMode := tpmTDumpValues;
+  LControl.BeginUpdate;
+  try
+    LControl.Clear;
+    LControl.SetColumnHeaders(['Property', 'Value']);
+    LControl.AddColumns(['Load command', Format('#%d %s',
+      [LCommand.Index, LCommand.Name])]);
+    LControl.AddColumns(['Dynamic imports',
+      FDocument.MachDynamicImports.Count.ToString]);
+    LControl.AddColumns(['Indirect symbols',
+      FDocument.MachIndirectSymbols.Count.ToString]);
+    for var LProperty in LCommand.Properties do
+      LControl.AddColumns([LProperty.Name, LProperty.RawValue]);
+  finally
+    LControl.EndUpdate;
+  end;
+  CardPanel1.ActiveCard := FHighlighterCards[tdkMachDynamicSymbolMetadata];
+end;
+
 procedure TFrame1.ShowDataDirectoriesDetails;
 begin
   if FDocument = nil then
@@ -661,6 +709,32 @@ begin
   CardPanel1.ActiveCard := FHighlighterCards[tdkELFSectionHeaders];
 end;
 
+procedure TFrame1.ShowELFProgramHeadersDetails;
+begin
+  if FDocument = nil then
+    Exit;
+
+  var LControl := EnsureHighlighterDetailControl(tdkELFProgramHeaders);
+  LControl.ParserMode := tpmTDumpValues;
+  LControl.BeginUpdate;
+  try
+    LControl.Clear;
+    LControl.SetColumnHeaders(['Ndx', 'Type', 'Offset', 'VAddr', 'PAddr',
+      'File size', 'Memory size', 'Flags', 'Align']);
+    LControl.SetColumnDataTypes([thdtInteger, thdtSymbol, thdtHexadecimal,
+      thdtHexadecimal, thdtHexadecimal, thdtHexadecimal, thdtHexadecimal,
+      thdtSymbol, thdtHexadecimal]);
+    for var LHeader in FDocument.ELFProgramHeaders do
+      LControl.AddColumns([IntToStr(LHeader.Index), LHeader.HeaderType,
+        LHeader.Offset, LHeader.VirtualAddress, LHeader.PhysicalAddress,
+        LHeader.FileSize, LHeader.MemorySize, LHeader.Flags,
+        LHeader.Alignment]);
+  finally
+    LControl.EndUpdate;
+  end;
+  CardPanel1.ActiveCard := FHighlighterCards[tdkELFProgramHeaders];
+end;
+
 procedure TFrame1.ShowELFSymbolTableDetails;
 begin
   if FDocument = nil then
@@ -688,7 +762,29 @@ begin
   CardPanel1.ActiveCard := FHighlighterCards[tdkELFSymbolTable];
 end;
 
-procedure TFrame1.ShowELFRelocationsDetails;
+procedure TFrame1.ShowELFDynamicSectionDetails;
+begin
+  if FDocument = nil then
+    Exit;
+
+  var LControl := EnsureHighlighterDetailControl(tdkELFDynamicSection);
+  LControl.ParserMode := tpmTDumpValues;
+  LControl.BeginUpdate;
+  try
+    LControl.Clear;
+    LControl.SetColumnHeaders(['Ndx', 'Tag', 'Value']);
+    LControl.SetColumnDataTypes([thdtInteger, thdtSymbol, thdtHexadecimal]);
+    for var LEntry in FDocument.ELFDynamicEntries do
+      LControl.AddColumns([LEntry.Index.ToString, LEntry.Tag, LEntry.Value]);
+  finally
+    LControl.EndUpdate;
+  end;
+  FHighlighterCards[tdkELFDynamicSection].Caption := Format(
+    'ELF Dynamic Section [%d entries]', [FDocument.ELFDynamicEntries.Count]);
+  CardPanel1.ActiveCard := FHighlighterCards[tdkELFDynamicSection];
+end;
+
+procedure TFrame1.ShowELFRelocationsDetails(const ASectionName: string);
 begin
   if FDocument = nil then
     Exit;
@@ -698,19 +794,48 @@ begin
   LControl.BeginUpdate;
   try
     LControl.Clear;
-    LControl.SetColumnHeaders(['Section', 'Ndx', 'Type', 'Offset', '(Addend)',
-      'Value', 'Symbol', 'Addend', 'Name']);
-    LControl.SetColumnDataTypes([thdtText, thdtInteger, thdtSymbol,
-      thdtHexadecimal, thdtHexadecimal, thdtHexadecimal, thdtInteger,
-      thdtHexadecimal, thdtAuto]);
-    for var LRelocation in FDocument.ELFRelocations do
-      LControl.AddColumns([LRelocation.SectionName, IntToStr(LRelocation.Index),
-        LRelocation.RelocationType, LRelocation.Offset,
-        LRelocation.ParenthesizedAddend, LRelocation.Value,
-        LRelocation.SymbolIndex, LRelocation.Addend, LRelocation.Name]);
+    if ASectionName = '' then
+    begin
+      var LCounts := TDictionary<string, Integer>.Create;
+      try
+        for var LRelocation in FDocument.ELFRelocations do
+        begin
+          var LCount := 0;
+          LCounts.TryGetValue(LRelocation.SectionName, LCount);
+          LCounts.AddOrSetValue(LRelocation.SectionName, LCount + 1);
+        end;
+        LControl.SetColumnHeaders(['Section', 'Entries']);
+        LControl.SetColumnDataTypes([thdtText, thdtInteger]);
+        for var LSectionName in LCounts.Keys do
+          LControl.AddColumns([LSectionName,
+            LCounts[LSectionName].ToString]);
+      finally
+        LCounts.Free;
+      end;
+    end
+    else
+    begin
+      LControl.SetColumnHeaders(['Ndx', 'Type', 'Offset', '(Addend)', 'Value',
+        'Symbol', 'Addend', 'Name']);
+      LControl.SetColumnDataTypes([thdtInteger, thdtSymbol, thdtHexadecimal,
+        thdtHexadecimal, thdtHexadecimal, thdtInteger, thdtHexadecimal,
+        thdtAuto]);
+      for var LRelocation in FDocument.ELFRelocations do
+        if SameText(LRelocation.SectionName, ASectionName) then
+          LControl.AddColumns([IntToStr(LRelocation.Index),
+            LRelocation.RelocationType, LRelocation.Offset,
+            LRelocation.ParenthesizedAddend, LRelocation.Value,
+            LRelocation.SymbolIndex, LRelocation.Addend, LRelocation.Name]);
+    end;
   finally
     LControl.EndUpdate;
   end;
+  if ASectionName = '' then
+    FHighlighterCards[tdkELFRelocations].Caption := Format(
+      'ELF Relocation Tables [%d entries]', [FDocument.ELFRelocations.Count])
+  else
+    FHighlighterCards[tdkELFRelocations].Caption :=
+      'ELF Relocations ' + ASectionName;
   CardPanel1.ActiveCard := FHighlighterCards[tdkELFRelocations];
 end;
 
@@ -800,12 +925,20 @@ begin
   LControl.BeginUpdate;
   try
     LControl.Clear;
-    LControl.SetColumnHeaders(['Offset', 'Record', 'Details', 'Lines']);
-    LControl.SetColumnDataTypes([thdtHexadecimal, thdtSymbol, thdtAuto,
-      thdtInteger]);
-    for var LRecord in FDocument.ObjectRecords do
-      LControl.AddColumns([LRecord.RawOffset, LRecord.RecordKind, LRecord.Name,
-        IntToStr(LRecord.EndLine - LRecord.StartLine + 1)]);
+    LControl.SetColumnHeaders(['Property', 'Value']);
+    LControl.SetColumnDataTypes([thdtText, thdtAuto]);
+    LControl.AddColumns(['Records', IntToStr(FDocument.ObjectRecords.Count)]);
+    if FDocument.ObjectRecords.Count > 0 then
+    begin
+      var LFirstRecord := FDocument.ObjectRecords[0];
+      var LLastRecord := FDocument.ObjectRecords.Last;
+      LControl.AddColumns(['First record', LFirstRecord.RawOffset + ' ' +
+        LFirstRecord.RecordKind]);
+      LControl.AddColumns(['Last record', LLastRecord.RawOffset + ' ' +
+        LLastRecord.RecordKind]);
+      LControl.AddColumns(['Source lines', Format('%d..%d',
+        [LFirstRecord.StartLine, LLastRecord.EndLine])]);
+    end;
   finally
     LControl.EndUpdate;
   end;
@@ -835,6 +968,77 @@ begin
   CardPanel1.ActiveCard := FHighlighterCards[tdkOMFLibraryMembers];
 end;
 
+procedure TFrame1.ShowOMFLibraryIndexDetails;
+begin
+  if (FDocument = nil) or (FDocument.OMFLibraryIndex = nil) then
+    Exit;
+
+  var LIndex := FDocument.OMFLibraryIndex;
+  var LControl := EnsureHighlighterDetailControl(tdkOMFLibraryIndex);
+  LControl.ParserMode := tpmTDumpValues;
+  LControl.BeginUpdate;
+  try
+    LControl.Clear;
+    LControl.SetColumnHeaders(['Property', 'Value']);
+    if LIndex.HasFileOffset then
+      LControl.AddColumns(['Index file offset', LIndex.RawFileOffset]);
+    if LIndex.HasBlockCount then
+      LControl.AddColumns(['Index blocks', LIndex.BlockCount.ToString]);
+    if LIndex.HasPageSize then
+      LControl.AddColumns(['Library page size', LIndex.PageSize.ToString +
+        ' bytes']);
+  finally
+    LControl.EndUpdate;
+  end;
+  CardPanel1.ActiveCard := FHighlighterCards[tdkOMFLibraryIndex];
+end;
+
+procedure TFrame1.ShowArchiveMembersDetails;
+begin
+  if FDocument = nil then
+    Exit;
+
+  var LControl := EnsureHighlighterDetailControl(tdkArchiveMembers);
+  LControl.ParserMode := tpmTDumpValues;
+  LControl.BeginUpdate;
+  try
+    LControl.Clear;
+    LControl.SetColumnHeaders(['Index', 'Member', 'Offset', 'Size', 'Mode',
+      'UID', 'GID', 'Timestamp']);
+    LControl.SetColumnDataTypes([thdtInteger, thdtText, thdtHexadecimal,
+      thdtHexadecimal, thdtText, thdtInteger, thdtInteger, thdtText]);
+    for var LMember in FDocument.ArchiveMembers do
+      LControl.AddColumns([IntToStr(LMember.Index), LMember.Name,
+        LMember.RawOffset, LMember.RawSize, LMember.Mode, LMember.UserId,
+        LMember.GroupId, LMember.Timestamp]);
+  finally
+    LControl.EndUpdate;
+  end;
+  CardPanel1.ActiveCard := FHighlighterCards[tdkArchiveMembers];
+end;
+
+procedure TFrame1.ShowArchiveSymbolsDetails;
+begin
+  if FDocument = nil then
+    Exit;
+
+  var LControl := EnsureHighlighterDetailControl(tdkArchiveSymbols);
+  LControl.ParserMode := tpmTDumpValues;
+  LControl.BeginUpdate;
+  try
+    LControl.Clear;
+    LControl.SetColumnHeaders(['Index', 'Symbol', 'Member', 'Offset', 'Size']);
+    LControl.SetColumnDataTypes([thdtInteger, thdtText, thdtText,
+      thdtHexadecimal, thdtHexadecimal]);
+    for var LSymbol in FDocument.ArchiveSymbols do
+      LControl.AddColumns([IntToStr(LSymbol.Index), LSymbol.Name,
+        LSymbol.MemberName, LSymbol.RawMemberOffset, LSymbol.RawMemberSize]);
+  finally
+    LControl.EndUpdate;
+  end;
+  CardPanel1.ActiveCard := FHighlighterCards[tdkArchiveSymbols];
+end;
+
 procedure TFrame1.ShowOMFRecordDetails(ARecord: TDumpObjectRecord);
 begin
   if ARecord = nil then
@@ -842,7 +1046,19 @@ begin
 
   var LControl := EnsureHighlighterDetailControl(tdkOMFRecord);
   LControl.ParserMode := tpmTDumpValues;
-  LControl.SetText(ARecord.RawText);
+  LControl.BeginUpdate;
+  try
+    LControl.Clear;
+    LControl.SetColumnHeaders(['Property', 'Value']);
+    LControl.AddColumns(['Offset', ARecord.RawOffset]);
+    LControl.AddColumns(['Record', ARecord.RecordKind]);
+    if ARecord.Name <> '' then
+      LControl.AddColumns(['Name', ARecord.Name]);
+    for var LDetail in ARecord.Details do
+      LControl.AddColumns([LDetail.Name, LDetail.RawValue]);
+  finally
+    LControl.EndUpdate;
+  end;
   FHighlighterCards[tdkOMFRecord].Caption := ARecord.RawOffset + ' ' +
     ARecord.RecordKind;
   CardPanel1.ActiveCard := FHighlighterCards[tdkOMFRecord];
@@ -1428,9 +1644,37 @@ begin
     if (FDocument.FileKind = dfELFObject) and (FDocument.Symbols.Count > 0) then
       AddTreeNode(LRootNode, Format('Symbol Table [%d symbols]',
         [FDocument.Symbols.Count]), tdkELFSymbolTable);
+    if FDocument.ELFProgramHeaders.Count > 0 then
+      AddTreeNode(LRootNode, Format('Program Headers [%d]',
+        [FDocument.ELFProgramHeaders.Count]), tdkELFProgramHeaders);
+    if FDocument.ELFDynamicEntries.Count > 0 then
+      AddTreeNode(LRootNode, Format('Dynamic Section [%d entries]',
+        [FDocument.ELFDynamicEntries.Count]), tdkELFDynamicSection);
     if FDocument.ELFRelocations.Count > 0 then
-      AddTreeNode(LRootNode, Format('Relocations [%d]',
-        [FDocument.ELFRelocations.Count]), tdkELFRelocations);
+    begin
+      var LRelocationsNode := AddTreeNode(LRootNode, Format(
+        'Relocations [%d entries]', [FDocument.ELFRelocations.Count]),
+        tdkELFRelocations);
+      var LSections := TList<string>.Create;
+      try
+        for var LRelocation in FDocument.ELFRelocations do
+          if LSections.IndexOf(LRelocation.SectionName) < 0 then
+            LSections.Add(LRelocation.SectionName);
+        for var LSectionName in LSections do
+        begin
+          var LEntryCount := 0;
+          for var LRelocation in FDocument.ELFRelocations do
+            if SameText(LRelocation.SectionName, LSectionName) then
+              Inc(LEntryCount);
+          var LSectionNode := AddTreeNode(LRelocationsNode, Format('%s [%d entries]',
+            [LSectionName, LEntryCount]), tdkELFRelocations);
+          PTreeItemData(Tree.GetNodeData(LSectionNode))^.ELFRelocationSectionName :=
+            LSectionName;
+        end;
+      finally
+        LSections.Free;
+      end;
+    end;
 
     if FDocument.ObjectRecords.Count > 0 then
     begin
@@ -1449,6 +1693,15 @@ begin
     if FDocument.LibraryMembers.Count > 0 then
       AddTreeNode(LRootNode, Format('Library Members [%d]',
         [FDocument.LibraryMembers.Count]), tdkOMFLibraryMembers);
+    if FDocument.OMFLibraryIndex <> nil then
+      AddTreeNode(LRootNode, 'Library Index', tdkOMFLibraryIndex);
+
+    if FDocument.ArchiveMembers.Count > 0 then
+      AddTreeNode(LRootNode, Format('Archive Members [%d]',
+        [FDocument.ArchiveMembers.Count]), tdkArchiveMembers);
+    if FDocument.ArchiveSymbols.Count > 0 then
+      AddTreeNode(LRootNode, Format('Archive Symbols [%d]',
+        [FDocument.ArchiveSymbols.Count]), tdkArchiveSymbols);
 
     if FDocument.MachArchitectures.Count > 0 then
     begin
@@ -1492,12 +1745,27 @@ begin
     if FDocument.MachSymbols.Count > 0 then
       AddTreeNode(LRootNode, Format('Symbol Table [%d symbols]',
         [FDocument.MachSymbols.Count]), tdkMachSymbolTable);
-    if FDocument.MachDynamicImports.Count > 0 then
-      AddTreeNode(LRootNode, Format('Dynamic Imports [%d symbols]',
-        [FDocument.MachDynamicImports.Count]), tdkMachDynamicImports);
-    if FDocument.MachIndirectSymbols.Count > 0 then
-      AddTreeNode(LRootNode, Format('Indirect Symbols [%d symbols]',
-        [FDocument.MachIndirectSymbols.Count]), tdkMachIndirectSymbols);
+    if FDocument.MachDynamicSymbolTableCommand <> nil then
+    begin
+      var LDynamicSymbolsNode := AddTreeNode(LRootNode, 'Dynamic Symbol Table');
+      AddTreeNode(LDynamicSymbolsNode, 'Metadata',
+        tdkMachDynamicSymbolMetadata);
+      if FDocument.MachDynamicImports.Count > 0 then
+        AddTreeNode(LDynamicSymbolsNode, Format('Dynamic Imports [%d symbols]',
+          [FDocument.MachDynamicImports.Count]), tdkMachDynamicImports);
+      if FDocument.MachIndirectSymbols.Count > 0 then
+        AddTreeNode(LDynamicSymbolsNode, Format('Indirect Symbols [%d symbols]',
+          [FDocument.MachIndirectSymbols.Count]), tdkMachIndirectSymbols);
+    end
+    else
+    begin
+      if FDocument.MachDynamicImports.Count > 0 then
+        AddTreeNode(LRootNode, Format('Dynamic Imports [%d symbols]',
+          [FDocument.MachDynamicImports.Count]), tdkMachDynamicImports);
+      if FDocument.MachIndirectSymbols.Count > 0 then
+        AddTreeNode(LRootNode, Format('Indirect Symbols [%d symbols]',
+          [FDocument.MachIndirectSymbols.Count]), tdkMachIndirectSymbols);
+    end;
 
     if HasBorlandSymbolTable then
     begin
@@ -1615,10 +1883,14 @@ begin
       ShowObjectTableDetails;
     tdkELFSectionHeaders:
       ShowELFSectionHeadersDetails;
+    tdkELFProgramHeaders:
+      ShowELFProgramHeadersDetails;
     tdkELFSymbolTable:
       ShowELFSymbolTableDetails;
+    tdkELFDynamicSection:
+      ShowELFDynamicSectionDetails;
     tdkELFRelocations:
-      ShowELFRelocationsDetails;
+      ShowELFRelocationsDetails(LNodeData.ELFRelocationSectionName);
     tdkRelocations:
       ShowRelocationsDetails;
     tdkRelocationBlock:
@@ -1629,8 +1901,14 @@ begin
       ShowOMFRecordsDetails;
     tdkOMFLibraryMembers:
       ShowOMFLibraryMembersDetails;
+    tdkOMFLibraryIndex:
+      ShowOMFLibraryIndexDetails;
     tdkOMFRecord:
       ShowOMFRecordDetails(LNodeData.ObjectRecord);
+    tdkArchiveMembers:
+      ShowArchiveMembersDetails;
+    tdkArchiveSymbols:
+      ShowArchiveSymbolsDetails;
     tdkImportDirectory:
       ShowImportDirectoryDetails;
     tdkImportModule:
@@ -1667,6 +1945,8 @@ begin
       ShowMachSymbolTableDetails;
     tdkMachDynamicImports, tdkMachIndirectSymbols:
       ShowMachDynamicSymbolsDetails(LNodeData.DetailKind);
+    tdkMachDynamicSymbolMetadata:
+      ShowMachDynamicSymbolMetadataDetails;
     tdkDiagnostics:
       ShowDiagnosticsDetails;
   else
