@@ -6,18 +6,50 @@ uses
   System.SysUtils,
   System.IOUtils,
   System.StrUtils,
+  DUnitX.TestFramework,
+  DUnitX.Loggers.Xml.NUnit,
   TDump.Explorer.Parser in '..\source\parser\TDump.Explorer.Parser.pas',
   TDump.Explorer.Runner in '..\source\common\TDump.Explorer.Runner.pas';
 
 const
   CGeneratedFixtureDirectory = 'C:\dev\TDump-Explorer\fixtures\generated';
+  CTestResultsDirectory = 'C:\dev\TDump-Explorer\tests\test-results';
+  CTestResultsFile = CTestResultsDirectory + '\TDumpParserTests.nunit.xml';
   CTurboDumpBannerFixture =
     'C:\dev\TDump-Explorer\fixtures\PlainVanilla.Delphi.Package.bpl.tdump';
 
+type
+  [TestFixture]
+  TParserFixture = class
+  public
+    [Test] procedure ReportRecognition;
+    [Test] procedure BinaryFileRecognition;
+    [Test] procedure RunnerOptionProfiles;
+    [Test] procedure TypedRunnerOptions;
+    [Test] procedure DelphiUnitDiagnostics;
+    [Test] procedure ShortToolDiagnosticCapture;
+    [Test] procedure RawMachHexDump;
+    [Test] procedure TurboDumpMetadata;
+    [Test] procedure PECoreProjection;
+    [Test] procedure SourceSpanProvenance;
+    [Test] procedure CompactImports;
+    [Test] procedure CompactExports;
+    [Test] procedure Relocations;
+    [Test] procedure UnknownFallback;
+    [Test] procedure GeneratedFixtureCoverage;
+    [Test] procedure GeneratedPECoreProjection;
+    [Test] procedure GeneratedCompactProjections;
+    [Test] procedure InvalidFixtureFallback;
+    [Test] procedure DebugInformationProjection;
+    [Test] procedure P2ProjectionsAndMerge;
+    [Test] procedure GeneratedDocumentIntegrity;
+    [Test] procedure GeneratedNativeFormatCoverage;
+    [Test] procedure GeneratedBorlandDebugCoverage;
+  end;
+
 procedure Require(ACondition: Boolean; const AMessage: string);
 begin
-  if not ACondition then
-    raise Exception.Create(AMessage);
+  Assert.IsTrue(ACondition, AMessage);
 end;
 
 function ParseGeneratedFixture(const AFileName: string): TDumpDocument;
@@ -29,6 +61,41 @@ begin
   finally
     LParser.Free;
   end;
+end;
+
+procedure RequireGeneratedDocumentIntegrity(const AFileName: string;
+  ADocument: TDumpDocument);
+begin
+  Require(ADocument <> nil, AFileName + ' must produce a document.');
+  Require(ADocument.Lines.Count > 0,
+    AFileName + ' must retain its physical source lines.');
+  Require((ADocument.Runs.Count = 1) and
+    (ADocument.PrimaryRun = ADocument.Runs[0]) and
+    (ADocument.PrimaryRun.Document = ADocument),
+    AFileName + ' must retain one document-owned source run.');
+  Require(SameText(ADocument.PrimaryRun.SourceFileName,
+    ADocument.SourceFileName),
+    AFileName + ' must retain its source file name in the source run.');
+
+  for var LIndex := 0 to ADocument.Lines.Count - 1 do
+  begin
+    var LLine := ADocument.Lines[LIndex];
+    Require((LLine.LineNumber = LIndex + 1) and LLine.SourceSpan.IsValid and
+      (LLine.SourceSpan.Run = ADocument.PrimaryRun) and
+      (LLine.SourceSpan.StartLine = LIndex + 1) and
+      (LLine.SourceSpan.EndLine = LIndex + 1),
+      AFileName + ' must retain exact provenance for every source line.');
+  end;
+
+  for var LNode in ADocument.Nodes do
+    Require(LNode.SourceSpan.IsValid and
+      (LNode.SourceSpan.Run = ADocument.PrimaryRun),
+      AFileName + ' nodes must retain source-run provenance.');
+
+  for var LHeader in ADocument.Headers do
+    Require(LHeader.SourceSpan.IsValid and
+      (LHeader.SourceSpan.Run = ADocument.PrimaryRun),
+      AFileName + ' headers must retain source-run provenance.');
 end;
 
 procedure TestTDumpReportRecognition;
@@ -601,34 +668,224 @@ begin
   end;
 end;
 
+procedure TestGeneratedDocumentIntegrity;
 begin
-  try
-    TestTDumpReportRecognition;
-    TestTDumpBinaryFileRecognition;
-    TestRunnerOptionProfiles;
-    TestTypedRunnerOptions;
-    TestDelphiUnitDiagnostics;
-    TestShortToolDiagnosticCapture;
-    TestRawMachHexDump;
-    TestTurboDumpMetadata;
-    TestPECoreProjection;
-    TestSourceSpanProvenance;
-    TestCompactImports;
-    TestCompactExports;
-    TestRelocations;
-    TestUnknownFallback;
-    TestGeneratedFixtureCoverage;
-    TestGeneratedPECoreProjection;
-    TestGeneratedCompactProjections;
-    TestInvalidFixtureFallback;
-    TestDebugInformationProjection;
-    TestP2ProjectionsAndMerge;
-    Writeln('TDump parser assertions passed.');
-  except
-    on LException: Exception do
-    begin
-      Writeln(ErrOutput, LException.Message);
-      ExitCode := 1;
+  var LFixtureFiles := TDirectory.GetFiles(CGeneratedFixtureDirectory,
+    '*.tdump', TSearchOption.soAllDirectories);
+  Require(Length(LFixtureFiles) >= 30,
+    'The generated TDUMP fixture corpus must remain comprehensive.');
+
+  for var LFixtureFileName in LFixtureFiles do
+  begin
+    var LFixtureName := ExtractFileName(LFixtureFileName);
+    Require(IsTDumpReport(TFile.ReadAllText(LFixtureFileName,
+      TEncoding.Default)), LFixtureName + ' must be recognized as TDUMP output.');
+    var LDocument := ParseGeneratedFixture(LFixtureName);
+    try
+      RequireGeneratedDocumentIntegrity(LFixtureName, LDocument);
+    finally
+      LDocument.Free;
     end;
   end;
+end;
+
+procedure TestGeneratedNativeFormatCoverage;
+const
+  CNativeFixtures: array[0..4] of string = ('OMF.Object.Win32.tdump',
+    'OMF.Library.Win32.tdump', 'ELF.Object.Win64.tdump',
+    'Mach.Universal.Rad23.tdump', 'Mach.Universal.Rad37.tdump');
+  CExpectedKinds: array[0..4] of TDumpFileKind = (dfOMFObject, dfOMFLibrary,
+    dfELFObject, dfMach, dfMach);
+begin
+  for var LIndex := Low(CNativeFixtures) to High(CNativeFixtures) do
+  begin
+    var LFixtureName := CNativeFixtures[LIndex];
+    var LDocument := ParseGeneratedFixture(LFixtureName);
+    try
+      Require(LDocument.FileKind = CExpectedKinds[LIndex],
+        LFixtureName + ' must retain its native format classification.');
+      RequireGeneratedDocumentIntegrity(LFixtureName, LDocument);
+
+      case LDocument.FileKind of
+        dfOMFObject:
+          Require((LDocument.ObjectRecords.Count > 100) and
+            LDocument.ObjectRecords[0].SourceSpan.IsValid,
+            LFixtureName + ' must project its OMF record stream.');
+        dfOMFLibrary:
+          Require((LDocument.ObjectRecords.Count > 20) and
+            (LDocument.LibraryMembers.Count > 0) and
+            LDocument.LibraryMembers[0].SourceSpan.IsValid,
+            LFixtureName + ' must project OMF members and their records.');
+        dfELFObject:
+          Require((LDocument.Headers.Count > 0) and
+            (LDocument.Sections.Count > 0) and (LDocument.Symbols.Count > 0) and
+            (LDocument.ELFRelocations.Count > 0) and
+            LDocument.ELFRelocations[0].SourceSpan.IsValid,
+            LFixtureName + ' must project ELF headers, sections, symbols, and relocations.');
+        dfMach:
+          Require((LDocument.Headers.Count > 0) and
+            (LDocument.MachArchitectures.Count > 0) and
+            (LDocument.MachLoadCommands.Count > 0) and
+            (LDocument.MachSymbols.Count > 0) and
+            LDocument.MachSymbols[0].SourceSpan.IsValid,
+            LFixtureName + ' must project Mach architectures, commands, and symbols.');
+      end;
+    finally
+      LDocument.Free;
+    end;
+  end;
+end;
+
+procedure TestGeneratedBorlandDebugCoverage;
+const
+  CDebugFixtures: array[0..2] of string = (
+    'PlainVanilla.Delphi.Package.bpl.tdump', 'Package.Win32.debug.tdump',
+    'Package.Win64.debug.tdump');
+begin
+  for var LFixtureName in CDebugFixtures do
+  begin
+    var LDocument := ParseGeneratedFixture(LFixtureName);
+    try
+      Require((LDocument.BorlandSubsections.Count > 0) and
+        (LDocument.BorlandNames.Count > 0) and (LDocument.Symbols.Count > 0) and
+        (LDocument.DebugInformation <> nil) and
+        (LDocument.DebugInformation.SourceModules.Count > 0) and
+        (LDocument.DebugInformation.Methods.Count > 0),
+        LFixtureName + ' must project Borland subsections, names, symbols, and methods.');
+      Require(LDocument.DebugInformation.Methods[0].SourceSpan.IsValid and
+        (LDocument.DebugInformation.Methods[0].SourceSpan.Run =
+          LDocument.PrimaryRun),
+        LFixtureName + ' debug methods must retain source-run provenance.');
+    finally
+      LDocument.Free;
+    end;
+  end;
+end;
+
+procedure TParserFixture.ReportRecognition;
+begin
+  TestTDumpReportRecognition;
+end;
+
+procedure TParserFixture.BinaryFileRecognition;
+begin
+  TestTDumpBinaryFileRecognition;
+end;
+
+procedure TParserFixture.RunnerOptionProfiles;
+begin
+  TestRunnerOptionProfiles;
+end;
+
+procedure TParserFixture.TypedRunnerOptions;
+begin
+  TestTypedRunnerOptions;
+end;
+
+procedure TParserFixture.DelphiUnitDiagnostics;
+begin
+  TestDelphiUnitDiagnostics;
+end;
+
+procedure TParserFixture.ShortToolDiagnosticCapture;
+begin
+  TestShortToolDiagnosticCapture;
+end;
+
+procedure TParserFixture.RawMachHexDump;
+begin
+  TestRawMachHexDump;
+end;
+
+procedure TParserFixture.TurboDumpMetadata;
+begin
+  TestTurboDumpMetadata;
+end;
+
+procedure TParserFixture.PECoreProjection;
+begin
+  TestPECoreProjection;
+end;
+
+procedure TParserFixture.SourceSpanProvenance;
+begin
+  TestSourceSpanProvenance;
+end;
+
+procedure TParserFixture.CompactImports;
+begin
+  TestCompactImports;
+end;
+
+procedure TParserFixture.CompactExports;
+begin
+  TestCompactExports;
+end;
+
+procedure TParserFixture.Relocations;
+begin
+  TestRelocations;
+end;
+
+procedure TParserFixture.UnknownFallback;
+begin
+  TestUnknownFallback;
+end;
+
+procedure TParserFixture.GeneratedFixtureCoverage;
+begin
+  TestGeneratedFixtureCoverage;
+end;
+
+procedure TParserFixture.GeneratedPECoreProjection;
+begin
+  TestGeneratedPECoreProjection;
+end;
+
+procedure TParserFixture.GeneratedCompactProjections;
+begin
+  TestGeneratedCompactProjections;
+end;
+
+procedure TParserFixture.InvalidFixtureFallback;
+begin
+  TestInvalidFixtureFallback;
+end;
+
+procedure TParserFixture.DebugInformationProjection;
+begin
+  TestDebugInformationProjection;
+end;
+
+procedure TParserFixture.P2ProjectionsAndMerge;
+begin
+  TestP2ProjectionsAndMerge;
+end;
+
+procedure TParserFixture.GeneratedDocumentIntegrity;
+begin
+  TestGeneratedDocumentIntegrity;
+end;
+
+procedure TParserFixture.GeneratedNativeFormatCoverage;
+begin
+  TestGeneratedNativeFormatCoverage;
+end;
+
+procedure TParserFixture.GeneratedBorlandDebugCoverage;
+begin
+  TestGeneratedBorlandDebugCoverage;
+end;
+
+begin
+  ReportMemoryLeaksOnShutdown := True;
+  TDUnitX.RegisterTestFixture(TParserFixture);
+  var LRunner := TDUnitX.CreateRunner;
+  LRunner.UseRTTI := False;
+  LRunner.FailsOnNoAsserts := True;
+  ForceDirectories(CTestResultsDirectory);
+  LRunner.AddLogger(TDUnitXXMLNUnitFileLogger.Create(CTestResultsFile));
+  var LResults := LRunner.Execute;
+  if not LResults.AllPassed then
+    ExitCode := EXIT_ERRORS;
 end.

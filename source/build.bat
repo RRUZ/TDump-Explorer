@@ -11,6 +11,7 @@ set "TESTS_SOURCE=%PROJECT_ROOT%\tests\TDumpParserTests.dpr"
 set "TESTS_EXE=%PROJECT_ROOT%\tests\TDumpParserTests.exe"
 set "TINY_PARSER_TESTS_SOURCE=%PROJECT_ROOT%\tests\TDumpTinyParserTests.dpr"
 set "TINY_PARSER_TESTS_EXE=%PROJECT_ROOT%\tests\TDumpTinyParserTests.exe"
+set "DUNITX_SOURCE=C:\dev\DUnitX-0.4.1\Source"
 set "RUNNER_SOURCE=%PROJECT_ROOT%\tests\TDumpRunnerConsole.dpr"
 set "RUNNER_EXE=%PROJECT_ROOT%\tests\TDumpRunnerConsole.exe"
 set "FINDER_SOURCE=%PROJECT_ROOT%\tests\TDumpFinderConsole.dpr"
@@ -103,7 +104,7 @@ if not exist "%INTERMEDIATE_DIR%" (
 )
 pushd "%PROJECT_ROOT%\tests"
 if errorlevel 1 exit /b 1
-dcc32.exe -B -Q -N"%INTERMEDIATE_DIR%" "TDumpParserTests.dpr"
+dcc32.exe -B -Q -N"%INTERMEDIATE_DIR%" -U"%DUNITX_SOURCE%" "TDumpParserTests.dpr"
 set "BUILD_RESULT=%ERRORLEVEL%"
 popd
 if not "%BUILD_RESULT%"=="0" exit /b %BUILD_RESULT%
@@ -312,7 +313,7 @@ if not exist "%INTERMEDIATE_DIR%" (
 )
 pushd "%PROJECT_ROOT%\tests"
 if errorlevel 1 exit /b 1
-dcc32.exe -B -Q -N"%INTERMEDIATE_DIR%" "TDumpTinyParserTests.dpr"
+dcc32.exe -B -Q -N"%INTERMEDIATE_DIR%" -U"%DUNITX_SOURCE%" "TDumpTinyParserTests.dpr"
 set "BUILD_RESULT=%ERRORLEVEL%"
 popd
 if not "%BUILD_RESULT%"=="0" exit /b %BUILD_RESULT%

@@ -6,13 +6,28 @@ uses
   System.SysUtils,
   System.Types,
   Vcl.Graphics,
+  DUnitX.TestFramework,
+  DUnitX.Loggers.Xml.NUnit,
   TDump.Explorer.TinyParser in '..\source\common\TDump.Explorer.TinyParser.pas',
   TDump.Explorer.Highlighter in '..\source\common\TDump.Explorer.Highlighter.pas';
 
+const
+  CTestResultsDirectory = 'C:\dev\TDump-Explorer\tests\test-results';
+  CTestResultsFile = CTestResultsDirectory + '\TDumpTinyParserTests.nunit.xml';
+
+type
+  [TestFixture]
+  TTinyParserFixture = class
+  public
+    [Test] procedure TDumpValueTokenization;
+    [Test] procedure HighlightThemes;
+    [Test] procedure CppBuilderMethodTokenization;
+    [Test] procedure TextFormatDrawing;
+  end;
+
 procedure Require(ACondition: Boolean; const AMessage: string);
 begin
-  if not ACondition then
-    raise Exception.Create(AMessage);
+  Assert.IsTrue(ACondition, AMessage);
 end;
 
 function HasToken(const ATokens: TTinyTokenList; AKind: TTinyTokenKind;
@@ -210,6 +225,7 @@ begin
         Rect(0, 0, LBitmap.Width, LBitmap.Height), 'Value=0xCAFEBABE',
         thtDark, [tfRight, tfVerticalCenter, tfEndEllipsis],
         tpmCppBuilderMethod);
+      Assert.Pass('Highlighted text rendering completed without an exception.');
     finally
       LHighlighter.Free;
     end;
@@ -218,20 +234,35 @@ begin
   end;
 end;
 
+procedure TTinyParserFixture.TDumpValueTokenization;
+begin
+  TestTDumpValueTokenization;
+end;
+
+procedure TTinyParserFixture.HighlightThemes;
+begin
+  TestHighlightThemes;
+end;
+
+procedure TTinyParserFixture.CppBuilderMethodTokenization;
+begin
+  TestCppBuilderMethodTokenization;
+end;
+
+procedure TTinyParserFixture.TextFormatDrawing;
+begin
+  TestTextFormatDrawing;
+end;
+
 begin
   ReportMemoryLeaksOnShutdown := True;
-  try
-    TestTDumpValueTokenization;
-    TestHighlightThemes;
-    TestCppBuilderMethodTokenization;
-    TestTextFormatDrawing;
-    Writeln('TDump tiny parser assertions passed.');
-    Readln;
-  except
-    on LException: Exception do
-    begin
-      Writeln(ErrOutput, LException.Message);
-      ExitCode := 1;
-    end;
-  end;
+  TDUnitX.RegisterTestFixture(TTinyParserFixture);
+  var LRunner := TDUnitX.CreateRunner;
+  LRunner.UseRTTI := False;
+  LRunner.FailsOnNoAsserts := True;
+  ForceDirectories(CTestResultsDirectory);
+  LRunner.AddLogger(TDUnitXXMLNUnitFileLogger.Create(CTestResultsFile));
+  var LResults := LRunner.Execute;
+  if not LResults.AllPassed then
+    ExitCode := EXIT_ERRORS;
 end.
