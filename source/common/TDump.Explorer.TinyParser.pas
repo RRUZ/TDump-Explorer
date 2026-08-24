@@ -7,6 +7,8 @@ uses
   System.Generics.Collections;
 
 type
+  TTinyParserMode = (tpmTDumpValues, tpmCppBuilderMethod);
+
   TTinyTokenKind = (
     ttkWhitespace,
     ttkString,
@@ -16,7 +18,11 @@ type
     ttkDate,
     ttkTime,
     ttkDateTime,
-    ttkSymbol
+    ttkSymbol,
+    ttkKeyword,
+    ttkNamespace,
+    ttkTypeName,
+    ttkMethodName
   );
 
   TTinyToken = record
@@ -31,6 +37,8 @@ type
   TTinyParser = class
   private
     class function IsDateSeparator(ACharacter: Char): Boolean; static;
+    class function IsCppBuilderKeyword(const AText: string): Boolean; static;
+    class function IsCppBuilderTypeName(const AText: string): Boolean; static;
     class function IsHexadecimalCharacter(ACharacter: Char): Boolean; static;
     class function IsIdentifierCharacter(ACharacter: Char): Boolean; static;
     class function IsIdentifierStart(ACharacter: Char): Boolean; static;
@@ -46,10 +54,12 @@ type
       out AEndIndex: Integer; out AKind: TTinyTokenKind): Boolean; static;
     class function TryReadTime(const AText: string; AStartIndex: Integer;
       out AEndIndex: Integer): Boolean; static;
+    procedure ApplyCppBuilderMethodMode(AResult: TTinyTokenList);
     procedure AddToken(AResult: TTinyTokenList; AKind: TTinyTokenKind;
       const AText: string; AStartIndex, AEndIndex: Integer);
   public
-    function Tokenize(const AText: string): TTinyTokenList;
+    function Tokenize(const AText: string;
+      AMode: TTinyParserMode = tpmTDumpValues): TTinyTokenList;
   end;
 
 implementation
@@ -65,9 +75,77 @@ begin
   AResult.Add(LToken);
 end;
 
+procedure TTinyParser.ApplyCppBuilderMethodMode(AResult: TTinyTokenList);
+begin
+  for var LIndex := 0 to AResult.Count - 1 do
+  begin
+    var LToken := AResult[LIndex];
+    if LToken.Kind <> ttkString then
+      Continue;
+
+    if IsCppBuilderKeyword(LToken.Text) then
+      LToken.Kind := ttkKeyword
+    else
+    begin
+      var LNextIndex := LIndex + 1;
+      while (LNextIndex < AResult.Count) and
+        (AResult[LNextIndex].Kind = ttkWhitespace) do
+        Inc(LNextIndex);
+      var LPreviousIndex := LIndex - 1;
+      while (LPreviousIndex >= 0) and
+        (AResult[LPreviousIndex].Kind = ttkWhitespace) do
+        Dec(LPreviousIndex);
+      var LIsQualifiedIdentifier := (LPreviousIndex >= 0) and
+        (AResult[LPreviousIndex].Text = ':');
+      if LIsQualifiedIdentifier then
+      begin
+        Dec(LPreviousIndex);
+        while (LPreviousIndex >= 0) and
+          (AResult[LPreviousIndex].Kind = ttkWhitespace) do
+          Dec(LPreviousIndex);
+        LIsQualifiedIdentifier := (LPreviousIndex >= 0) and
+          (AResult[LPreviousIndex].Text = ':');
+      end;
+
+      if (LNextIndex < AResult.Count) and (AResult[LNextIndex].Text = '(') then
+        LToken.Kind := ttkMethodName
+      else if (LNextIndex + 1 < AResult.Count) and
+        (AResult[LNextIndex].Text = ':') and
+        (AResult[LNextIndex + 1].Text = ':') then
+        LToken.Kind := ttkNamespace
+      else if IsCppBuilderTypeName(LToken.Text) or
+        (LIsQualifiedIdentifier and CharInSet(LToken.Text[1], ['A'..'Z'])) then
+        LToken.Kind := ttkTypeName;
+      if LToken.Kind = ttkString then
+        LToken.Kind := ttkMethodName;
+    end;
+    AResult[LIndex] := LToken;
+  end;
+end;
+
 class function TTinyParser.IsDateSeparator(ACharacter: Char): Boolean;
 begin
   Result := CharInSet(ACharacter, ['-', '/', '.']);
+end;
+
+class function TTinyParser.IsCppBuilderKeyword(const AText: string): Boolean;
+begin
+  Result := SameText(AText, '__cdecl') or SameText(AText, '__fastcall') or
+    SameText(AText, '__linkproc__') or SameText(AText, '__stdcall') or
+    SameText(AText, '__thiscall') or SameText(AText, 'const') or
+    SameText(AText, 'volatile');
+end;
+
+class function TTinyParser.IsCppBuilderTypeName(const AText: string): Boolean;
+begin
+  Result := SameText(AText, 'signed') or SameText(AText, 'unsigned') or
+    SameText(AText, 'short') or SameText(AText, 'long') or
+    SameText(AText, 'void') or SameText(AText, 'char') or
+    SameText(AText, 'int') or SameText(AText, 'float') or
+    SameText(AText, 'double') or SameText(AText, 'bool') or
+    SameText(AText, 'wchar_t') or
+    ((Length(AText) >= 2) and (AText[1] = 'T') and
+      CharInSet(AText[2], ['A'..'Z']));
 end;
 
 class function TTinyParser.IsHexadecimalCharacter(ACharacter: Char): Boolean;
@@ -92,7 +170,8 @@ begin
     (AStartIndex + ACount - 1 <= Length(AText));
 end;
 
-function TTinyParser.Tokenize(const AText: string): TTinyTokenList;
+function TTinyParser.Tokenize(const AText: string;
+  AMode: TTinyParserMode): TTinyTokenList;
 begin
   Result := TTinyTokenList.Create;
   var LIndex := 1;
@@ -162,6 +241,15 @@ begin
       Continue;
     end;
 
+    if CharInSet(LCharacter, ['0'..'9']) then
+    begin
+      repeat
+        Inc(LIndex);
+      until (LIndex > Length(AText)) or not IsIdentifierCharacter(AText[LIndex]);
+      AddToken(Result, ttkString, AText, LStartIndex, LIndex);
+      Continue;
+    end;
+
     if IsIdentifierStart(LCharacter) then
     begin
       repeat
@@ -174,6 +262,8 @@ begin
     Inc(LIndex);
     AddToken(Result, ttkSymbol, AText, LStartIndex, LIndex);
   end;
+  if AMode = tpmCppBuilderMethod then
+    ApplyCppBuilderMethodMode(Result);
 end;
 
 class function TTinyParser.TryReadDate(const AText: string;
@@ -296,6 +386,13 @@ begin
       Exit(True);
     end;
 
+    if (LIndex - AStartIndex >= 4) and (AText[AStartIndex] = '0') and
+      ((LIndex > Length(AText)) or not IsIdentifierCharacter(AText[LIndex])) then
+    begin
+      AEndIndex := LIndex;
+      Exit(True);
+    end;
+
     if (LIndex - AStartIndex >= 2) and LContainsHexLetter and
       ((LIndex > Length(AText)) or
       not IsIdentifierCharacter(AText[LIndex])) then
@@ -346,6 +443,9 @@ begin
       LIndex := LExponentIndex;
     end;
   end;
+
+  if (LIndex <= Length(AText)) and IsIdentifierCharacter(AText[LIndex]) then
+    Exit;
 
   AEndIndex := LIndex;
   Result := True;

@@ -17,6 +17,10 @@ type
     HexadecimalColor: TColor;
     DateTimeColor: TColor;
     SymbolColor: TColor;
+    KeywordColor: TColor;
+    NamespaceColor: TColor;
+    TypeColor: TColor;
+    MethodColor: TColor;
   end;
 
   TTinyHighlightThemeKind = (thtLight, thtDark);
@@ -37,16 +41,20 @@ type
       static;
     procedure TextRect(ACanvas: TCanvas; const ARect: TRect; AX, AY: Integer;
       const AText: string; const ATheme: TTinyHighlightTheme;
-      ATextFormat: TTextFormat = []); overload;
+      ATextFormat: TTextFormat = [];
+      AParserMode: TTinyParserMode = tpmTDumpValues); overload;
     procedure TextRect(ACanvas: TCanvas; const ARect: TRect; AX, AY: Integer;
       const AText: string; AThemeKind: TTinyHighlightThemeKind;
-      ATextFormat: TTextFormat = []); overload;
+      ATextFormat: TTextFormat = [];
+      AParserMode: TTinyParserMode = tpmTDumpValues); overload;
     procedure TextRect(ACanvas: TCanvas; const ARect: TRect;
       const AText: string; const ATheme: TTinyHighlightTheme;
-      ATextFormat: TTextFormat = []); overload;
+      ATextFormat: TTextFormat = [];
+      AParserMode: TTinyParserMode = tpmTDumpValues); overload;
     procedure TextRect(ACanvas: TCanvas; const ARect: TRect;
       const AText: string; AThemeKind: TTinyHighlightThemeKind;
-      ATextFormat: TTextFormat = []); overload;
+      ATextFormat: TTextFormat = [];
+      AParserMode: TTinyParserMode = tpmTDumpValues); overload;
   end;
 
 implementation
@@ -93,6 +101,10 @@ begin
   Result.HexadecimalColor := TColor(RGB(95, 220, 210));
   Result.DateTimeColor := TColor(RGB(205, 155, 255));
   Result.SymbolColor := TColor(RGB(145, 155, 165));
+  Result.KeywordColor := TColor(RGB(255, 170, 110));
+  Result.NamespaceColor := TColor(RGB(135, 190, 250));
+  Result.TypeColor := TColor(RGB(130, 220, 205));
+  Result.MethodColor := TColor(RGB(245, 205, 125));
 end;
 
 class function TTinyHighlighter.LightTheme: TTinyHighlightTheme;
@@ -104,6 +116,10 @@ begin
   Result.HexadecimalColor := TColor(RGB(0, 120, 115));
   Result.DateTimeColor := TColor(RGB(125, 55, 165));
   Result.SymbolColor := TColor(RGB(110, 110, 110));
+  Result.KeywordColor := TColor(RGB(175, 75, 20));
+  Result.NamespaceColor := TColor(RGB(30, 85, 175));
+  Result.TypeColor := TColor(RGB(0, 115, 105));
+  Result.MethodColor := TColor(RGB(145, 95, 15));
 end;
 
 class function TTinyHighlighter.Theme(
@@ -119,10 +135,10 @@ end;
 
 procedure TTinyHighlighter.TextRect(ACanvas: TCanvas; const ARect: TRect;
   AX, AY: Integer; const AText: string; const ATheme: TTinyHighlightTheme;
-  ATextFormat: TTextFormat);
+  ATextFormat: TTextFormat; AParserMode: TTinyParserMode);
 begin
   var LText := FitText(ACanvas, AText, ARect.Right - AX, ATextFormat);
-  var LTokens := FParser.Tokenize(LText);
+  var LTokens := FParser.Tokenize(LText, AParserMode);
   var LOriginalFontColor := ACanvas.Font.Color;
   var LOriginalBrushStyle := ACanvas.Brush.Style;
   var LSavedDeviceContext := SaveDC(ACanvas.Handle);
@@ -149,14 +165,15 @@ end;
 
 procedure TTinyHighlighter.TextRect(ACanvas: TCanvas; const ARect: TRect;
   AX, AY: Integer; const AText: string; AThemeKind: TTinyHighlightThemeKind;
-  ATextFormat: TTextFormat);
+  ATextFormat: TTextFormat; AParserMode: TTinyParserMode);
 begin
-  TextRect(ACanvas, ARect, AX, AY, AText, Theme(AThemeKind), ATextFormat);
+  TextRect(ACanvas, ARect, AX, AY, AText, Theme(AThemeKind), ATextFormat,
+    AParserMode);
 end;
 
 procedure TTinyHighlighter.TextRect(ACanvas: TCanvas; const ARect: TRect;
   const AText: string; const ATheme: TTinyHighlightTheme;
-  ATextFormat: TTextFormat);
+  ATextFormat: TTextFormat; AParserMode: TTinyParserMode);
 begin
   var LText := FitText(ACanvas, AText, ARect.Width, ATextFormat);
   var LX := ARect.Left;
@@ -169,14 +186,15 @@ begin
     LY := ARect.Bottom - ACanvas.TextHeight(LText)
   else if tfVerticalCenter in ATextFormat then
     LY := ARect.Top + ((ARect.Height - ACanvas.TextHeight(LText)) div 2);
-  TextRect(ACanvas, ARect, LX, LY, LText, ATheme, ATextFormat);
+  TextRect(ACanvas, ARect, LX, LY, LText, ATheme, ATextFormat, AParserMode);
 end;
 
 procedure TTinyHighlighter.TextRect(ACanvas: TCanvas; const ARect: TRect;
   const AText: string; AThemeKind: TTinyHighlightThemeKind;
-  ATextFormat: TTextFormat);
+  ATextFormat: TTextFormat; AParserMode: TTinyParserMode);
 begin
-  TextRect(ACanvas, ARect, AText, Theme(AThemeKind), ATextFormat);
+  TextRect(ACanvas, ARect, AText, Theme(AThemeKind), ATextFormat,
+    AParserMode);
 end;
 
 function TTinyHighlighter.TokenColor(ATokenKind: TTinyTokenKind;
@@ -193,6 +211,14 @@ begin
       Result := ATheme.DateTimeColor;
     ttkSymbol:
       Result := ATheme.SymbolColor;
+    ttkKeyword:
+      Result := ATheme.KeywordColor;
+    ttkNamespace:
+      Result := ATheme.NamespaceColor;
+    ttkTypeName:
+      Result := ATheme.TypeColor;
+    ttkMethodName:
+      Result := ATheme.MethodColor;
   else
     Result := ATheme.TextColor;
   end;

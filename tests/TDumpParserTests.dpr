@@ -50,9 +50,11 @@ end;
 
 procedure TestTDumpBinaryFileRecognition;
 const
-  CSupportedBinaryNames: array[0..11] of string = ('sample.exe', 'sample.dll',
-    'sample.bpl', 'sample.dpl', 'sample.obj', 'sample.lib', 'sample.dcu',
-    'sample.elf', 'sample.ar', 'sample.o', 'sample.a', 'sample.so');
+  CSupportedBinaryNames: array[0..19] of string = ('sample.exe', 'sample.dll',
+    'sample.bpl', 'sample.dpl', 'sample.ocx', 'sample.cpl', 'sample.scr',
+    'sample.com', 'sample.sys', 'sample.obj', 'sample.lib', 'sample.dcu',
+    'sample.elf', 'sample.ar', 'sample.o', 'sample.a', 'sample.so',
+    'sample.dylib', 'sample.bundle', 'sample.mach');
 begin
   for var LFileName in CSupportedBinaryNames do
     Require(IsTDumpBinaryFile(LFileName), LFileName +
@@ -216,6 +218,12 @@ begin
     Require(LDocument.Headers.Count = 2, 'PE core must project both headers.');
     Require(LDocument.Sections.Count = 10, 'PE core must project ten sections.');
     Require(LDocument.Imports.Count = 2, 'PE core must project two import modules.');
+    Require((SameText(LDocument.Imports[0].Name, 'kernel32.dll')) and
+      (LDocument.Imports[0].Entries.Count = 11),
+      'The kernel32 module must contain only its eleven imported methods.');
+    Require((SameText(LDocument.Imports[1].Name, 'rtl370.bpl')) and
+      (LDocument.Imports[1].Entries.Count = 9),
+      'The rtl370 module must contain only its nine imported methods.');
     Require(LDocument.ExportList.Count = 9, 'PE core must project nine exports.');
     Require(LDocument.Resources.Count = 2, 'PE core must project two resource roots.');
   finally

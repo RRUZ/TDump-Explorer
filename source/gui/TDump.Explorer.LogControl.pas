@@ -6,7 +6,7 @@ uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
   System.Generics.Collections,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls,
-  Vcl.ExtCtrls, Vcl.ControlList, Vcl.WinXCtrls;
+  Vcl.ExtCtrls, Vcl.ControlList, Vcl.WinXCtrls, Vcl.Clipbrd;
 
 type
   TLogEntryType = (letInformation, letSuccess, letWarning, letError, letProfile);
@@ -32,7 +32,11 @@ type
       FEntries: TLogEntryList;
     procedure ControlList1BeforeDrawItem(AIndex: Integer; ACanvas: TCanvas;
       ARect: TRect; AState: TOwnerDrawState);
+    procedure ControlList1KeyDown(Sender: TObject; var Key: Word;
+      Shift: TShiftState);
+    procedure CopySelectedItemsToClipboard;
     function EntryTypeColor(AEntryType: TLogEntryType): TColor;
+    function EntryText(const AEntry: TLogEntry): string;
     function EntryTypeText(AEntryType: TLogEntryType): string;
     procedure UpdateControlList;
   public
@@ -56,7 +60,9 @@ constructor TLogControl.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   FEntries := TLogEntryList.Create;
+  ControlList1.MultiSelect := True;
   ControlList1.OnBeforeDrawItem := ControlList1BeforeDrawItem;
+  ControlList1.OnKeyDown := ControlList1KeyDown;
   Panel1.Alignment := taLeftJustify;
   UpdateControlList;
 end;
@@ -167,6 +173,44 @@ begin
     LMessageRect, DT_SINGLELINE or DT_VCENTER or DT_END_ELLIPSIS or DT_NOPREFIX);
 end;
 
+procedure TLogControl.ControlList1KeyDown(Sender: TObject; var Key: Word;
+  Shift: TShiftState);
+begin
+  if ssCtrl in Shift then
+    case Key of
+      Ord('A'):
+        begin
+          ControlList1.SelectAll;
+          Key := 0;
+        end;
+      Ord('C'):
+        begin
+          CopySelectedItemsToClipboard;
+          Key := 0;
+        end;
+    end;
+end;
+
+procedure TLogControl.CopySelectedItemsToClipboard;
+begin
+  var LText := TStringBuilder.Create;
+  try
+    for var LIndex in ControlList1.GetSelectedEnumerator do
+    begin
+      if LText.Length > 0 then
+        LText.AppendLine;
+      LText.Append(EntryText(FEntries[LIndex]));
+    end;
+    if (LText.Length = 0) and (ControlList1.ItemIndex >= 0) and
+      (ControlList1.ItemIndex < FEntries.Count) then
+      LText.Append(EntryText(FEntries[ControlList1.ItemIndex]));
+    if LText.Length > 0 then
+      Clipboard.AsText := LText.ToString;
+  finally
+    LText.Free;
+  end;
+end;
+
 function TLogControl.EntryTypeColor(AEntryType: TLogEntryType): TColor;
 begin
   var LStyle := StyleServices;
@@ -182,6 +226,13 @@ begin
   else
     Result := ColorBlendRGB(LStyle.GetSystemColor(clWindowText), LStyle.GetSystemColor(clWindow), 0.3);
   end;
+end;
+
+function TLogControl.EntryText(const AEntry: TLogEntry): string;
+begin
+  Result := Format('%s'#9'%s'#9'%s', [
+    FormatDateTime('hh:nn:ss.zzz', AEntry.Timestamp),
+    EntryTypeText(AEntry.EntryType), AEntry.Message]);
 end;
 
 function TLogControl.EntryTypeText(AEntryType: TLogEntryType): string;

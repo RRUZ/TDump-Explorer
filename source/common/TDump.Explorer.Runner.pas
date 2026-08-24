@@ -512,13 +512,11 @@ begin
                   RaiseLastError('Waiting for TDUMP');
               end;
             end;
-            if not GetExitCodeProcess(LProcessInformation.hProcess,
-              Result.ExitCode) then
+            if not GetExitCodeProcess(LProcessInformation.hProcess, Result.ExitCode) then
               RaiseLastError('Reading the TDUMP exit code');
           finally
             LExecutionStopwatch.Stop;
-            Result.ExecutionMilliseconds :=
-              LExecutionStopwatch.ElapsedMilliseconds;
+            Result.ExecutionMilliseconds := LExecutionStopwatch.ElapsedMilliseconds;
             CloseHandle(LProcessInformation.hThread);
             CloseHandle(LProcessInformation.hProcess);
           end;

@@ -6,9 +6,9 @@ object HighlighterControl: THighlighterControl
   TabOrder = 0
   object ControlList1: TControlList
     Left = 0
-    Top = 41
+    Top = 24
     Width = 640
-    Height = 439
+    Height = 456
     Align = alClient
     ItemHeight = 20
     ItemMargins.Left = 0
@@ -23,32 +23,16 @@ object HighlighterControl: THighlighterControl
     ItemSelectionOptions.UseFontColorForLabels = True
     ParentColor = False
     TabOrder = 0
-    ExplicitTop = 0
-    ExplicitHeight = 480
+    ExplicitTop = 20
+    ExplicitHeight = 460
   end
-  object Panel1: TPanel
+  object HeaderControl1: THeaderControl
     Left = 0
     Top = 0
     Width = 640
-    Height = 41
-    Align = alTop
-    BevelOuter = bvNone
-    TabOrder = 1
-    ExplicitTop = 8
-    object SearchFilterBox: TSearchBox
-      AlignWithMargins = True
-      Left = 467
-      Top = 8
-      Width = 169
-      Height = 25
-      Margins.Left = 4
-      Margins.Top = 8
-      Margins.Right = 4
-      Margins.Bottom = 8
-      Align = alRight
-      TabOrder = 0
-      ExplicitLeft = 471
-      ExplicitTop = 5
-    end
+    Height = 24
+    Sections = <>
+    Style = hsFlat
+    NoSizing = True
   end
 end

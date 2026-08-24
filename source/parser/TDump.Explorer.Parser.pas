@@ -1133,8 +1133,9 @@ end;
 
 function IsTDumpBinaryFile(const AFileName: string): Boolean;
 const
-  CBinaryExtensions: array[0..11] of string = ('.exe', '.dll', '.bpl',
-    '.dpl', '.obj', '.lib', '.dcu', '.elf', '.ar', '.o', '.a', '.so');
+  CBinaryExtensions: array[0..19] of string = ('.exe', '.dll', '.bpl',
+    '.dpl', '.ocx', '.cpl', '.scr', '.com', '.sys', '.obj', '.lib', '.dcu',
+    '.elf', '.ar', '.o', '.a', '.so', '.dylib', '.bundle', '.mach');
 begin
   var LExtension := LowerCase(ExtractFileExt(AFileName));
   for var LBinaryExtension in CBinaryExtensions do
@@ -2512,20 +2513,24 @@ begin
 
   var LSectionEnd := FLines.Count - 1;
   if LCompactMode then
+  begin
     for var LIndex := LSectionStart + 1 to FLines.Count - 1 do
       if (Trim(FLines[LIndex]) <> '') and not StartsWithText(Trim(FLines[LIndex]), 'IMPORT:') then
       begin
         LSectionEnd := LIndex - 1;
         Break;
-      end
+      end;
+  end
   else
+  begin
     for var LEndIndex := LSectionStart + 1 to FLines.Count - 1 do
-      if StartsWithText(Trim(FLines[LEndIndex]), 'Section:') and
+      if (FDocument.Lines[LEndIndex].Kind = tlkSection) and
         (LEndIndex > LSectionStart) then
       begin
         LSectionEnd := LEndIndex - 1;
         Break;
       end;
+  end;
 
   var LNodeTitle := 'Section: Import';
   if LCompactMode then
@@ -2692,19 +2697,23 @@ begin
 
   var LSectionEnd := FLines.Count - 1;
   if LCompactMode then
+  begin
     for var LIndex := LSectionStart + 1 to FLines.Count - 1 do
       if (Trim(FLines[LIndex]) <> '') and not StartsWithText(Trim(FLines[LIndex]), 'EXPORT ') then
       begin
         LSectionEnd := LIndex - 1;
         Break;
-      end
+      end;
+  end
   else
+  begin
     for var LEndIndex := LSectionStart + 1 to FLines.Count - 1 do
       if StartsWithText(Trim(FLines[LEndIndex]), 'Section:') then
       begin
         LSectionEnd := LEndIndex - 1;
         Break;
       end;
+  end;
 
   // Preserve the entire section while projecting recognizable export rows.
   var LNodeTitle := 'Section: Exports';
