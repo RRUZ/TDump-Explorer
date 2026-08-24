@@ -32,6 +32,7 @@ type
       FItems: TStringList;
       FItemParserModes: TList<Integer>;
       FColumnHeaders: TStringList;
+      FColumnDataTypes: array of TTinyHighlightDataType;
       FMeasureBitmap: TBitmap;
       FAutoSizeColumns: Boolean;
       FColumnCount: Integer;
@@ -42,6 +43,7 @@ type
       FUpdatePending: Boolean;
     function ColumnCount(const AText: string): Integer;
     function ColumnText(AItemIndex, AColumnIndex: Integer): string;
+    function ColumnDataType(AColumnIndex: Integer): TTinyHighlightDataType;
     function ColumnWidth(AColumnIndex: Integer; AAvailableWidth: Integer): Integer;
     procedure ControlList1BeforeDrawItem(AIndex: Integer; ACanvas: TCanvas;
       ARect: TRect; AState: TOwnerDrawState);
@@ -67,6 +69,8 @@ type
     procedure Clear;
     procedure EndUpdate;
     procedure SetColumnHeaders(const AColumns: array of string);
+    procedure SetColumnDataTypes(
+      const ADataTypes: array of TTinyHighlightDataType);
     procedure SetText(const AText: string);
     property Items: TStringList read FItems;
     property AutoSizeColumns: Boolean read FAutoSizeColumns
@@ -179,6 +183,14 @@ begin
     end;
 end;
 
+function THighlighterControl.ColumnDataType(
+  AColumnIndex: Integer): TTinyHighlightDataType;
+begin
+  if (AColumnIndex >= 0) and (AColumnIndex < Length(FColumnDataTypes)) then
+    Exit(FColumnDataTypes[AColumnIndex]);
+  Result := thdtAuto;
+end;
+
 function THighlighterControl.ColumnWidth(AColumnIndex,
   AAvailableWidth: Integer): Integer;
 begin
@@ -223,6 +235,7 @@ begin
   FItems.Clear;
   FItemParserModes.Clear;
   FColumnHeaders.Clear;
+  SetLength(FColumnDataTypes, 0);
   UpdateControlList;
 end;
 
@@ -247,12 +260,30 @@ begin
   for var LColumn in AColumns do
     FColumnHeaders.Add(StringReplace(StringReplace(LColumn, #13, ' ',
       [rfReplaceAll]), #10, ' ', [rfReplaceAll]));
+  SetLength(FColumnDataTypes, FColumnHeaders.Count);
+  for var LColumnIndex := 0 to High(FColumnDataTypes) do
+    FColumnDataTypes[LColumnIndex] := thdtAuto;
   UpdateControlList;
+end;
+
+procedure THighlighterControl.SetColumnDataTypes(
+  const ADataTypes: array of TTinyHighlightDataType);
+begin
+  SetLength(FColumnDataTypes, FColumnHeaders.Count);
+  for var LColumnIndex := 0 to High(FColumnDataTypes) do
+  begin
+    if LColumnIndex <= High(ADataTypes) then
+      FColumnDataTypes[LColumnIndex] := ADataTypes[LColumnIndex]
+    else
+      FColumnDataTypes[LColumnIndex] := thdtAuto;
+  end;
+  ControlList1.Invalidate;
 end;
 
 procedure THighlighterControl.SetText(const AText: string);
 begin
   FColumnHeaders.Clear;
+  SetLength(FColumnDataTypes, 0);
   FItems.BeginUpdate;
   try
     FItems.Text := AText;
@@ -320,7 +351,7 @@ begin
     FHighlighter.TextRect(ACanvas, LColumnRect,
       ColumnText(AIndex, LColumnIndex), FThemeKind,
       [tfLeft, tfVerticalCenter, tfSingleLine, tfEndEllipsis, tfNoPrefix],
-      LParserMode);
+      LParserMode, ColumnDataType(LColumnIndex));
     LLeft := LColumnRect.Right;
   end;
 end;

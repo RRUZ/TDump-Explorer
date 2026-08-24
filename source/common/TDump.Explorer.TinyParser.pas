@@ -4,6 +4,7 @@ interface
 
 uses
   System.SysUtils,
+  System.StrUtils,
   System.Generics.Collections;
 
 type
@@ -12,6 +13,7 @@ type
   TTinyTokenKind = (
     ttkWhitespace,
     ttkString,
+    ttkStringLiteral,
     ttkInteger,
     ttkHexadecimal,
     ttkFloat,
@@ -22,7 +24,8 @@ type
     ttkKeyword,
     ttkNamespace,
     ttkTypeName,
-    ttkMethodName
+    ttkMethodName,
+    ttkMangledSignature
   );
 
   TTinyToken = record
@@ -48,10 +51,15 @@ type
       out AEndIndex: Integer): Boolean; static;
     class function TryReadDateTime(const AText: string; AStartIndex: Integer;
       out AEndIndex: Integer): Boolean; static;
+    class function TryReadBorlandMethod(const AText: string;
+      AStartIndex: Integer; out AMethodStartIndex, AMethodEndIndex,
+      AEndIndex: Integer): Boolean; static;
     class function TryReadHexadecimal(const AText: string; AStartIndex: Integer;
       out AEndIndex: Integer): Boolean; static;
     class function TryReadNumber(const AText: string; AStartIndex: Integer;
       out AEndIndex: Integer; out AKind: TTinyTokenKind): Boolean; static;
+    class function TryReadQuotedString(const AText: string;
+      AStartIndex: Integer; out AEndIndex: Integer): Boolean; static;
     class function TryReadTime(const AText: string; AStartIndex: Integer;
       out AEndIndex: Integer): Boolean; static;
     procedure ApplyCppBuilderMethodMode(AResult: TTinyTokenList);
@@ -130,20 +138,14 @@ end;
 
 class function TTinyParser.IsCppBuilderKeyword(const AText: string): Boolean;
 begin
-  Result := SameText(AText, '__cdecl') or SameText(AText, '__fastcall') or
-    SameText(AText, '__linkproc__') or SameText(AText, '__stdcall') or
-    SameText(AText, '__thiscall') or SameText(AText, 'const') or
-    SameText(AText, 'volatile');
+  Result := MatchText(AText, ['__cdecl', '__fastcall', '__linkproc__',
+    '__stdcall', '__thiscall', 'const', 'volatile']);
 end;
 
 class function TTinyParser.IsCppBuilderTypeName(const AText: string): Boolean;
 begin
-  Result := SameText(AText, 'signed') or SameText(AText, 'unsigned') or
-    SameText(AText, 'short') or SameText(AText, 'long') or
-    SameText(AText, 'void') or SameText(AText, 'char') or
-    SameText(AText, 'int') or SameText(AText, 'float') or
-    SameText(AText, 'double') or SameText(AText, 'bool') or
-    SameText(AText, 'wchar_t') or
+  Result := MatchText(AText, ['signed', 'unsigned', 'short', 'long', 'void',
+    'char', 'int', 'float', 'double', 'bool', 'wchar_t']) or
     ((Length(AText) >= 2) and (AText[1] = 'T') and
       CharInSet(AText[2], ['A'..'Z']));
 end;
@@ -188,26 +190,28 @@ begin
       Continue;
     end;
 
-    if CharInSet(LCharacter, ['''', '"']) then
+    var LEndIndex := 0;
+    if TryReadQuotedString(AText, LIndex, LEndIndex) then
     begin
-      var LQuote := LCharacter;
-      Inc(LIndex);
-      while LIndex <= Length(AText) do
-      begin
-        if (AText[LIndex] = '\') and (LIndex < Length(AText)) then
-          Inc(LIndex, 2)
-        else
-        begin
-          Inc(LIndex);
-          if AText[LIndex - 1] = LQuote then
-            Break;
-        end;
-      end;
-      AddToken(Result, ttkString, AText, LStartIndex, LIndex);
+      AddToken(Result, ttkStringLiteral, AText, LStartIndex, LEndIndex);
+      LIndex := LEndIndex;
       Continue;
     end;
-
-    var LEndIndex := 0;
+    var LMethodStartIndex := 0;
+    var LMethodEndIndex := 0;
+    if TryReadBorlandMethod(AText, LIndex, LMethodStartIndex,
+      LMethodEndIndex, LEndIndex) then
+    begin
+      if LStartIndex < LMethodStartIndex then
+        AddToken(Result, ttkNamespace, AText, LStartIndex, LMethodStartIndex);
+      AddToken(Result, ttkMethodName, AText, LMethodStartIndex,
+        LMethodEndIndex);
+      if LMethodEndIndex < LEndIndex then
+        AddToken(Result, ttkMangledSignature, AText, LMethodEndIndex,
+          LEndIndex);
+      LIndex := LEndIndex;
+      Continue;
+    end;
     if TryReadDateTime(AText, LIndex, LEndIndex) then
     begin
       AddToken(Result, ttkDateTime, AText, LStartIndex, LEndIndex);
@@ -312,6 +316,63 @@ begin
       AEndIndex := AStartIndex + 10;
       Result := True;
     end;
+  end;
+end;
+
+class function TTinyParser.TryReadBorlandMethod(const AText: string;
+  AStartIndex: Integer; out AMethodStartIndex, AMethodEndIndex,
+  AEndIndex: Integer): Boolean;
+begin
+  Result := False;
+  AMethodStartIndex := AStartIndex;
+  AMethodEndIndex := AStartIndex;
+  AEndIndex := AStartIndex;
+  if (AStartIndex > Length(AText)) or (AText[AStartIndex] <> '@') then
+    Exit;
+
+  var LIndex := AStartIndex + 1;
+  var LMethodStart := 0;
+  while LIndex <= Length(AText) do
+  begin
+    if (AText[LIndex] = '@') and (LIndex > AStartIndex + 1) then
+    begin
+      LMethodStart := LIndex + 1;
+      Break;
+    end;
+    if (AText[LIndex] = '\') and (LIndex < Length(AText)) and
+      (AText[LIndex + 1] = '@') then
+    begin
+      LMethodStart := LIndex + 2;
+      Break;
+    end;
+    if not (IsIdentifierCharacter(AText[LIndex]) or (AText[LIndex] = '.')) then
+      Exit;
+    Inc(LIndex);
+  end;
+
+  if LMethodStart = 0 then
+    Exit;
+  while (LMethodStart <= Length(AText)) and (AText[LMethodStart] = '@') do
+    Inc(LMethodStart);
+  if (LMethodStart > Length(AText)) or
+    not IsIdentifierStart(AText[LMethodStart]) then
+    Exit;
+
+  LIndex := LMethodStart;
+  while (LIndex <= Length(AText)) and IsIdentifierCharacter(AText[LIndex]) do
+    Inc(LIndex);
+  AMethodStartIndex := LMethodStart;
+  AMethodEndIndex := LIndex;
+  if (LIndex <= Length(AText)) and (AText[LIndex] = '$') then
+    repeat
+      Inc(LIndex)
+    until (LIndex > Length(AText)) or
+      not (IsIdentifierCharacter(AText[LIndex]) or
+        CharInSet(AText[LIndex], ['$', '@']));
+  if AMethodEndIndex > AMethodStartIndex then
+  begin
+    AEndIndex := LIndex;
+    Result := True;
   end;
 end;
 
@@ -447,6 +508,36 @@ begin
   if (LIndex <= Length(AText)) and IsIdentifierCharacter(AText[LIndex]) then
     Exit;
 
+  AEndIndex := LIndex;
+  Result := True;
+end;
+
+class function TTinyParser.TryReadQuotedString(const AText: string;
+  AStartIndex: Integer; out AEndIndex: Integer): Boolean;
+begin
+  Result := False;
+  AEndIndex := AStartIndex;
+  if (AStartIndex > Length(AText)) or
+    not CharInSet(AText[AStartIndex], ['''', '"']) then
+    Exit;
+
+  var LQuote := AText[AStartIndex];
+  var LIndex := AStartIndex + 1;
+  while LIndex <= Length(AText) do
+  begin
+    if (AText[LIndex] = '\') and (LIndex < Length(AText)) then
+      Inc(LIndex, 2)
+    else if AText[LIndex] = LQuote then
+    begin
+      Inc(LIndex);
+      if (LIndex <= Length(AText)) and (AText[LIndex] = LQuote) then
+        Inc(LIndex)
+      else
+        Break;
+    end
+    else
+      Inc(LIndex);
+  end;
   AEndIndex := LIndex;
   Result := True;
 end;

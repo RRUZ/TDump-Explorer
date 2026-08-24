@@ -369,6 +369,21 @@ type
     SourceSpan: TDumpSourceSpan;
   end;
 
+  // Owns the structural metadata for one TDUMP Fixup Table block.
+  // Entries are document-owned and grouped here by non-owning references.
+  TDumpRelocationBlock = class
+  public
+    Index: UInt64;
+    PageRVA: UInt64;
+    BlockSize: UInt64;
+    StartLine: Integer;
+    EndLine: Integer;
+    Entries: TList<TDumpRelocation>;
+    SourceSpan: TDumpSourceSpan;
+    constructor Create;
+    destructor Destroy; override;
+  end;
+
   // Represents one printable string emitted by TDUMP's strings display.
   TDumpStringEntry = class
   public
@@ -392,6 +407,7 @@ type
     StartLine: Integer;
     EndLine: Integer;
     SourceSpan: TDumpSourceSpan;
+    RawText: string;
   end;
 
   // Identifies one OMF library member introduced by a THEADR record.
@@ -434,10 +450,57 @@ type
   public
     Name: string;
     SegmentName: string;
+    Properties: TList<TDumpProperty>;
     Address: UInt64;
     HasAddress: Boolean;
     Size: UInt64;
     HasSize: Boolean;
+    StartLine: Integer;
+    EndLine: Integer;
+    SourceSpan: TDumpSourceSpan;
+    constructor Create;
+    destructor Destroy; override;
+  end;
+
+  // Represents one row in TDUMP's Mach Symbol Table display.
+  TDumpMachSymbol = class
+  public
+    Index: Integer;
+    TypeCode: string;
+    Section: string;
+    Description: string;
+    Value: UInt64;
+    RawValue: string;
+    HasValue: Boolean;
+    Name: string;
+    StartLine: Integer;
+    EndLine: Integer;
+    SourceSpan: TDumpSourceSpan;
+  end;
+
+  // Represents an indexed entry emitted by Mach's Dynamic Symbol Table.
+  // The same compact model is used for both import and indirect-symbol lists.
+  TDumpMachDynamicSymbol = class
+  public
+    Index: Integer;
+    Name: string;
+    StartLine: Integer;
+    EndLine: Integer;
+    SourceSpan: TDumpSourceSpan;
+  end;
+
+  // Represents one row in an ELF relocation table.
+  TDumpELFRelocation = class
+  public
+    SectionName: string;
+    Index: Integer;
+    RelocationType: string;
+    Offset: string;
+    ParenthesizedAddend: string;
+    Value: string;
+    SymbolIndex: string;
+    Addend: string;
+    Name: string;
     StartLine: Integer;
     EndLine: Integer;
     SourceSpan: TDumpSourceSpan;
@@ -835,11 +898,16 @@ type
     ResourceMetadata: TDumpSectionMetadata;
     Resources: TObjectList<TDumpResource>;
     Relocations: TObjectList<TDumpRelocation>;
+    RelocationBlocks: TObjectList<TDumpRelocationBlock>;
     Strings: TObjectList<TDumpStringEntry>;
     ObjectRecords: TObjectList<TDumpObjectRecord>;
     LibraryMembers: TObjectList<TDumpLibraryMember>;
     MachArchitectures: TObjectList<TDumpMachArchitecture>;
     MachLoadCommands: TObjectList<TDumpMachLoadCommand>;
+    MachSymbols: TObjectList<TDumpMachSymbol>;
+    MachDynamicImports: TObjectList<TDumpMachDynamicSymbol>;
+    MachIndirectSymbols: TObjectList<TDumpMachDynamicSymbol>;
+    ELFRelocations: TObjectList<TDumpELFRelocation>;
     Symbols: TObjectList<TDumpSymbol>;
     SymbolSubsections: TList<TDumpSymbolSubsection>;
     SymbolModules: TObjectList<TDumpSymbolModule>;
@@ -1305,6 +1373,20 @@ begin
   inherited;
 end;
 
+{ TDumpRelocationBlock }
+
+constructor TDumpRelocationBlock.Create;
+begin
+  inherited Create;
+  Entries := TList<TDumpRelocation>.Create;
+end;
+
+destructor TDumpRelocationBlock.Destroy;
+begin
+  Entries.Free;
+  inherited;
+end;
+
 { TDumpSymbol }
 
 constructor TDumpSymbol.Create;
@@ -1503,6 +1585,20 @@ begin
   inherited;
 end;
 
+{ TDumpMachSection }
+
+constructor TDumpMachSection.Create;
+begin
+  inherited Create;
+  Properties := TList<TDumpProperty>.Create;
+end;
+
+destructor TDumpMachSection.Destroy;
+begin
+  Properties.Free;
+  inherited;
+end;
+
 { TDumpDebugInformation }
 
 constructor TDumpDebugInformation.Create;
@@ -1557,11 +1653,16 @@ begin
   ResourceMetadata := nil;
   Resources := TObjectList<TDumpResource>.Create(True);
   Relocations := TObjectList<TDumpRelocation>.Create(True);
+  RelocationBlocks := TObjectList<TDumpRelocationBlock>.Create(True);
   Strings := TObjectList<TDumpStringEntry>.Create(True);
   ObjectRecords := TObjectList<TDumpObjectRecord>.Create(True);
   LibraryMembers := TObjectList<TDumpLibraryMember>.Create(True);
   MachArchitectures := TObjectList<TDumpMachArchitecture>.Create(True);
   MachLoadCommands := TObjectList<TDumpMachLoadCommand>.Create(True);
+  MachSymbols := TObjectList<TDumpMachSymbol>.Create(True);
+  MachDynamicImports := TObjectList<TDumpMachDynamicSymbol>.Create(True);
+  MachIndirectSymbols := TObjectList<TDumpMachDynamicSymbol>.Create(True);
+  ELFRelocations := TObjectList<TDumpELFRelocation>.Create(True);
   Symbols := TObjectList<TDumpSymbol>.Create(True);
   SymbolSubsections := TList<TDumpSymbolSubsection>.Create;
   SymbolModules := TObjectList<TDumpSymbolModule>.Create(True);
@@ -1597,11 +1698,16 @@ begin
   SymbolModules.Free;
   SymbolSubsections.Free;
   Symbols.Free;
+  ELFRelocations.Free;
+  MachIndirectSymbols.Free;
+  MachDynamicImports.Free;
+  MachSymbols.Free;
   MachLoadCommands.Free;
   MachArchitectures.Free;
   LibraryMembers.Free;
   ObjectRecords.Free;
   Strings.Free;
+  RelocationBlocks.Free;
   Relocations.Free;
   Resources.Free;
   ResourceMetadata.Free;
@@ -1977,6 +2083,12 @@ begin
     LRelocation.SourceSpan.StartLine := LRelocation.StartLine;
     LRelocation.SourceSpan.EndLine := LRelocation.StartLine;
   end;
+  for var LBlock in FDocument.RelocationBlocks do
+  begin
+    LBlock.SourceSpan.Run := LRun;
+    LBlock.SourceSpan.StartLine := LBlock.StartLine;
+    LBlock.SourceSpan.EndLine := LBlock.EndLine;
+  end;
   for var LString in FDocument.Strings do
   begin
     LString.SourceSpan.Run := LRun;
@@ -2006,6 +2118,36 @@ begin
     LCommand.SourceSpan.Run := LRun;
     LCommand.SourceSpan.StartLine := LCommand.StartLine;
     LCommand.SourceSpan.EndLine := LCommand.EndLine;
+    for var LSection in LCommand.Sections do
+    begin
+      LSection.SourceSpan.Run := LRun;
+      LSection.SourceSpan.StartLine := LSection.StartLine;
+      LSection.SourceSpan.EndLine := LSection.EndLine;
+    end;
+  end;
+  for var LSymbol in FDocument.MachSymbols do
+  begin
+    LSymbol.SourceSpan.Run := LRun;
+    LSymbol.SourceSpan.StartLine := LSymbol.StartLine;
+    LSymbol.SourceSpan.EndLine := LSymbol.EndLine;
+  end;
+  for var LSymbol in FDocument.MachDynamicImports do
+  begin
+    LSymbol.SourceSpan.Run := LRun;
+    LSymbol.SourceSpan.StartLine := LSymbol.StartLine;
+    LSymbol.SourceSpan.EndLine := LSymbol.EndLine;
+  end;
+  for var LSymbol in FDocument.MachIndirectSymbols do
+  begin
+    LSymbol.SourceSpan.Run := LRun;
+    LSymbol.SourceSpan.StartLine := LSymbol.StartLine;
+    LSymbol.SourceSpan.EndLine := LSymbol.EndLine;
+  end;
+  for var LRelocation in FDocument.ELFRelocations do
+  begin
+    LRelocation.SourceSpan.Run := LRun;
+    LRelocation.SourceSpan.StartLine := LRelocation.StartLine;
+    LRelocation.SourceSpan.EndLine := LRelocation.EndLine;
   end;
   for var LSymbol in FDocument.Symbols do
   begin
@@ -3027,6 +3169,7 @@ begin
     var LBlockIndex: UInt64 := 0;
     var LPageRVA: UInt64 := 0;
     var LBlockSize: UInt64 := 0;
+    var LCurrentBlock: TDumpRelocationBlock := nil;
     for var LIndex := LSectionStart to FLines.Count - 1 do
     begin
       if LRaw.Length > 0 then
@@ -3034,7 +3177,18 @@ begin
       LRaw.Append(FLines[LIndex]);
       if TryParseRelocationBlock(FLines[LIndex], LBlockIndex, LPageRVA,
         LBlockSize) then
+      begin
+        if LCurrentBlock <> nil then
+          LCurrentBlock.EndLine := LIndex;
+        LCurrentBlock := TDumpRelocationBlock.Create;
+        LCurrentBlock.Index := LBlockIndex;
+        LCurrentBlock.PageRVA := LPageRVA;
+        LCurrentBlock.BlockSize := LBlockSize;
+        LCurrentBlock.StartLine := LIndex + 1;
+        LCurrentBlock.EndLine := FLines.Count;
+        FDocument.RelocationBlocks.Add(LCurrentBlock);
         Continue;
+      end;
 
       var LEntryText := Trim(FLines[LIndex]);
       if StartsWithText(LEntryText, 'Fixup Table') then
@@ -3056,8 +3210,12 @@ begin
           Break;
         end;
         FDocument.Relocations.Add(LRelocation);
+        if LCurrentBlock <> nil then
+          LCurrentBlock.Entries.Add(LRelocation);
       end;
     end;
+    if LCurrentBlock <> nil then
+      LCurrentBlock.EndLine := FLines.Count;
     LNode.RawText := LRaw.ToString;
   finally
     LRaw.Free;
@@ -3821,6 +3979,7 @@ begin
     LRecord.HasOffset := True;
     LRecord.RawOffset := LRawOffset;
     LRecord.RecordKind := LRecordKind;
+    LRecord.Name := LRemainder;
     LRecord.StartLine := LIndex + 1;
     LRecord.EndLine := FLines.Count;
     FDocument.ObjectRecords.Add(LRecord);
@@ -3837,6 +3996,24 @@ begin
   end;
   if LCurrentMember <> nil then
     LCurrentMember.EndLine := FLines.Count;
+  for var LRecord in FDocument.ObjectRecords do
+  begin
+    var LRawText := TStringBuilder.Create;
+    try
+      var LLastLineIndex := LRecord.EndLine - 1;
+      if LLastLineIndex >= FLines.Count then
+        LLastLineIndex := FLines.Count - 1;
+      for var LLineIndex := LRecord.StartLine - 1 to LLastLineIndex do
+      begin
+        if LRawText.Length > 0 then
+          LRawText.AppendLine;
+        LRawText.Append(FLines[LLineIndex]);
+      end;
+      LRecord.RawText := LRawText.ToString;
+    finally
+      LRawText.Free;
+    end;
+  end;
   if FDocument.ObjectRecords.Count > 0 then
     AddNode(nkObjectRecord, 'OMF records', LStartLine + 1, FLines.Count);
 end;
@@ -3847,6 +4024,83 @@ procedure TDumpParser.ParseMach;
     var LWork := Trim(ALine);
     FirstToken(LWork);
     Result := Trim(LWork);
+  end;
+
+  function TryParseMachPropertyLine(const ALine: string; ALineNumber: Integer;
+    out AProperty: TDumpProperty): Boolean;
+  begin
+    if TryParsePropertyLine(ALine, ALineNumber, AProperty) then
+      Exit(True);
+
+    FillChar(AProperty, SizeOf(AProperty), 0);
+    var LLine := Trim(ALine);
+    for var LIndex := 1 to Length(LLine) - 1 do
+      if CharInSet(LLine[LIndex], [' ', #9]) and
+        CharInSet(LLine[LIndex + 1], [' ', #9]) then
+      begin
+        var LName := Trim(Copy(LLine, 1, LIndex - 1));
+        var LValue := Trim(Copy(LLine, LIndex + 1, MaxInt));
+        if (LName = '') or (LValue = '') then
+          Break;
+        AProperty.Name := LName;
+        AProperty.RawValue := LValue;
+        AProperty.TextValue := LValue;
+        AProperty.ValueKind := PropertyValueKind(LName);
+        AProperty.StartLine := ALineNumber;
+        Exit(True);
+      end;
+    Result := False;
+  end;
+
+  function TryParseMachSymbolLine(const ALine: string; ALineNumber: Integer;
+    out ASymbol: TDumpMachSymbol): Boolean;
+  begin
+    ASymbol := nil;
+    var LWork := Trim(ALine);
+    var LIndexText := FirstToken(LWork);
+    var LIndex: UInt64;
+    if not TryParseNumericToken(LIndexText, ncDecimal, LIndex) then
+      Exit(False);
+
+    var LTypeCode := FirstToken(LWork);
+    var LSection := FirstToken(LWork);
+    var LDescription := FirstToken(LWork);
+    var LRawValue := FirstToken(LWork);
+    var LName := Trim(LWork);
+    if (LTypeCode = '') or (LSection = '') or (LDescription = '') or
+      (LRawValue = '') or (LName = '') then
+      Exit(False);
+
+    ASymbol := TDumpMachSymbol.Create;
+    ASymbol.Index := Integer(LIndex);
+    ASymbol.TypeCode := LTypeCode;
+    ASymbol.Section := LSection;
+    ASymbol.Description := LDescription;
+    ASymbol.RawValue := LRawValue;
+    ASymbol.HasValue := TryParseHexUIntToken(LRawValue, ASymbol.Value);
+    ASymbol.Name := LName;
+    ASymbol.StartLine := ALineNumber;
+    ASymbol.EndLine := ALineNumber;
+    Result := True;
+  end;
+
+  function TryParseMachDynamicSymbolLine(const ALine: string;
+    ALineNumber: Integer; out ASymbol: TDumpMachDynamicSymbol): Boolean;
+  begin
+    ASymbol := nil;
+    var LWork := Trim(ALine);
+    var LIndexText := FirstToken(LWork);
+    var LIndex: UInt64;
+    if not TryParseNumericToken(LIndexText, ncDecimal, LIndex) or
+      (LWork = '') then
+      Exit(False);
+
+    ASymbol := TDumpMachDynamicSymbol.Create;
+    ASymbol.Index := Integer(LIndex);
+    ASymbol.Name := LWork;
+    ASymbol.StartLine := ALineNumber;
+    ASymbol.EndLine := ALineNumber;
+    Result := True;
   end;
 
 begin
@@ -3888,6 +4142,8 @@ begin
   end;
   if LCurrentArchitecture <> nil then
     LCurrentArchitecture.EndLine := LHeaderLine;
+  if FDocument.MachArchitectures.Count > 0 then
+    AddNode(nkHeader, 'Mach FAT architectures', 1, LHeaderLine);
 
   var LLoadCommandsLine := -1;
   for var LIndex := LHeaderLine + 1 to FLines.Count - 1 do
@@ -3898,14 +4154,36 @@ begin
     end;
   if LLoadCommandsLine < 0 then
     LLoadCommandsLine := FLines.Count;
+
+  var LMachHeader := TDumpHeader.Create;
+  LMachHeader.Name := 'Mach Header';
+  LMachHeader.StartLine := LHeaderLine + 1;
+  LMachHeader.EndLine := LLoadCommandsLine;
+  for var LIndex := LHeaderLine + 1 to LLoadCommandsLine - 1 do
+  begin
+    var LProperty: TDumpProperty;
+    if TryParseMachPropertyLine(FLines[LIndex], LIndex + 1, LProperty) then
+      LMachHeader.Properties.Add(LProperty);
+  end;
+  if LMachHeader.Properties.Count > 0 then
+    FDocument.Headers.Add(LMachHeader)
+  else
+    LMachHeader.Free;
   AddNode(nkHeader, 'Mach Header', LHeaderLine + 1, LLoadCommandsLine);
 
   var LCurrentCommand: TDumpMachLoadCommand := nil;
+  var LCurrentSection: TDumpMachSection := nil;
+  var LSymbolTableStart := -1;
   for var LIndex := LLoadCommandsLine + 1 to FLines.Count - 1 do
   begin
     var LTrimmed := Trim(FLines[LIndex]);
     if (Length(LTrimmed) > 1) and (LTrimmed[1] = '#') then
     begin
+      if LCurrentSection <> nil then
+      begin
+        LCurrentSection.EndLine := LIndex;
+        LCurrentSection := nil;
+      end;
       if LCurrentCommand <> nil then
         LCurrentCommand.EndLine := LIndex;
       var LCommandText := LTrimmed;
@@ -3924,16 +4202,116 @@ begin
     end;
     if LCurrentCommand <> nil then
     begin
+      if ContainsText(LTrimmed, 'Symbol Table') then
+      begin
+        if LCurrentSection <> nil then
+        begin
+          LCurrentSection.EndLine := LIndex;
+          LCurrentSection := nil;
+        end;
+        LCurrentCommand.EndLine := LIndex;
+        LCurrentCommand := nil;
+        LSymbolTableStart := LIndex;
+        Break;
+      end;
       var LProperty: TDumpProperty;
-      if TryParsePropertyLine(FLines[LIndex], LIndex + 1, LProperty) then
-        LCurrentCommand.Properties.Add(LProperty);
+      if TryParseMachPropertyLine(FLines[LIndex], LIndex + 1, LProperty) then
+      begin
+        if SameText(LProperty.Name, 'section name') then
+        begin
+          if LCurrentSection <> nil then
+            LCurrentSection.EndLine := LIndex;
+          LCurrentSection := TDumpMachSection.Create;
+          LCurrentSection.Name := LProperty.RawValue;
+          LCurrentSection.StartLine := LIndex + 1;
+          LCurrentSection.EndLine := FLines.Count;
+          LCurrentCommand.Sections.Add(LCurrentSection);
+        end;
+
+        if LCurrentSection <> nil then
+        begin
+          LCurrentSection.Properties.Add(LProperty);
+          if SameText(LProperty.Name, 'segment name') then
+            LCurrentSection.SegmentName := LProperty.RawValue
+          else if SameText(LProperty.Name, 'addr') then
+            LCurrentSection.HasAddress := TryParseHexUIntToken(
+              FirstToken(LProperty.RawValue), LCurrentSection.Address)
+          else if SameText(LProperty.Name, 'size') then
+            LCurrentSection.HasSize := TryParseHexUIntToken(
+              FirstToken(LProperty.RawValue), LCurrentSection.Size);
+        end
+        else
+          LCurrentCommand.Properties.Add(LProperty);
+      end;
     end;
   end;
+  if LCurrentSection <> nil then
+    LCurrentSection.EndLine := FLines.Count;
   if LCurrentCommand <> nil then
     LCurrentCommand.EndLine := FLines.Count;
   if FDocument.MachLoadCommands.Count > 0 then
     AddNode(nkSections, 'Mach load commands', LLoadCommandsLine + 1,
       FLines.Count);
+
+  if LSymbolTableStart >= 0 then
+  begin
+    var LSymbolTableEnd := FLines.Count;
+    for var LIndex := LSymbolTableStart + 1 to FLines.Count - 1 do
+    begin
+      var LTrimmed := Trim(FLines[LIndex]);
+      if StartsWithText(LTrimmed, '---') then
+      begin
+        LSymbolTableEnd := LIndex;
+        Break;
+      end;
+      var LSymbol: TDumpMachSymbol;
+      if TryParseMachSymbolLine(FLines[LIndex], LIndex + 1, LSymbol) then
+        FDocument.MachSymbols.Add(LSymbol);
+    end;
+    if FDocument.MachSymbols.Count > 0 then
+      AddNode(nkSymbols, 'Mach Symbol Table', LSymbolTableStart + 1,
+        LSymbolTableEnd);
+
+    var LDynamicMode := 0;
+    var LDynamicStart := -1;
+    var LDynamicEnd := -1;
+    for var LIndex := LSymbolTableEnd + 1 to FLines.Count - 1 do
+    begin
+      var LTrimmed := Trim(FLines[LIndex]);
+      if StartsWithText(LTrimmed, '----------- Resources') then
+        Break;
+      if StartsWithText(LTrimmed, 'Imports:') then
+      begin
+        LDynamicMode := 1;
+        if LDynamicStart < 0 then
+          LDynamicStart := LIndex;
+        Continue;
+      end;
+      if StartsWithText(LTrimmed, 'Indirect symbols:') then
+      begin
+        LDynamicMode := 2;
+        if LDynamicStart < 0 then
+          LDynamicStart := LIndex;
+        Continue;
+      end;
+      if LDynamicMode = 0 then
+        Continue;
+
+      var LDynamicSymbol: TDumpMachDynamicSymbol;
+      if TryParseMachDynamicSymbolLine(FLines[LIndex], LIndex + 1,
+        LDynamicSymbol) then
+      begin
+        if LDynamicMode = 1 then
+          FDocument.MachDynamicImports.Add(LDynamicSymbol)
+        else
+          FDocument.MachIndirectSymbols.Add(LDynamicSymbol);
+        LDynamicEnd := LIndex;
+      end;
+    end;
+    if LDynamicStart >= 0 then
+      AddNode(nkSymbols, 'Mach Dynamic Symbol Table', LDynamicStart + 1,
+        LDynamicEnd + 1);
+  end;
 end;
 
 procedure TDumpParser.ParseRawMachHexDump;
@@ -4034,6 +4412,16 @@ procedure TDumpParser.ParseELF;
 
   procedure ParseELFSectionRow(const ALine: string; ALineNumber: Integer;
     ASection: TDumpSection; AContinuation: Boolean);
+    procedure AddProperty(const AName, AValue: string);
+    begin
+      var LProperty: TDumpProperty;
+      LProperty.Name := AName;
+      LProperty.RawValue := AValue;
+      LProperty.TextValue := AValue;
+      LProperty.ValueKind := vkText;
+      LProperty.StartLine := ALineNumber;
+      ASection.Properties.Add(LProperty);
+    end;
   begin
     var LWork := Trim(ALine);
     if not AContinuation then
@@ -4042,20 +4430,30 @@ procedure TDumpParser.ParseELF;
       ASection.Name := FirstToken(LWork);
     end;
     var LType := FirstToken(LWork);
-    var LFlags := FirstToken(LWork);
-    var LAddress := FirstToken(LWork);
+    var LFlagsOrAddress := FirstToken(LWork);
+    var LAddress := LFlagsOrAddress;
+    var LAddressValue: UInt64;
+    var LFlags := '';
+    if not TryParseHexUIntToken(LFlagsOrAddress, LAddressValue) then
+    begin
+      LFlags := LFlagsOrAddress;
+      LAddress := FirstToken(LWork);
+    end;
     var LOffset := FirstToken(LWork);
     var LSize := FirstToken(LWork);
-    if LType <> '' then
-    begin
-      var LProperty: TDumpProperty;
-      LProperty.Name := 'type';
-      LProperty.RawValue := LType;
-      LProperty.TextValue := LType;
-      LProperty.ValueKind := vkText;
-      LProperty.StartLine := ALineNumber;
-      ASection.Properties.Add(LProperty);
-    end;
+    var LLink := FirstToken(LWork);
+    var LInfo := FirstToken(LWork);
+    var LAlign := FirstToken(LWork);
+    var LEntrySize := FirstToken(LWork);
+    AddProperty('Type', LType);
+    AddProperty('Flags', LFlags);
+    AddProperty('Address', LAddress);
+    AddProperty('Offset', LOffset);
+    AddProperty('Size', LSize);
+    AddProperty('Link', LLink);
+    AddProperty('Info', LInfo);
+    AddProperty('Align', LAlign);
+    AddProperty('Entry size', LEntrySize);
     ASection.FlagsText := LFlags;
     TryParseHexUIntToken(LAddress, ASection.RVA);
     TryParseHexUIntToken(LOffset, ASection.RawOffset);
@@ -4063,19 +4461,36 @@ procedure TDumpParser.ParseELF;
   end;
 
   procedure ParseELFSymbolRow(const ALine: string; ALineNumber: Integer);
+    procedure AddProperty(ASymbol: TDumpSymbol; const AName, AValue: string);
+    begin
+      var LProperty: TDumpProperty;
+      LProperty.Name := AName;
+      LProperty.RawValue := AValue;
+      LProperty.TextValue := AValue;
+      LProperty.ValueKind := vkText;
+      LProperty.StartLine := ALineNumber;
+      ASymbol.Properties.Add(LProperty);
+    end;
   begin
     var LWork := Trim(ALine);
     var LIndexText := FirstToken(LWork);
     var LIndex: UInt64;
     if not TryParseNumericToken(LIndexText, ncDecimal, LIndex) then
       Exit;
-    var LName := FirstToken(LWork);
-    var LValue := FirstToken(LWork);
-    FirstToken(LWork); // size
+    var LNameOrValue := FirstToken(LWork);
+    var LValue := LNameOrValue;
+    var LValueNumber: UInt64;
+    var LName := '';
+    if not TryParseHexUIntToken(LNameOrValue, LValueNumber) then
+    begin
+      LName := LNameOrValue;
+      LValue := FirstToken(LWork);
+    end;
+    var LSize := FirstToken(LWork);
     var LType := FirstToken(LWork);
     var LBind := FirstToken(LWork);
-    if LName = '' then
-      Exit;
+    var LOther := FirstToken(LWork);
+    var LSection := FirstToken(LWork);
     var LSymbol := TDumpSymbol.Create;
     LSymbol.Name := LName;
     LSymbol.MangledName := LName;
@@ -4088,9 +4503,43 @@ procedure TDumpParser.ParseELF;
       LSymbol.Kind := skData
     else if SameText(LType, 'SECTION') then
       LSymbol.Kind := skType;
-    if LBind <> '' then
-      LSymbol.SectionName := LBind;
+    LSymbol.SectionName := LSection;
+    AddProperty(LSymbol, 'Index', LIndexText);
+    AddProperty(LSymbol, 'Name', LName);
+    AddProperty(LSymbol, 'Value', LValue);
+    AddProperty(LSymbol, 'Size', LSize);
+    AddProperty(LSymbol, 'Type', LType);
+    AddProperty(LSymbol, 'Bind', LBind);
+    AddProperty(LSymbol, 'Other', LOther);
+    AddProperty(LSymbol, 'Section', LSection);
     FDocument.Symbols.Add(LSymbol);
+  end;
+
+  procedure ParseELFRelocationRow(const ALine, ASectionName: string;
+    ALineNumber: Integer);
+  begin
+    var LWork := Trim(ALine);
+    var LIndexText := FirstToken(LWork);
+    var LIndex: UInt64;
+    if not TryParseNumericToken(LIndexText, ncDecimal, LIndex) then
+      Exit;
+
+    var LRelocation := TDumpELFRelocation.Create;
+    LRelocation.SectionName := ASectionName;
+    LRelocation.Index := Integer(LIndex);
+    LRelocation.RelocationType := FirstToken(LWork);
+    LRelocation.Offset := FirstToken(LWork);
+    LRelocation.ParenthesizedAddend := FirstToken(LWork);
+    LRelocation.Value := FirstToken(LWork);
+    LRelocation.SymbolIndex := FirstToken(LWork);
+    LRelocation.Addend := FirstToken(LWork);
+    LRelocation.Name := Trim(LWork);
+    LRelocation.StartLine := ALineNumber;
+    LRelocation.EndLine := ALineNumber;
+    if (LRelocation.RelocationType = '') or (LRelocation.Offset = '') then
+      LRelocation.Free
+    else
+      FDocument.ELFRelocations.Add(LRelocation);
   end;
 
 begin
@@ -4160,6 +4609,18 @@ begin
         if not StartsWithText(Trim(FLines[LRow]), 'ndx') then
           ParseELFSymbolRow(FLines[LRow], LRow + 1);
       AddELFTableNode(nkSymbols, 'ELF Symbol Table', LTableStart, LTableEnd);
+    end
+    else if Pos('Relocations for section ', LTitle) > 0 then
+    begin
+      var LSectionTitle := LTitle;
+      var LSectionPosition := Pos('section ', LowerCase(LSectionTitle));
+      Delete(LSectionTitle, 1, LSectionPosition + Length('section ') - 1);
+      var LSectionName := FirstToken(LSectionTitle);
+      for var LRow := LTableStart + 1 to LTableEnd do
+        if not StartsWithText(Trim(FLines[LRow]), 'ndx') then
+          ParseELFRelocationRow(FLines[LRow], LSectionName, LRow + 1);
+      AddELFTableNode(nkRelocations, 'ELF Relocations ' + LSectionName,
+        LTableStart, LTableEnd);
     end;
   end;
 end;

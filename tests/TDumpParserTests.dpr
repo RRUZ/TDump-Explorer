@@ -298,6 +298,10 @@ begin
   try
     Require(LDocument.Relocations.Count > 1000,
       'Relocation fixture must project its relocation entries.');
+    Require((LDocument.RelocationBlocks.Count > 0) and
+      (LDocument.RelocationBlocks[0].Entries.Count > 0) and
+      LDocument.RelocationBlocks[0].SourceSpan.IsValid,
+      'Relocation fixture must group entries under source-backed Fixup Table blocks.');
     Require(LDocument.Relocations[0].HasPageRVA and
       LDocument.Relocations[0].HasOffset,
       'Relocation entries must retain page RVA and relative offset.');
@@ -310,6 +314,9 @@ begin
   try
     Require(LDocument.Relocations.Count > 1000,
       'Win64 relocation fixture must project DIR64 relocation entries.');
+    Require((LDocument.RelocationBlocks.Count > 0) and
+      (LDocument.RelocationBlocks[0].Entries.Count > 0),
+      'Win64 relocation fixture must group PTR/DIR64 entries by Fixup Table block.');
     Require(SameText(LDocument.Relocations[0].RelocationType, 'DIR64'),
       'Win64 relocation entries must retain their relocation type.');
     Require(LDocument.UnsupportedStructures.Count = 0,
@@ -356,8 +363,10 @@ begin
   try
     Require((LDocument.FileKind = dfOMFObject) and
       (LDocument.ObjectRecords.Count > 100) and
-      SameText(LDocument.ObjectRecords[0].RecordKind, 'THEADR'),
-      'OMF object fixture must project its typed record stream.');
+      SameText(LDocument.ObjectRecords[0].RecordKind, 'THEADR') and
+      SameText(LDocument.ObjectRecords[0].Name, 'System.pas') and
+      ContainsText(LDocument.ObjectRecords[0].RawText, 'THEADR'),
+      'OMF object fixture must project its typed, source-backed record stream.');
   finally
     LDocument.Free;
   end;
@@ -373,13 +382,34 @@ begin
     LDocument.Free;
   end;
 
-  LDocument := ParseGeneratedFixture('Mach.Universal.Rad37.tdump');
+  LDocument := ParseGeneratedFixture('Mach.Universal.Rad23.tdump');
   try
-    Require((LDocument.FileKind = dfMach) and
-      (LDocument.MachArchitectures.Count = 2) and
-      (LDocument.MachLoadCommands.Count > 10) and
-      LDocument.MachLoadCommands[0].SourceSpan.IsValid,
-      'Mach fixture must project FAT architectures and load commands.');
+    Require(LDocument.FileKind = dfMach, 'Mach fixture must be classified as Mach.');
+    Require(LDocument.MachArchitectures.Count = 2,
+      'Mach fixture must project its two FAT architectures.');
+    Require((LDocument.Headers.Count > 0) and
+      SameText(LDocument.Headers[0].Name, 'Mach Header') and
+      (LDocument.Headers[0].Properties.Count >= 6),
+      'Mach fixture must project the Mach header properties.');
+    Require(LDocument.MachLoadCommands.Count > 10,
+      'Mach fixture must project its load commands.');
+    Require((LDocument.MachLoadCommands[0].Sections.Count > 0) and
+      (LDocument.MachLoadCommands[0].Sections[0].Properties.Count > 0),
+      'Mach fixture must project segment sections and their properties.');
+    Require(SameText(LDocument.MachLoadCommands.Last.Name, 'LC_DATA_IN_CODE') and
+      (LDocument.MachLoadCommands.Last.Properties.Count = 0),
+      'The Mach Symbol Table must not be captured as LC_DATA_IN_CODE data.');
+    Require((LDocument.MachSymbols.Count > 1000) and
+      (LDocument.MachSymbols[0].Name <> '') and
+      LDocument.MachSymbols[0].SourceSpan.IsValid,
+      'Mach fixture must project its Symbol Table as typed symbol rows.');
+    Require((LDocument.MachDynamicImports.Count > 100) and
+      (LDocument.MachIndirectSymbols.Count > 100) and
+      LDocument.MachDynamicImports[0].SourceSpan.IsValid and
+      LDocument.MachIndirectSymbols[0].SourceSpan.IsValid,
+      'Mach fixture must project Dynamic Symbol Table imports and indirect symbols.');
+    Require(LDocument.MachLoadCommands[0].SourceSpan.IsValid,
+      'Mach load commands must preserve their source spans.');
   finally
     LDocument.Free;
   end;
@@ -389,9 +419,11 @@ begin
     Require((LDocument.FileKind = dfELFObject) and
       (LDocument.Headers.Count = 1) and
       (LDocument.Headers[0].Properties.Count >= 10) and
-      (LDocument.Sections.Count = 12) and (LDocument.Symbols.Count >= 10) and
-      LDocument.Symbols[0].SourceSpan.IsValid,
-      'The real ELF fixture must project its header, sections, and symbols.');
+      (LDocument.Sections.Count = 12) and (LDocument.Symbols.Count = 13) and
+      (LDocument.ELFRelocations.Count = 29) and
+      LDocument.Symbols[0].SourceSpan.IsValid and
+      LDocument.ELFRelocations[0].SourceSpan.IsValid,
+      'The real ELF fixture must project its header, sections, symbols, and relocations.');
   finally
     LDocument.Free;
   end;

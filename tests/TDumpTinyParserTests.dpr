@@ -34,8 +34,16 @@ begin
   try
     var LTokens := LParser.Tokenize(CText);
     try
-      Require(HasToken(LTokens, ttkString, '"Turbo Dump"'),
-        'Quoted TDUMP text must be classified as a string.');
+      Require(HasToken(LTokens, ttkStringLiteral, '"Turbo Dump"'),
+        'Double-quoted TDUMP text must be classified as a string literal.');
+      var LSingleQuoteTokens := LParser.Tokenize('Linker name: ''@Unit@Method$qqrv''');
+      try
+        Require(HasToken(LSingleQuoteTokens, ttkStringLiteral,
+          '''@Unit@Method$qqrv'''),
+          'Single-quoted TDUMP text must be classified as a string literal.');
+      finally
+        LSingleQuoteTokens.Free;
+      end;
       Require(HasToken(LTokens, ttkString, 'C'),
         'A path drive letter must remain a string rather than bare hexadecimal.');
       Require(HasToken(LTokens, ttkHexadecimal, '0x1A2B'),
@@ -78,8 +86,10 @@ begin
     'Light and dark highlighter themes must have distinct backgrounds.');
   Require(LLightTheme.HexadecimalColor <> LLightTheme.NumberColor,
     'The light theme must distinguish hexadecimal and decimal values.');
-  Require(LDarkTheme.DateTimeColor <> LDarkTheme.StringColor,
-    'The dark theme must distinguish date/time and string values.');
+    Require(LDarkTheme.DateTimeColor <> LDarkTheme.StringColor,
+      'The dark theme must distinguish date/time and string values.');
+    Require(LDarkTheme.StringLiteralColor <> LDarkTheme.MethodColor,
+      'The dark theme must distinguish string literals and methods.');
   Require(LLightTheme.MethodColor <> LLightTheme.KeywordColor,
     'The light theme must distinguish demangled methods and keywords.');
 end;
@@ -105,6 +115,60 @@ begin
         'C++Builder T-prefixed classes must be classified as types.');
       Require(HasToken(LTokens, ttkKeyword, 'const'),
         'C++ type qualifiers must be classified as keywords.');
+      var LBorlandMethodTokens := LParser.Tokenize(
+        '@Sysinit@InterlockedExchange$qqsrii', tpmCppBuilderMethod);
+      try
+        Require(HasToken(LBorlandMethodTokens, ttkMethodName,
+          'InterlockedExchange'),
+          'Borland linker method names must be classified as methods.');
+        Require(HasToken(LBorlandMethodTokens, ttkMangledSignature, '$qqsrii'),
+          'Borland mangled signatures must have a stable token kind.');
+      finally
+        LBorlandMethodTokens.Free;
+      end;
+      var LBorlandSlashMethodTokens := LParser.Tokenize(
+        '@Sysinit\@InterlockedExchange$qqsrii', tpmCppBuilderMethod);
+      try
+        Require(HasToken(LBorlandSlashMethodTokens, ttkMethodName,
+          'InterlockedExchange'),
+          'Borland linker names using \\@ must classify the method name.');
+      finally
+        LBorlandSlashMethodTokens.Free;
+      end;
+      for var LMode in [tpmTDumpValues, tpmCppBuilderMethod] do
+      begin
+        var LInitProcessTokens := LParser.Tokenize(
+          '@Sysinit@InitProcessTLS$qqrv', LMode);
+        try
+          Require(HasToken(LInitProcessTokens, ttkMethodName, 'InitProcessTLS'),
+            'Borland method names must be mode-independent.');
+          Require(HasToken(LInitProcessTokens, ttkMangledSignature, '$qqrv'),
+            'Borland mangled suffixes must be mode-independent.');
+        finally
+          LInitProcessTokens.Free;
+        end;
+
+        var LSlashTokens := LParser.Tokenize(
+          '@Sysinit\@InterlockedExchange$qqsrii', LMode);
+        try
+          Require(HasToken(LSlashTokens, ttkMethodName, 'InterlockedExchange'),
+            'The Borland \\@ method name must be mode-independent.');
+          Require(HasToken(LSlashTokens, ttkMangledSignature, '$qqsrii'),
+            'The Borland \\@ mangled suffix must be mode-independent.');
+        finally
+          LSlashTokens.Free;
+        end;
+      end;
+      var LQuotedLinkerTokens := LParser.Tokenize(
+        'Linker name: ''@Sysinit@InterlockedExchange$qqsrii''',
+        tpmCppBuilderMethod);
+      try
+        Require(HasToken(LQuotedLinkerTokens, ttkStringLiteral,
+          '''@Sysinit@InterlockedExchange$qqsrii'''),
+          'Quoted linker names must remain string literals in method mode.');
+      finally
+        LQuotedLinkerTokens.Free;
+      end;
       var LBareImportTokens := LParser.Tokenize('GetLastError',
         tpmCppBuilderMethod);
       try
