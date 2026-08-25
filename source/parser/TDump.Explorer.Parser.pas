@@ -30,7 +30,7 @@ type
     dfCOFFObject, dfOMFLibrary, dfDelphiUnit, dfELFObject, dfELFArchive,
     dfARArchive, dfMach, dfRawHex, dfASCII);
   TDumpNodeKind = (nkDocument, nkHeader, nkDataDirectory, nkSections,
-    nkImports, nkExports, nkResources, nkRelocations, nkDebug, nkSymbols,
+    nkImports, nkDelayedImports, nkExports, nkResources, nkRelocations, nkDebug, nkSymbols,
     nkLines, nkLibrary, nkLibraryMember, nkObjectRecord, nkStrings,
     nkDisassembly, nkHexDump, nkUnknown);
   TDumpValueKind = (vkUnknown, vkText, vkUInt, vkAddress, vkRVA, vkFileOffset,
@@ -68,12 +68,17 @@ type
   TDumpDocument = class;
   TDumpRun = class;
 
+  // Declares an exact, parser-confirmed rendering rule for one source span.
+  // Consumers must not infer this from raw text alone.
+  TDumpRawSyntaxHint = (rshDefault, rshCppBuilderMethod);
+
   // Identifies a contiguous source range from one TDUMP invocation.
   // Raw text remains document-owned; the run provides provenance without copies.
   TDumpSourceSpan = record
     Run: TDumpRun;
     StartLine: Integer;
     EndLine: Integer;
+    SyntaxHint: TDumpRawSyntaxHint;
     function IsValid: Boolean;
   end;
 
@@ -266,6 +271,17 @@ type
     Name: string;
     Entries: TObjectList<TDumpImport>;
     Properties: TList<TDumpProperty>;
+    StartLine: Integer;
+    EndLine: Integer;
+    SourceSpan: TDumpSourceSpan;
+    constructor Create;
+    destructor Destroy; override;
+  end;
+
+  // Owns the PE delayed-load import descriptors and their source range.
+  TDumpDelayedImportTable = class
+  public
+    Modules: TObjectList<TDumpImportModule>;
     StartLine: Integer;
     EndLine: Integer;
     SourceSpan: TDumpSourceSpan;
@@ -981,6 +997,7 @@ type
     DataDirectories: TList<TDumpDataDirectory>;
     Sections: TObjectList<TDumpSection>;
     Imports: TObjectList<TDumpImportModule>;
+    DelayedImportTable: TDumpDelayedImportTable;
     ExportList: TObjectList<TDumpExport>;
     ImportMetadata: TDumpSectionMetadata;
     ExportMetadata: TDumpSectionMetadata;
@@ -1426,6 +1443,20 @@ begin
   inherited;
 end;
 
+{ TDumpDelayedImportTable }
+
+constructor TDumpDelayedImportTable.Create;
+begin
+  inherited Create;
+  Modules := TObjectList<TDumpImportModule>.Create(True);
+end;
+
+destructor TDumpDelayedImportTable.Destroy;
+begin
+  Modules.Free;
+  inherited;
+end;
+
 { TDumpExport }
 
 constructor TDumpExport.Create;
@@ -1758,6 +1789,7 @@ begin
   DataDirectories := TList<TDumpDataDirectory>.Create;
   Sections := TObjectList<TDumpSection>.Create(True);
   Imports := TObjectList<TDumpImportModule>.Create(True);
+  DelayedImportTable := nil;
   ExportList := TObjectList<TDumpExport>.Create(True);
   ImportMetadata := nil;
   ExportMetadata := nil;
@@ -1836,6 +1868,7 @@ begin
   ExportMetadata.Free;
   ImportMetadata.Free;
   ExportList.Free;
+  DelayedImportTable.Free;
   Imports.Free;
   Sections.Free;
   DataDirectories.Free;
@@ -2182,6 +2215,34 @@ begin
       LImport.SourceSpan.Run := LRun;
       LImport.SourceSpan.StartLine := LImport.StartLine;
       LImport.SourceSpan.EndLine := LImport.StartLine;
+      if (LImport.StartLine >= 1) and
+        (LImport.StartLine <= FDocument.Lines.Count) then
+      FDocument.Lines[LImport.StartLine - 1].SourceSpan.SyntaxHint :=
+          LImport.SourceSpan.SyntaxHint;
+    end;
+  end;
+  if FDocument.DelayedImportTable <> nil then
+  begin
+    FDocument.DelayedImportTable.SourceSpan.Run := LRun;
+    FDocument.DelayedImportTable.SourceSpan.StartLine :=
+      FDocument.DelayedImportTable.StartLine;
+    FDocument.DelayedImportTable.SourceSpan.EndLine :=
+      FDocument.DelayedImportTable.EndLine;
+    for var LModule in FDocument.DelayedImportTable.Modules do
+    begin
+      LModule.SourceSpan.Run := LRun;
+      LModule.SourceSpan.StartLine := LModule.StartLine;
+      LModule.SourceSpan.EndLine := LModule.EndLine;
+      for var LImport in LModule.Entries do
+      begin
+        LImport.SourceSpan.Run := LRun;
+        LImport.SourceSpan.StartLine := LImport.StartLine;
+        LImport.SourceSpan.EndLine := LImport.StartLine;
+        if (LImport.StartLine >= 1) and
+          (LImport.StartLine <= FDocument.Lines.Count) then
+          FDocument.Lines[LImport.StartLine - 1].SourceSpan.SyntaxHint :=
+            LImport.SourceSpan.SyntaxHint;
+      end;
     end;
   end;
   for var LExport in FDocument.ExportList do
@@ -2189,6 +2250,10 @@ begin
     LExport.SourceSpan.Run := LRun;
     LExport.SourceSpan.StartLine := LExport.StartLine;
     LExport.SourceSpan.EndLine := LExport.StartLine;
+    if (LExport.StartLine >= 1) and
+      (LExport.StartLine <= FDocument.Lines.Count) then
+      FDocument.Lines[LExport.StartLine - 1].SourceSpan.SyntaxHint :=
+        LExport.SourceSpan.SyntaxHint;
   end;
   for var LMetadata in [FDocument.ImportMetadata, FDocument.ExportMetadata,
     FDocument.ResourceMetadata] do
@@ -2309,6 +2374,15 @@ begin
     LSymbol.SourceSpan.Run := LRun;
     LSymbol.SourceSpan.StartLine := LSymbol.StartLine;
     LSymbol.SourceSpan.EndLine := LSymbol.StartLine;
+    if (LSymbol.Kind = skFunction) or
+      SameText(LSymbol.RecordKind, 'S_GPROCREF') then
+    begin
+      LSymbol.SourceSpan.SyntaxHint := rshCppBuilderMethod;
+      if (LSymbol.StartLine >= 1) and
+        (LSymbol.StartLine <= FDocument.Lines.Count) then
+        FDocument.Lines[LSymbol.StartLine - 1].SourceSpan.SyntaxHint :=
+          rshCppBuilderMethod;
+    end;
   end;
   if FDocument.DebugInformation <> nil then
   begin
@@ -2811,12 +2885,30 @@ begin
   var LSectionEnd := FLines.Count - 1;
   if LCompactMode then
   begin
+    var LDelayedLoadActive := False;
     for var LIndex := LSectionStart + 1 to FLines.Count - 1 do
-      if (Trim(FLines[LIndex]) <> '') and not StartsWithText(Trim(FLines[LIndex]), 'IMPORT:') then
+    begin
+      var LTrimmed := Trim(FLines[LIndex]);
+      if SameText(LTrimmed, 'Delayed Load Import Table') then
+      begin
+        LDelayedLoadActive := True;
+        Continue;
+      end;
+      if LDelayedLoadActive then
+      begin
+        if FDocument.Lines[LIndex].Kind = tlkSection then
+        begin
+          LSectionEnd := LIndex - 1;
+          Break;
+        end;
+        Continue;
+      end;
+      if (LTrimmed <> '') and not StartsWithText(LTrimmed, 'IMPORT:') then
       begin
         LSectionEnd := LIndex - 1;
         Break;
       end;
+    end;
   end
   else
   begin
@@ -2841,6 +2933,8 @@ begin
   FDocument.ImportMetadata.EndLine := LSectionEnd + 1;
   var LCurrentModule: TDumpImportModule := nil;
   var LModuleNode: TDumpNode := nil;
+  var LDelayedMode := False;
+  var LDelayedTableNode: TDumpNode := nil;
   var LRaw := TStringBuilder.Create;
   try
     for var LIndex := LSectionStart to LSectionEnd do
@@ -2857,7 +2951,69 @@ begin
           Continue;
       end;
 
-      if LCompactMode then
+      if SameText(LTrimmed, 'Delayed Load Import Table') then
+      begin
+        if LCurrentModule <> nil then
+        begin
+          LCurrentModule.EndLine := LIndex;
+          if LModuleNode <> nil then
+            LModuleNode.EndLine := LIndex;
+        end;
+        LCurrentModule := nil;
+        LModuleNode := nil;
+        if FDocument.DelayedImportTable = nil then
+        begin
+          FDocument.DelayedImportTable := TDumpDelayedImportTable.Create;
+          FDocument.DelayedImportTable.StartLine := LIndex + 1;
+          FDocument.DelayedImportTable.EndLine := LSectionEnd + 1;
+          LDelayedTableNode := TDumpNode.Create;
+          LDelayedTableNode.Kind := nkDelayedImports;
+          LDelayedTableNode.Title := 'Delayed Load Import Table';
+          LDelayedTableNode.StartLine := LIndex + 1;
+          LDelayedTableNode.EndLine := LSectionEnd + 1;
+          LNode.Children.Add(LDelayedTableNode);
+        end;
+        LDelayedMode := True;
+        Continue;
+      end;
+
+      if StartsWithText(LTrimmed, 'Delayed Imports from ') then
+      begin
+        if FDocument.DelayedImportTable = nil then
+        begin
+          FDocument.DelayedImportTable := TDumpDelayedImportTable.Create;
+          FDocument.DelayedImportTable.StartLine := LIndex + 1;
+          FDocument.DelayedImportTable.EndLine := LSectionEnd + 1;
+          LDelayedTableNode := TDumpNode.Create;
+          LDelayedTableNode.Kind := nkDelayedImports;
+          LDelayedTableNode.Title := 'Delayed Load Import Table';
+          LDelayedTableNode.StartLine := LIndex + 1;
+          LDelayedTableNode.EndLine := LSectionEnd + 1;
+          LNode.Children.Add(LDelayedTableNode);
+        end;
+        if LCurrentModule <> nil then
+        begin
+          LCurrentModule.EndLine := LIndex;
+          if LModuleNode <> nil then
+            LModuleNode.EndLine := LIndex;
+        end;
+        LCurrentModule := TDumpImportModule.Create;
+        LCurrentModule.Name := Trim(Copy(LTrimmed,
+          Length('Delayed Imports from ') + 1, MaxInt));
+        LCurrentModule.StartLine := LIndex + 1;
+        LCurrentModule.EndLine := LSectionEnd + 1;
+        FDocument.DelayedImportTable.Modules.Add(LCurrentModule);
+        LModuleNode := TDumpNode.Create;
+        LModuleNode.Kind := nkDelayedImports;
+        LModuleNode.Title := LCurrentModule.Name;
+        LModuleNode.StartLine := LIndex + 1;
+        LModuleNode.EndLine := LSectionEnd + 1;
+        LDelayedTableNode.Children.Add(LModuleNode);
+        LDelayedMode := True;
+        Continue;
+      end;
+
+      if LCompactMode and not LDelayedMode then
       begin
         var LImportText := Trim(Copy(LTrimmed, Length('IMPORT:') + 1, MaxInt));
         var LEqualsPos := Pos('=', LImportText);
@@ -2875,6 +3031,12 @@ begin
           LEntryName := Copy(LEntryName, 2, Length(LEntryName) - 2);
         if (LCurrentModule = nil) or not SameText(LCurrentModule.Name, LModuleName) then
         begin
+          if LCurrentModule <> nil then
+          begin
+            LCurrentModule.EndLine := LIndex;
+            if LModuleNode <> nil then
+              LModuleNode.EndLine := LIndex;
+          end;
           LCurrentModule := TDumpImportModule.Create;
           LCurrentModule.Name := LModuleName;
           LCurrentModule.StartLine := LIndex + 1;
@@ -2892,6 +3054,7 @@ begin
         LCompactImport.MangledName := LEntryName;
         LCompactImport.RawText := LLine;
         LCompactImport.StartLine := LIndex + 1;
+        LCompactImport.SourceSpan.SyntaxHint := rshCppBuilderMethod;
         LCurrentModule.Entries.Add(LCompactImport);
         Continue;
       end;
@@ -2900,6 +3063,12 @@ begin
       begin
         var LModuleName := Trim(Copy(LTrimmed, Length('Imports from ') + 1,
           MaxInt));
+        if LCurrentModule <> nil then
+        begin
+          LCurrentModule.EndLine := LIndex;
+          if LModuleNode <> nil then
+            LModuleNode.EndLine := LIndex;
+        end;
         LCurrentModule := TDumpImportModule.Create;
         LCurrentModule.Name := LModuleName;
         LCurrentModule.StartLine := LIndex + 1;
@@ -2911,6 +3080,7 @@ begin
         LModuleNode.StartLine := LIndex + 1;
         LModuleNode.EndLine := LSectionEnd + 1;
         LNode.Children.Add(LModuleNode);
+        LDelayedMode := False;
         Continue;
       end;
 
@@ -2940,9 +3110,22 @@ begin
         Continue;
       end;
 
+      if LDelayedMode then
+      begin
+        var LProperty: TDumpProperty;
+        if TryParsePropertyLine(LLine, LIndex + 1, LProperty) then
+        begin
+          LCurrentModule.Properties.Add(LProperty);
+          if LModuleNode <> nil then
+            LModuleNode.Properties.Add(LProperty);
+          Continue;
+        end;
+      end;
+
       var LImport: TDumpImport;
       if TryParseImportLine(LLine, LIndex + 1, LImport) then
       begin
+        LImport.SourceSpan.SyntaxHint := rshCppBuilderMethod;
         LCurrentModule.Entries.Add(LImport);
         if LModuleNode <> nil then
         begin
@@ -2963,6 +3146,18 @@ begin
           'Unsupported import entry.');
         AddDiagnostic(dsWarning, LIndex + 1, 'Unrecognized import entry.', LLine);
       end;
+    end;
+    if LCurrentModule <> nil then
+    begin
+      LCurrentModule.EndLine := LSectionEnd + 1;
+      if LModuleNode <> nil then
+        LModuleNode.EndLine := LSectionEnd + 1;
+    end;
+    if FDocument.DelayedImportTable <> nil then
+    begin
+      FDocument.DelayedImportTable.EndLine := LSectionEnd + 1;
+      if LDelayedTableNode <> nil then
+        LDelayedTableNode.EndLine := LSectionEnd + 1;
     end;
     LNode.RawText := LRaw.ToString;
   finally
@@ -3046,6 +3241,7 @@ begin
         var LCompactExport := TDumpExport.Create;
         LCompactExport.RawText := LLine;
         LCompactExport.StartLine := LIndex + 1;
+        LCompactExport.SourceSpan.SyntaxHint := rshCppBuilderMethod;
         LCompactExport.HasOrdinal := TryParseHexUIntToken(LOrdinalText,
           LCompactExport.Ordinal);
         if LEqualsPos > 0 then
@@ -3090,6 +3286,7 @@ begin
       var LExport: TDumpExport;
       if TryParseExportLine(LLine, LIndex + 1, LExport) then
       begin
+        LExport.SourceSpan.SyntaxHint := rshCppBuilderMethod;
         FDocument.ExportList.Add(LExport);
 
         var LProperty: TDumpProperty;
@@ -5252,7 +5449,8 @@ begin
   begin
     for var LIndex := 2 to Length(ALine) do
       if LooksLikeValueStart(LIndex) and CharInSet(ALine[LIndex - 1], [' ', #9]) and
-        ((LIndex <= 2) or CharInSet(ALine[LIndex - 2], [' ', #9])) then
+        ((LIndex <= 2) or CharInSet(ALine[LIndex - 2], [' ', #9])) and
+        (Trim(Copy(ALine, 1, LIndex - 1)) <> '') then
       begin
         LStartValue := LIndex;
         Break;

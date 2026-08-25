@@ -9,13 +9,16 @@ uses
   TDump.Explorer.Runner in '..\common\TDump.Explorer.Runner.pas',
   TDump.Explorer.Main in 'TDump.Explorer.Main.pas' {FrmMain},
   TDump.Explorer.Frame in 'TDump.Explorer.Frame.pas' {Frame1: TFrame},
+  TDump.Explorer.CrossReferences in 'TDump.Explorer.CrossReferences.pas' {CrossReferencesFrame: TFrame},
+  TDump.Explorer.RawView in 'TDump.Explorer.RawView.pas' {RawViewFrame: TFrame},
   TDump.Explorer.HighlighterControl in 'TDump.Explorer.HighlighterControl.pas' {HighlighterControl: TFrame},
   TDump.Explorer.TinyParser in '..\common\TDump.Explorer.TinyParser.pas',
   TDump.Explorer.Highlighter in '..\common\TDump.Explorer.Highlighter.pas',
   TDump.Explorer.UI in '..\common\TDump.Explorer.UI.pas',
   Vcl.Themes,
   Vcl.Styles,
-  TDump.Explorer.LogControl in 'TDump.Explorer.LogControl.pas' {LogControl: TFrame};
+  TDump.Explorer.LogControl in 'TDump.Explorer.LogControl.pas' {LogControl: TFrame},
+  TDump.Explorer.Relations in '..\common\TDump.Explorer.Relations.pas';
 
 {$R *.res}
 

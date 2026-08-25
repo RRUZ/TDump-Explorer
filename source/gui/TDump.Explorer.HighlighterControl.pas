@@ -35,16 +35,24 @@ type
       FColumnDataTypes: array of TTinyHighlightDataType;
       FMeasureBitmap: TBitmap;
       FAutoSizeColumns: Boolean;
+      FUseColumnMode: Boolean;
+      FShowLineNumbers: Boolean;
       FColumnCount: Integer;
       FColumnWidths: array of Integer;
       FParserMode: TTinyParserMode;
       FThemeKind: TTinyHighlightThemeKind;
+      FUseEndEllipsis: Boolean;
+      FHighlightColor: TColor;
+      FHighlightedItems: TList<Integer>;
       FUpdateDepth: Integer;
       FUpdatePending: Boolean;
+      FRestoreItemIndex: Integer;
+      FRestoreItemIndexPending: Boolean;
     function ColumnCount(const AText: string): Integer;
     function ColumnText(AItemIndex, AColumnIndex: Integer): string;
     function ColumnDataType(AColumnIndex: Integer): TTinyHighlightDataType;
     function ColumnWidth(AColumnIndex: Integer; AAvailableWidth: Integer): Integer;
+    function LineNumberGutterWidth: Integer;
     procedure ControlList1BeforeDrawItem(AIndex: Integer; ACanvas: TCanvas;
       ARect: TRect; AState: TOwnerDrawState);
     procedure ControlList1KeyDown(Sender: TObject; var Key: Word;
@@ -52,11 +60,17 @@ type
     procedure CopySelectedItemsToClipboard;
     procedure ItemsChanged(Sender: TObject);
     procedure SetAutoSizeColumns(const AValue: Boolean);
+    procedure SetUseColumnMode(const AValue: Boolean);
+    procedure SetShowLineNumbers(const AValue: Boolean);
     procedure SetParserMode(const AValue: TTinyParserMode);
     procedure SetThemeKind(const AValue: TTinyHighlightThemeKind);
+    procedure SetUseEndEllipsis(const AValue: Boolean);
+    procedure SetHighlightColor(const AValue: TColor);
     procedure UpdateHeaderControl;
     procedure UpdateColumnWidths;
     procedure UpdateControlList;
+  protected
+    procedure Resize; override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -67,17 +81,31 @@ type
       AParserMode: TTinyParserMode); overload;
     procedure BeginUpdate;
     procedure Clear;
+    procedure ClearHighlightedItems;
     procedure EndUpdate;
     procedure SetColumnHeaders(const AColumns: array of string);
     procedure SetColumnDataTypes(
       const ADataTypes: array of TTinyHighlightDataType);
+    procedure SetItemParserMode(AItemIndex: Integer;
+      AParserMode: TTinyParserMode);
     procedure SetText(const AText: string);
+    procedure SetHighlightedItems(const AItemIndexes: array of Integer);
+    procedure SetHighlightedRange(AStartItemIndex, AEndItemIndex: Integer);
+    procedure SelectItem(AItemIndex: Integer);
+    procedure ScrollItemToTop(AItemIndex: Integer);
     property Items: TStringList read FItems;
     property AutoSizeColumns: Boolean read FAutoSizeColumns
       write SetAutoSizeColumns default True;
+    property UseColumnMode: Boolean read FUseColumnMode
+      write SetUseColumnMode default True;
+    property ShowLineNumbers: Boolean read FShowLineNumbers
+      write SetShowLineNumbers default False;
     property ParserMode: TTinyParserMode read FParserMode write SetParserMode;
     property ThemeKind: TTinyHighlightThemeKind read FThemeKind
       write SetThemeKind;
+    property UseEndEllipsis: Boolean read FUseEndEllipsis
+      write SetUseEndEllipsis default True;
+    property HighlightColor: TColor read FHighlightColor write SetHighlightColor;
   end;
 
 implementation
@@ -97,10 +125,17 @@ begin
   FItemParserModes := TList<Integer>.Create;
   FColumnHeaders := TStringList.Create;
   FMeasureBitmap := TBitmap.Create;
+  FHighlightedItems := TList<Integer>.Create;
   FAutoSizeColumns := True;
+  FUseColumnMode := True;
+  FShowLineNumbers := False;
   FColumnCount := 1;
   FParserMode := tpmTDumpValues;
   FThemeKind := thtDark;
+  FUseEndEllipsis := True;
+
+  var LStyle := StyleServices;
+  FHighlightColor := ColorBlendRGB(clWhite, LStyle.GetSystemColor(clWindow), 0.95);
   HeaderControl1.Align := alTop;
   HeaderControl1.Visible := False;
   ControlList1.MultiSelect := True;
@@ -113,6 +148,7 @@ destructor THighlighterControl.Destroy;
 begin
   FMeasureBitmap.Free;
   FItemParserModes.Free;
+  FHighlightedItems.Free;
   FColumnHeaders.Free;
   FItems.Free;
   FHighlighter.Free;
@@ -127,8 +163,9 @@ begin
     begin
       if LColumnIndex > 0 then
         LText.Append(#9);
-      LText.Append(StringReplace(StringReplace(AColumns[LColumnIndex], #13,
-        ' ', [rfReplaceAll]), #10, ' ', [rfReplaceAll]));
+      LText.Append(StringReplace(StringReplace(StringReplace(AColumns[LColumnIndex],
+        #13, ' ', [rfReplaceAll]), #10, ' ', [rfReplaceAll]), #9, ' ',
+        [rfReplaceAll]));
     end;
     Add(LText.ToString);
   finally
@@ -145,8 +182,9 @@ begin
     begin
       if LColumnIndex > 0 then
         LText.Append(#9);
-      LText.Append(StringReplace(StringReplace(AColumns[LColumnIndex], #13,
-        ' ', [rfReplaceAll]), #10, ' ', [rfReplaceAll]));
+      LText.Append(StringReplace(StringReplace(StringReplace(AColumns[LColumnIndex],
+        #13, ' ', [rfReplaceAll]), #10, ' ', [rfReplaceAll]), #9, ' ',
+        [rfReplaceAll]));
     end;
     Add(LText.ToString, AParserMode);
   finally
@@ -157,6 +195,8 @@ end;
 function THighlighterControl.ColumnCount(const AText: string): Integer;
 begin
   Result := 1;
+  if not FUseColumnMode then
+    Exit;
   for var LCharacter in AText do
     if LCharacter = #9 then
       Inc(Result);
@@ -169,6 +209,13 @@ begin
   if (AItemIndex < 0) or (AItemIndex >= FItems.Count) or
     (AColumnIndex < 0) then
     Exit;
+
+  if not FUseColumnMode then
+  begin
+    if AColumnIndex = 0 then
+      Result := FItems[AItemIndex];
+    Exit;
+  end;
 
   var LStartIndex := 1;
   var LColumn := 0;
@@ -198,6 +245,15 @@ begin
     (AColumnIndex < Length(FColumnWidths)) then
     Exit(FColumnWidths[AColumnIndex]);
   Result := AAvailableWidth div FColumnCount;
+end;
+
+function THighlighterControl.LineNumberGutterWidth: Integer;
+begin
+  Result := 0;
+  if not FShowLineNumbers then
+    Exit;
+  FMeasureBitmap.Canvas.Font.Assign(Font);
+  Result := FMeasureBitmap.Canvas.TextWidth('00000000:') + (CTextPadding * 2);
 end;
 
 procedure THighlighterControl.Add(const AText: string);
@@ -241,6 +297,11 @@ end;
 
 procedure THighlighterControl.BeginUpdate;
 begin
+  if FUpdateDepth = 0 then
+  begin
+    FRestoreItemIndex := ControlList1.ItemIndex;
+    FRestoreItemIndexPending := True;
+  end;
   Inc(FUpdateDepth);
 end;
 
@@ -250,8 +311,21 @@ begin
     Exit;
 
   Dec(FUpdateDepth);
-  if (FUpdateDepth = 0) and FUpdatePending then
+  if FUpdateDepth <> 0 then
+    Exit;
+
+  if FUpdatePending then
     UpdateControlList;
+  if FRestoreItemIndexPending then
+  begin
+    if FItems.Count = 0 then
+      ControlList1.ItemIndex := -1
+    else if FRestoreItemIndex >= 0 then
+      ControlList1.ItemIndex := Min(FRestoreItemIndex, FItems.Count - 1)
+    else if ControlList1.ItemIndex < 0 then
+      ControlList1.ItemIndex := 0;
+    FRestoreItemIndexPending := False;
+  end;
 end;
 
 procedure THighlighterControl.SetColumnHeaders(const AColumns: array of string);
@@ -282,6 +356,8 @@ end;
 
 procedure THighlighterControl.SetText(const AText: string);
 begin
+  var LPreviousItemIndex := ControlList1.ItemIndex;
+  ClearHighlightedItems;
   FColumnHeaders.Clear;
   SetLength(FColumnDataTypes, 0);
   FItems.BeginUpdate;
@@ -294,18 +370,110 @@ begin
     FItems.EndUpdate;
   end;
   if FItems.Count > 0 then
-    ControlList1.ItemIndex := 0;
+  begin
+    if LPreviousItemIndex >= 0 then
+      ControlList1.ItemIndex := Min(LPreviousItemIndex, FItems.Count - 1)
+    else
+      ControlList1.ItemIndex := 0;
+  end;
+end;
+
+procedure THighlighterControl.SetItemParserMode(AItemIndex: Integer;
+  AParserMode: TTinyParserMode);
+begin
+  if (AItemIndex < 0) or (AItemIndex >= FItemParserModes.Count) or
+    (FItemParserModes[AItemIndex] = Ord(AParserMode)) then
+    Exit;
+  FItemParserModes[AItemIndex] := Ord(AParserMode);
+  if FUpdateDepth > 0 then
+    FUpdatePending := True
+  else
+    ControlList1.Invalidate;
+end;
+
+procedure THighlighterControl.ClearHighlightedItems;
+begin
+  if FHighlightedItems.Count = 0 then
+    Exit;
+  FHighlightedItems.Clear;
+  ControlList1.Invalidate;
+end;
+
+procedure THighlighterControl.SetHighlightedItems(
+  const AItemIndexes: array of Integer);
+begin
+  FHighlightedItems.Clear;
+  for var LItemIndex in AItemIndexes do
+    if (LItemIndex >= 0) and (LItemIndex < FItems.Count) and
+      not FHighlightedItems.Contains(LItemIndex) then
+      FHighlightedItems.Add(LItemIndex);
+  ControlList1.Invalidate;
+end;
+
+procedure THighlighterControl.SetHighlightedRange(AStartItemIndex,
+  AEndItemIndex: Integer);
+begin
+  FHighlightedItems.Clear;
+  AStartItemIndex := Max(0, AStartItemIndex);
+  AEndItemIndex := Min(FItems.Count - 1, AEndItemIndex);
+  if AEndItemIndex < AStartItemIndex then
+  begin
+    ControlList1.Invalidate;
+    Exit;
+  end;
+
+  for var LItemIndex := AStartItemIndex to AEndItemIndex do
+    FHighlightedItems.Add(LItemIndex);
+  ControlList1.Invalidate;
+end;
+
+procedure THighlighterControl.SelectItem(AItemIndex: Integer);
+begin
+  if FItems.Count = 0 then
+    ControlList1.ItemIndex := -1
+  else
+    ControlList1.ItemIndex := EnsureRange(AItemIndex, 0, FItems.Count - 1);
+end;
+
+procedure THighlighterControl.ScrollItemToTop(AItemIndex: Integer);
+var
+  LScrollInfo: TScrollInfo;
+begin
+  if (AItemIndex < 0) or (AItemIndex >= FItems.Count) then
+    Exit;
+
+  ControlList1.ItemIndex := AItemIndex;
+  if not ControlList1.HandleAllocated then
+    Exit;
+
+  ZeroMemory(@LScrollInfo, SizeOf(LScrollInfo));
+  LScrollInfo.cbSize := SizeOf(LScrollInfo);
+  LScrollInfo.fMask := SIF_POS;
+  LScrollInfo.nPos := AItemIndex * (ControlList1.ItemHeight +
+    ControlList1.ItemMargins.Top + ControlList1.ItemMargins.Bottom);
+  SetScrollInfo(ControlList1.Handle, SB_VERT, LScrollInfo, True);
+  ControlList1.Perform(WM_VSCROLL,
+    MakeWParam(SB_THUMBPOSITION, 0), 0);
 end;
 
 procedure THighlighterControl.ControlList1BeforeDrawItem(AIndex: Integer;
   ACanvas: TCanvas; ARect: TRect; AState: TOwnerDrawState);
 var
   LFillColor: TColor;
+  LTextFormat: TTextFormat;
 begin
   if (AIndex < 0) or (AIndex >= FItems.Count) then
     Exit;
 
   var LStyle := StyleServices;
+
+  if FHighlightedItems.Contains(AIndex) then
+  begin
+    var LMarkerRect := ARect;
+    //LMarkerRect.Right := Min(LMarkerRect.Right, LMarkerRect.Left + 3);
+    ACanvas.Brush.Color := FHighlightColor;
+    ACanvas.FillRect(LMarkerRect);
+  end;
 
   if (odSelected in AState) then
   begin
@@ -332,8 +500,19 @@ begin
 
   var LTextRect := ARect;
   InflateRect(LTextRect, -CTextPadding, 0);
-  ACanvas.Font.Name := 'Segoe UI';
-  ACanvas.Font.Size := 9;
+  ACanvas.Font.Name := Font.Name;
+  ACanvas.Font.Size := Font.Size;
+  if FShowLineNumbers then
+  begin
+    var LGutterWidth := LineNumberGutterWidth;
+    var LGutterRect := ARect;
+    LGutterRect.Right := Min(LGutterRect.Right, LGutterRect.Left + LGutterWidth);
+    InflateRect(LGutterRect, -CTextPadding, 0);
+    FHighlighter.TextRect(ACanvas, LGutterRect, IntToHex(AIndex, 8) + ':',
+      FThemeKind, [tfRight, tfVerticalCenter, tfSingleLine, tfNoPrefix],
+      tpmTDumpValues, thdtHexadecimal);
+    LTextRect.Left := Min(LTextRect.Right, LTextRect.Left + LGutterWidth);
+  end;
   var LLeft := LTextRect.Left;
   for var LColumnIndex := 0 to FColumnCount - 1 do
   begin
@@ -348,9 +527,11 @@ begin
     if (AIndex < FItemParserModes.Count) and
       (FItemParserModes[AIndex] >= 0) then
       LParserMode := TTinyParserMode(FItemParserModes[AIndex]);
+    LTextFormat := [tfLeft, tfVerticalCenter, tfSingleLine, tfNoPrefix];
+    if FUseEndEllipsis then
+      Include(LTextFormat, tfEndEllipsis);
     FHighlighter.TextRect(ACanvas, LColumnRect,
-      ColumnText(AIndex, LColumnIndex), FThemeKind,
-      [tfLeft, tfVerticalCenter, tfSingleLine, tfEndEllipsis, tfNoPrefix],
+      ColumnText(AIndex, LColumnIndex), FThemeKind, LTextFormat,
       LParserMode, ColumnDataType(LColumnIndex));
     LLeft := LColumnRect.Right;
   end;
@@ -399,6 +580,13 @@ begin
   UpdateControlList;
 end;
 
+procedure THighlighterControl.Resize;
+begin
+  inherited;
+  if FItems <> nil then
+    UpdateControlList;
+end;
+
 procedure THighlighterControl.SetAutoSizeColumns(const AValue: Boolean);
 begin
   if FAutoSizeColumns = AValue then
@@ -407,12 +595,44 @@ begin
   UpdateControlList;
 end;
 
+procedure THighlighterControl.SetUseColumnMode(const AValue: Boolean);
+begin
+  if FUseColumnMode = AValue then
+    Exit;
+  FUseColumnMode := AValue;
+  UpdateControlList;
+end;
+
+procedure THighlighterControl.SetShowLineNumbers(const AValue: Boolean);
+begin
+  if FShowLineNumbers = AValue then
+    Exit;
+  FShowLineNumbers := AValue;
+  ControlList1.Invalidate;
+end;
+
 procedure THighlighterControl.SetThemeKind(
   const AValue: TTinyHighlightThemeKind);
 begin
   if FThemeKind = AValue then
     Exit;
   FThemeKind := AValue;
+  ControlList1.Invalidate;
+end;
+
+procedure THighlighterControl.SetUseEndEllipsis(const AValue: Boolean);
+begin
+  if FUseEndEllipsis = AValue then
+    Exit;
+  FUseEndEllipsis := AValue;
+  ControlList1.Invalidate;
+end;
+
+procedure THighlighterControl.SetHighlightColor(const AValue: TColor);
+begin
+  if FHighlightColor = AValue then
+    Exit;
+  FHighlightColor := AValue;
   ControlList1.Invalidate;
 end;
 
@@ -434,8 +654,8 @@ begin
   if not FAutoSizeColumns then
     Exit;
 
-  FMeasureBitmap.Canvas.Font.Name := 'Segoe UI';
-  FMeasureBitmap.Canvas.Font.Size := 9;
+  FMeasureBitmap.Canvas.Font.Name := Font.Name;
+  FMeasureBitmap.Canvas.Font.Size := Font.Size;
   for var LColumnIndex := 0 to FColumnCount - 1 do
   begin
     var LWidth := CTextPadding * 2;
@@ -457,10 +677,13 @@ begin
     Exit;
   end;
 
-  var LRequiresUpdate := HeaderControl1.Sections.Count <> FColumnHeaders.Count;
+  var LSectionCountChanged := HeaderControl1.Sections.Count <>
+    FColumnHeaders.Count;
+  var LRequiresUpdate := LSectionCountChanged;
   if not LRequiresUpdate then
     for var LColumnIndex := 0 to FColumnHeaders.Count - 1 do
-      if (HeaderControl1.Sections[LColumnIndex].Text <> FColumnHeaders[LColumnIndex]) or
+      if (HeaderControl1.Sections[LColumnIndex].Text <>
+        CHeaderCaptionMargin + FColumnHeaders[LColumnIndex]) or
         (HeaderControl1.Sections[LColumnIndex].Width <>
           ColumnWidth(LColumnIndex, HeaderControl1.ClientWidth)) then
       begin
@@ -477,13 +700,20 @@ begin
   HeaderControl1.Perform(WM_SETREDRAW, 0, 0);
   try
     HeaderControl1.Visible := True;
-    HeaderControl1.Sections.Clear;
+    if LSectionCountChanged then
+    begin
+      HeaderControl1.Sections.Clear;
+      for var LColumnIndex := 0 to FColumnHeaders.Count - 1 do
+      begin
+        var LSection := HeaderControl1.Sections.Add;
+        LSection.Style := hsText;
+      end;
+    end;
     for var LColumnIndex := 0 to FColumnHeaders.Count - 1 do
     begin
-      var LSection := HeaderControl1.Sections.Add;
+      var LSection := HeaderControl1.Sections[LColumnIndex];
       LSection.Text := CHeaderCaptionMargin + FColumnHeaders[LColumnIndex];
       LSection.Width := ColumnWidth(LColumnIndex, HeaderControl1.ClientWidth);
-      LSection.Style := hsText;
     end;
   finally
     HeaderControl1.Perform(WM_SETREDRAW, 1, 0);

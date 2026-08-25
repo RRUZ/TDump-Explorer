@@ -24,7 +24,7 @@ object LogControl: TLogControl
     ParentColor = False
     TabOrder = 0
   end
-  object Panel1: TPanel
+  object pnToolbar: TPanel
     Left = 0
     Top = 0
     Width = 640
@@ -44,8 +44,7 @@ object LogControl: TLogControl
       Margins.Bottom = 8
       Align = alRight
       TabOrder = 0
-      ExplicitLeft = 471
-      ExplicitTop = 5
+      ExplicitHeight = 23
     end
   end
 end

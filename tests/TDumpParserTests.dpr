@@ -34,6 +34,7 @@ type
     [Test] procedure PECoreProjection;
     [Test] procedure SourceSpanProvenance;
     [Test] procedure CompactImports;
+    [Test] procedure DelayedLoadImports;
     [Test] procedure CompactExports;
     [Test] procedure Relocations;
     [Test] procedure UnknownFallback;
@@ -784,6 +785,39 @@ begin
   end;
 end;
 
+procedure TestDelayedLoadImports;
+begin
+  var LDocument := ParseGeneratedFixture('Dll.Win32.imports.tdump');
+  try
+    Require((LDocument.Imports.Count = 4) and
+      SameText(LDocument.Imports[3].Name, 'advapi32.dll') and
+      (LDocument.Imports[3].Entries.Count = 3),
+      'Regular imports must end with the three advapi32 methods, before delayed imports.');
+    Require(LDocument.DelayedImportTable <> nil,
+      'The Delayed Load Import Table must have its own typed projection.');
+    Require((LDocument.DelayedImportTable.Modules.Count = 3) and
+      SameText(LDocument.DelayedImportTable.Modules[0].Name, 'kernel32.dll') and
+      SameText(LDocument.DelayedImportTable.Modules[1].Name, 'user32.dll') and
+      SameText(LDocument.DelayedImportTable.Modules[2].Name, 'kernel32.dll'),
+      'Delayed import descriptors must remain distinct and in report order.');
+    Require((LDocument.DelayedImportTable.Modules[0].Properties.Count = 7) and
+      SameText(LDocument.DelayedImportTable.Modules[0].Properties[0].Name,
+        'Attributes') and
+      (LDocument.DelayedImportTable.Modules[2].Properties.Count = 7),
+      'Each delayed import descriptor must retain its seven metadata properties.');
+    Require(LDocument.DelayedImportTable.SourceSpan.IsValid and
+      (LDocument.DelayedImportTable.SourceSpan.Run = LDocument.PrimaryRun) and
+      LDocument.DelayedImportTable.Modules[0].SourceSpan.IsValid and
+      (LDocument.DelayedImportTable.Modules[0].Entries.Count = 1),
+      'Delayed imports must retain provenance and their descriptor entries.');
+    Require((LDocument.UnsupportedStructures.Count = 0) and
+      (LDocument.Diagnostics.Count = 0),
+      'The generated delayed-load import report must parse without fallback warnings.');
+  finally
+    LDocument.Free;
+  end;
+end;
+
 procedure TestRelationGraph;
 begin
   var LParser := TDumpParser.Create;
@@ -1017,6 +1051,11 @@ end;
 procedure TParserFixture.CompactImports;
 begin
   TestCompactImports;
+end;
+
+procedure TParserFixture.DelayedLoadImports;
+begin
+  TestDelayedLoadImports;
 end;
 
 procedure TParserFixture.CompactExports;

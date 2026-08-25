@@ -23,8 +23,6 @@ object HighlighterControl: THighlighterControl
     ItemSelectionOptions.UseFontColorForLabels = True
     ParentColor = False
     TabOrder = 0
-    ExplicitTop = 20
-    ExplicitHeight = 460
   end
   object HeaderControl1: THeaderControl
     Left = 0

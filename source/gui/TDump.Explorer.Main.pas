@@ -9,7 +9,7 @@ uses
   System.TypInfo, Vcl.Graphics, Vcl.Controls, Vcl.Forms,
   Vcl.Dialogs, Vcl.StdCtrls, Winapi.ShellAPI, TDump.Explorer.Finder,
   TDump.Explorer.Parser, TDump.Explorer.Phosphor.Font, TDump.Explorer.Runner,
-  TDump.Explorer.Frame, Vcl.ComCtrls, TDump.Explorer.LogControl;
+  TDump.Explorer.Frame, Vcl.ComCtrls, TDump.Explorer.LogControl, Vcl.ExtCtrls;
 
 type
   TAnalysisKind = (akBinary, akReport);
@@ -33,6 +33,7 @@ type
   TFrmMain = class(TForm)
     PageControl1: TPageControl;
     LogControl1: TLogControl;
+    Splitter1: TSplitter;
   private
     FAnalysisId: Integer;
     FAnalysisTask: ITask;

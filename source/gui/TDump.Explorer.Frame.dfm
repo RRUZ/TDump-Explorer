@@ -6,10 +6,22 @@ object Frame1: TFrame1
   TabOrder = 0
   object Splitter1: TSplitter
     Left = 250
-    Top = 0
+    Top = 41
     Width = 4
-    Height = 476
+    Height = 331
     ExplicitLeft = 0
+    ExplicitTop = 0
+    ExplicitHeight = 476
+  end
+  object Splitter2: TSplitter
+    Left = 0
+    Top = 372
+    Width = 640
+    Height = 4
+    Cursor = crVSplit
+    Align = alBottom
+    ExplicitTop = 231
+    ExplicitWidth = 386
   end
   object ProgressBar1: TProgressBar
     Left = 0
@@ -21,9 +33,9 @@ object Frame1: TFrame1
   end
   object Tree: TVirtualStringTree
     Left = 0
-    Top = 0
+    Top = 41
     Width = 250
-    Height = 476
+    Height = 331
     Align = alLeft
     Header.AutoSizeIndex = 0
     Header.Height = 15
@@ -31,55 +43,87 @@ object Frame1: TFrame1
     TabOrder = 1
     Touch.InteractiveGestures = [igPan, igPressAndTap]
     Touch.InteractiveGestureOptions = [igoPanSingleFingerHorizontal, igoPanSingleFingerVertical, igoPanInertia, igoPanGutter, igoParentPassthrough]
-    ExplicitLeft = -116
-    ExplicitTop = -6
     Columns = <>
   end
-  object Panel1: TPanel
+  object pnCards: TPanel
     Left = 254
-    Top = 0
+    Top = 41
     Width = 386
-    Height = 476
+    Height = 331
     Align = alClient
     BevelOuter = bvNone
     TabOrder = 2
-    ExplicitLeft = 250
-    ExplicitWidth = 390
-    object CardPanel1: TCardPanel
+    object pnProperties: TPanel
       Left = 0
       Top = 0
       Width = 386
-      Height = 476
+      Height = 331
       Align = alClient
-      ActiveCard = Card1
-      Caption = 'CardPanel1'
+      BevelOuter = bvNone
       TabOrder = 0
-      ExplicitLeft = 4
-      object Card1: TCard
-        Left = 1
-        Top = 1
-        Width = 384
-        Height = 474
-        Caption = 'Card1'
-        CardIndex = 0
+      object cpViews: TCardPanel
+        Left = 0
+        Top = 0
+        Width = 386
+        Height = 331
+        Align = alClient
+        BevelOuter = bvNone
+        Caption = 'cpViews'
         TabOrder = 0
-        inline HighlighterControl1: THighlighterControl
-          Left = 0
-          Top = 0
-          Width = 384
-          Height = 474
-          Align = alClient
-          TabOrder = 0
-          ExplicitWidth = 384
-          ExplicitHeight = 474
-          inherited ControlList1: TControlList
-            Width = 384
-            Height = 474
-            ExplicitTop = 0
-            ExplicitWidth = 384
-            ExplicitHeight = 474
-          end
-        end
+      end
+    end
+    inline frCrossReferences: TCrossReferencesFrame
+      Left = 0
+      Top = 0
+      Width = 386
+      Height = 331
+      Align = alClient
+      TabOrder = 1
+      Visible = False
+      ExplicitWidth = 386
+      ExplicitHeight = 331
+      inherited Splitter1: TSplitter
+        Top = 0
+        Width = 386
+        ExplicitTop = 0
+        ExplicitWidth = 386
+      end
+    end
+  end
+  object pnTop: TPanel
+    Left = 0
+    Top = 0
+    Width = 640
+    Height = 41
+    Align = alTop
+    BevelOuter = bvNone
+    TabOrder = 3
+    Visible = False
+    object tcViews: TTabControl
+      Left = 0
+      Top = 0
+      Width = 640
+      Height = 41
+      Align = alClient
+      TabOrder = 0
+      Tabs.Strings = (
+        'Properties View'
+        'Cross References')
+      TabIndex = 0
+    end
+  end
+  inline frRawView: TRawViewFrame
+    Left = 0
+    Top = 376
+    Width = 640
+    Height = 100
+    Align = alBottom
+    TabOrder = 4
+    ExplicitTop = 376
+    ExplicitHeight = 100
+    inherited pnToolbar: TPanel
+      inherited SearchFilterBox: TSearchBox
+        Height = 25
       end
     end
   end

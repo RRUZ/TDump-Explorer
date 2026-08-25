@@ -4,18 +4,21 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
+  System.Math,
   System.Generics.Collections, System.StrUtils, Vcl.Graphics, Vcl.Controls,
   Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ComCtrls,
   TDump.Explorer.HighlighterControl, TDump.Explorer.Highlighter, Vcl.ExtCtrls,
   VirtualTrees.BaseAncestorVCL,
   VirtualTrees.BaseTree, VirtualTrees.AncestorVCL, VirtualTrees,
-  TDump.Explorer.Parser, TDump.Explorer.TinyParser, Vcl.WinXPanels;
+  TDump.Explorer.Parser, TDump.Explorer.TinyParser, Vcl.WinXPanels,
+  TDump.Explorer.CrossReferences, TDump.Explorer.RawView;
 
 type
   TTreeDetailKind = (tdkNone, tdkDocumentSummary,
     tdkOldExecutableHeader, tdkPortableExecutableHeader, tdkELFHeader,
     tdkDataDirectories, tdkObjectTable, tdkImportDirectory,
-    tdkImportModule, tdkExportDirectory, tdkResourceDirectory,
+    tdkImportModule, tdkDelayedImportTable, tdkDelayedImportModule,
+    tdkExportDirectory, tdkResourceDirectory,
     tdkResource, tdkBorlandSubsection, tdkBorlandSourceFile,
     tdkBorlandAlignSymbolRecord, tdkBorlandGlobalSymbolRecord,
     tdkBorlandGlobalTypeRecord, tdkMachHeader, tdkMachArchitectures,
@@ -45,20 +48,28 @@ type
     ObjectRecord: TDumpObjectRecord;
     RelocationBlock: TDumpRelocationBlock;
     ELFRelocationSectionName: string;
+    DetailItemIndex: Integer;
   end;
 
   TFrame1 = class(TFrame)
     ProgressBar1: TProgressBar;
-    HighlighterControl1: THighlighterControl;
     Tree: TVirtualStringTree;
-    Panel1: TPanel;
+    pnCards: TPanel;
     Splitter1: TSplitter;
-    CardPanel1: TCardPanel;
-    Card1: TCard;
+    cpViews: TCardPanel;
+    pnProperties: TPanel;
+    pnTop: TPanel;
+    tcViews: TTabControl;
+    frCrossReferences: TCrossReferencesFrame;
+    Splitter2: TSplitter;
+    frRawView: TRawViewFrame;
   private
     FDocument: TDumpDocument;
+    FSummaryCard: TCard;
+    FSummaryControl: THighlighterControl;
     FHighlighterCards: array[TTreeDetailKind] of TCard;
     FHighlighterControls: array[TTreeDetailKind] of THighlighterControl;
+    FActiveDetailNode: PVirtualNode;
     function AddTreeNode(AParent: PVirtualNode; const ACaption: string;
       ADetailKind: TTreeDetailKind = tdkNone;
       AHeaderIndex: Integer = -1; AImportModuleIndex: Integer = -1;
@@ -102,6 +113,10 @@ type
     procedure ShowArchiveSymbolsDetails;
     procedure ShowImportDirectoryDetails;
     procedure ShowImportModuleDetails(AImportModuleIndex: Integer);
+    procedure ShowImportModuleDetail(AImportModule: TDumpImportModule;
+      ADetailKind: TTreeDetailKind);
+    procedure ShowDelayedImportTableDetails;
+    procedure ShowDelayedImportModuleDetails(AImportModuleIndex: Integer);
     procedure ShowExportDirectoryDetails;
     procedure ShowResourceDirectoryDetails;
     procedure ShowResourceDetails(AResource: TDumpResource);
@@ -120,6 +135,14 @@ type
     procedure ShowMachDynamicSymbolsDetails(ADetailKind: TTreeDetailKind);
     procedure ShowMachDynamicSymbolMetadataDetails;
     procedure ShowDiagnosticsDetails;
+    procedure UpdateActiveView;
+    function DetailControlForNode(ANode: PVirtualNode): THighlighterControl;
+    procedure SaveActiveDetailItemIndex;
+    procedure RestoreDetailItemIndex(ANode: PVirtualNode);
+    procedure ResolveNodeSourceSpan(const AData: PTreeItemData;
+      out AStartLine, AEndLine: Integer);
+    procedure SyncRawViewToNode(ANode: PVirtualNode);
+    procedure RawViewSyncWithSelectedNodeChanged(Sender: TObject);
     procedure ActivateNode(ANode: PVirtualNode);
     procedure TreeFreeNode(Sender: TBaseVirtualTree; Node: PVirtualNode);
     procedure TreeFocusChanged(Sender: TBaseVirtualTree; Node: PVirtualNode;
@@ -128,6 +151,7 @@ type
       Column: TColumnIndex; TextType: TVSTTextType; var CellText: string);
     procedure TreeMouseUp(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
+    procedure tcViewsChange(Sender: TObject);
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -193,15 +217,28 @@ end;
 constructor TFrame1.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  FSummaryCard := TCard.Create(cpViews);
+  FSummaryCard.Parent := cpViews;
+  FSummaryCard.Caption := 'Summary';
+  FSummaryControl := THighlighterControl.Create(FSummaryCard);
+  FSummaryControl.Parent := FSummaryCard;
+  FSummaryControl.Align := alClient;
+  cpViews.ActiveCard := FSummaryCard;
   Tree.NodeDataSize := SizeOf(TTreeItemData);
   Tree.OnGetText := TreeGetText;
   Tree.OnFreeNode := TreeFreeNode;
   Tree.OnFocusChanged := TreeFocusChanged;
   Tree.OnMouseUp := TreeMouseUp;
+  frRawView.OnSyncWithSelectedNodeChanged :=
+    RawViewSyncWithSelectedNodeChanged;
+  tcViews.OnChange := tcViewsChange;
+  tcViews.TabIndex := 0;
+  UpdateActiveView;
 end;
 
 destructor TFrame1.Destroy;
 begin
+  frCrossReferences.Clear;
   FDocument.Free;
   inherited;
 end;
@@ -240,6 +277,7 @@ begin
   PTreeItemData(Tree.GetNodeData(Result))^.MachSection := AMachSection;
   PTreeItemData(Tree.GetNodeData(Result))^.ObjectRecord := AObjectRecord;
   PTreeItemData(Tree.GetNodeData(Result))^.RelocationBlock := ARelocationBlock;
+  PTreeItemData(Tree.GetNodeData(Result))^.DetailItemIndex := -1;
 end;
 
 procedure TFrame1.AddAlignSymbolRecordNode(AParent: PVirtualNode;
@@ -291,8 +329,8 @@ function TFrame1.EnsureHighlighterDetailControl(
 begin
   if FHighlighterControls[ADetailKind] = nil then
   begin
-    var LCard := TCard.Create(CardPanel1);
-    LCard.Parent := CardPanel1;
+    var LCard := TCard.Create(cpViews);
+    LCard.Parent := cpViews;
     case ADetailKind of
       tdkDataDirectories:
         LCard.Caption := 'Data Directories';
@@ -302,6 +340,10 @@ begin
         LCard.Caption := 'Import Directory';
       tdkImportModule:
         LCard.Caption := 'Import Module';
+      tdkDelayedImportTable:
+        LCard.Caption := 'Delayed Load Import Table';
+      tdkDelayedImportModule:
+        LCard.Caption := 'Delayed Import Module';
       tdkExportDirectory:
         LCard.Caption := 'Export Directory';
       tdkResourceDirectory:
@@ -438,7 +480,7 @@ begin
   finally
     LControl.EndUpdate;
   end;
-  CardPanel1.ActiveCard := FHighlighterCards[ADetailKind];
+  cpViews.ActiveCard := FHighlighterCards[ADetailKind];
 end;
 
 procedure TFrame1.ShowMachArchitecturesDetails;
@@ -452,6 +494,7 @@ begin
   try
     LControl.Clear;
     LControl.SetColumnHeaders(['CPU type', 'CPU subtype', 'File offset']);
+    LControl.SetColumnDataTypes([thdtSymbol, thdtSymbol, thdtHexadecimal]);
     for var LArchitecture in FDocument.MachArchitectures do
     begin
       var LOffset := '';
@@ -463,7 +506,7 @@ begin
   finally
     LControl.EndUpdate;
   end;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkMachArchitectures];
+  cpViews.ActiveCard := FHighlighterCards[tdkMachArchitectures];
 end;
 
 procedure TFrame1.ShowMachArchitectureDetails(
@@ -486,7 +529,7 @@ begin
     LControl.EndUpdate;
   end;
   FHighlighterCards[tdkMachArchitecture].Caption := AArchitecture.CPUType;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkMachArchitecture];
+  cpViews.ActiveCard := FHighlighterCards[tdkMachArchitecture];
 end;
 
 procedure TFrame1.ShowMachLoadCommandsDetails;
@@ -500,13 +543,14 @@ begin
   try
     LControl.Clear;
     LControl.SetColumnHeaders(['#', 'Command', 'Sections']);
+    LControl.SetColumnDataTypes([thdtInteger, thdtSymbol, thdtInteger]);
     for var LCommand in FDocument.MachLoadCommands do
       LControl.AddColumns([IntToStr(LCommand.Index), LCommand.Name,
         IntToStr(LCommand.Sections.Count)]);
   finally
     LControl.EndUpdate;
   end;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkMachLoadCommands];
+  cpViews.ActiveCard := FHighlighterCards[tdkMachLoadCommands];
 end;
 
 procedure TFrame1.ShowMachLoadCommandDetails(ACommand: TDumpMachLoadCommand);
@@ -531,7 +575,7 @@ begin
   end;
   FHighlighterCards[tdkMachLoadCommand].Caption := Format('#%d %s',
     [ACommand.Index, ACommand.Name]);
-  CardPanel1.ActiveCard := FHighlighterCards[tdkMachLoadCommand];
+  cpViews.ActiveCard := FHighlighterCards[tdkMachLoadCommand];
 end;
 
 procedure TFrame1.ShowMachSectionDetails(ASection: TDumpMachSection);
@@ -551,7 +595,7 @@ begin
     LControl.EndUpdate;
   end;
   FHighlighterCards[tdkMachSection].Caption := ASection.Name;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkMachSection];
+  cpViews.ActiveCard := FHighlighterCards[tdkMachSection];
 end;
 
 procedure TFrame1.ShowMachSymbolTableDetails;
@@ -566,13 +610,15 @@ begin
     LControl.Clear;
     LControl.SetColumnHeaders(['Index', 'Type', 'Section', 'Desc', 'Value',
       'Name']);
+    LControl.SetColumnDataTypes([thdtInteger, thdtSymbol, thdtSymbol,
+      thdtHexadecimal, thdtHexadecimal, thdtAuto]);
     for var LSymbol in FDocument.MachSymbols do
       LControl.AddColumns([IntToStr(LSymbol.Index), LSymbol.TypeCode,
         LSymbol.Section, LSymbol.Description, LSymbol.RawValue, LSymbol.Name]);
   finally
     LControl.EndUpdate;
   end;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkMachSymbolTable];
+  cpViews.ActiveCard := FHighlighterCards[tdkMachSymbolTable];
 end;
 
 procedure TFrame1.ShowMachDynamicSymbolsDetails(ADetailKind: TTreeDetailKind);
@@ -598,7 +644,7 @@ begin
   finally
     LControl.EndUpdate;
   end;
-  CardPanel1.ActiveCard := FHighlighterCards[ADetailKind];
+  cpViews.ActiveCard := FHighlighterCards[ADetailKind];
 end;
 
 procedure TFrame1.ShowMachDynamicSymbolMetadataDetails;
@@ -624,7 +670,7 @@ begin
   finally
     LControl.EndUpdate;
   end;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkMachDynamicSymbolMetadata];
+  cpViews.ActiveCard := FHighlighterCards[tdkMachDynamicSymbolMetadata];
 end;
 
 procedure TFrame1.ShowDataDirectoriesDetails;
@@ -638,6 +684,7 @@ begin
   try
     LControl.Clear;
     LControl.SetColumnHeaders(['Name', 'RVA', 'Size']);
+    LControl.SetColumnDataTypes([thdtText, thdtHexadecimal, thdtHexadecimal]);
     for var LDirectory in FDocument.DataDirectories do
     begin
       var LRVA := LDirectory.RawRVA;
@@ -651,7 +698,7 @@ begin
   finally
     LControl.EndUpdate;
   end;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkDataDirectories];
+  cpViews.ActiveCard := FHighlighterCards[tdkDataDirectories];
 end;
 
 procedure TFrame1.ShowObjectTableDetails;
@@ -666,6 +713,8 @@ begin
     LControl.Clear;
     LControl.SetColumnHeaders(['#', 'Name', 'VirtSize', 'RVA', 'PhysSize',
       'Phys off', 'Flags']);
+    LControl.SetColumnDataTypes([thdtHexadecimal, thdtText, thdtHexadecimal,
+      thdtHexadecimal, thdtHexadecimal, thdtHexadecimal, thdtSymbol]);
     for var LSection in FDocument.Sections do
       LControl.AddColumns([IntToHex(LSection.Index, 2), LSection.Name,
         IntToHex(LSection.VirtualSize, 8), IntToHex(LSection.RVA, 8),
@@ -677,7 +726,7 @@ begin
   finally
     LControl.EndUpdate;
   end;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkObjectTable];
+  cpViews.ActiveCard := FHighlighterCards[tdkObjectTable];
 end;
 
 procedure TFrame1.ShowELFSectionHeadersDetails;
@@ -692,6 +741,9 @@ begin
     LControl.Clear;
     LControl.SetColumnHeaders(['Ndx', 'Name', 'Type', 'Flags', 'Address',
       'Offset', 'Size', 'Link', 'Info', 'Align', 'Entry size']);
+    LControl.SetColumnDataTypes([thdtInteger, thdtText, thdtSymbol,
+      thdtSymbol, thdtHexadecimal, thdtHexadecimal, thdtHexadecimal,
+      thdtHexadecimal, thdtHexadecimal, thdtHexadecimal, thdtHexadecimal]);
     for var LSection in FDocument.Sections do
       LControl.AddColumns([IntToStr(LSection.Index), LSection.Name,
         PropertyValue(LSection.Properties, 'Type'),
@@ -706,7 +758,7 @@ begin
   finally
     LControl.EndUpdate;
   end;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkELFSectionHeaders];
+  cpViews.ActiveCard := FHighlighterCards[tdkELFSectionHeaders];
 end;
 
 procedure TFrame1.ShowELFProgramHeadersDetails;
@@ -732,7 +784,7 @@ begin
   finally
     LControl.EndUpdate;
   end;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkELFProgramHeaders];
+  cpViews.ActiveCard := FHighlighterCards[tdkELFProgramHeaders];
 end;
 
 procedure TFrame1.ShowELFSymbolTableDetails;
@@ -747,6 +799,8 @@ begin
     LControl.Clear;
     LControl.SetColumnHeaders(['Ndx', 'Name', 'Value', 'Size', 'Type',
       'Bind', 'Other', 'Section']);
+    LControl.SetColumnDataTypes([thdtInteger, thdtAuto, thdtHexadecimal,
+      thdtHexadecimal, thdtSymbol, thdtSymbol, thdtSymbol, thdtSymbol]);
     for var LSymbol in FDocument.Symbols do
       LControl.AddColumns([PropertyValue(LSymbol.Properties, 'Index'),
         PropertyValue(LSymbol.Properties, 'Name'),
@@ -759,7 +813,7 @@ begin
   finally
     LControl.EndUpdate;
   end;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkELFSymbolTable];
+  cpViews.ActiveCard := FHighlighterCards[tdkELFSymbolTable];
 end;
 
 procedure TFrame1.ShowELFDynamicSectionDetails;
@@ -781,7 +835,7 @@ begin
   end;
   FHighlighterCards[tdkELFDynamicSection].Caption := Format(
     'ELF Dynamic Section [%d entries]', [FDocument.ELFDynamicEntries.Count]);
-  CardPanel1.ActiveCard := FHighlighterCards[tdkELFDynamicSection];
+  cpViews.ActiveCard := FHighlighterCards[tdkELFDynamicSection];
 end;
 
 procedure TFrame1.ShowELFRelocationsDetails(const ASectionName: string);
@@ -836,7 +890,7 @@ begin
   else
     FHighlighterCards[tdkELFRelocations].Caption :=
       'ELF Relocations ' + ASectionName;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkELFRelocations];
+  cpViews.ActiveCard := FHighlighterCards[tdkELFRelocations];
 end;
 
 procedure TFrame1.ShowRelocationsDetails;
@@ -859,7 +913,7 @@ begin
   finally
     LControl.EndUpdate;
   end;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkRelocations];
+  cpViews.ActiveCard := FHighlighterCards[tdkRelocations];
 end;
 
 procedure TFrame1.ShowRelocationBlockDetails(ABlock: TDumpRelocationBlock);
@@ -887,7 +941,7 @@ begin
   FHighlighterCards[tdkRelocationBlock].Caption := Format(
     'Block #%d: Page RVA = %s, block size = %s', [ABlock.Index,
     IntToHex(ABlock.PageRVA, 8), IntToHex(ABlock.BlockSize, 8)]);
-  CardPanel1.ActiveCard := FHighlighterCards[tdkRelocationBlock];
+  cpViews.ActiveCard := FHighlighterCards[tdkRelocationBlock];
 end;
 
 procedure TFrame1.ShowStringsDetails;
@@ -912,7 +966,7 @@ begin
   finally
     LControl.EndUpdate;
   end;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkStrings];
+  cpViews.ActiveCard := FHighlighterCards[tdkStrings];
 end;
 
 procedure TFrame1.ShowOMFRecordsDetails;
@@ -942,7 +996,7 @@ begin
   finally
     LControl.EndUpdate;
   end;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkOMFRecords];
+  cpViews.ActiveCard := FHighlighterCards[tdkOMFRecords];
 end;
 
 procedure TFrame1.ShowOMFLibraryMembersDetails;
@@ -965,7 +1019,7 @@ begin
   finally
     LControl.EndUpdate;
   end;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkOMFLibraryMembers];
+  cpViews.ActiveCard := FHighlighterCards[tdkOMFLibraryMembers];
 end;
 
 procedure TFrame1.ShowOMFLibraryIndexDetails;
@@ -990,7 +1044,7 @@ begin
   finally
     LControl.EndUpdate;
   end;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkOMFLibraryIndex];
+  cpViews.ActiveCard := FHighlighterCards[tdkOMFLibraryIndex];
 end;
 
 procedure TFrame1.ShowArchiveMembersDetails;
@@ -1014,7 +1068,7 @@ begin
   finally
     LControl.EndUpdate;
   end;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkArchiveMembers];
+  cpViews.ActiveCard := FHighlighterCards[tdkArchiveMembers];
 end;
 
 procedure TFrame1.ShowArchiveSymbolsDetails;
@@ -1036,7 +1090,7 @@ begin
   finally
     LControl.EndUpdate;
   end;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkArchiveSymbols];
+  cpViews.ActiveCard := FHighlighterCards[tdkArchiveSymbols];
 end;
 
 procedure TFrame1.ShowOMFRecordDetails(ARecord: TDumpObjectRecord);
@@ -1061,7 +1115,7 @@ begin
   end;
   FHighlighterCards[tdkOMFRecord].Caption := ARecord.RawOffset + ' ' +
     ARecord.RecordKind;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkOMFRecord];
+  cpViews.ActiveCard := FHighlighterCards[tdkOMFRecord];
 end;
 
 procedure TFrame1.ShowImportDirectoryDetails;
@@ -1089,7 +1143,7 @@ begin
   finally
     LText.Free;
   end;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkImportDirectory];
+  cpViews.ActiveCard := FHighlighterCards[tdkImportDirectory];
 end;
 
 procedure TFrame1.ShowImportModuleDetails(AImportModuleIndex: Integer);
@@ -1098,16 +1152,65 @@ begin
     (AImportModuleIndex >= FDocument.Imports.Count) then
     Exit;
 
-  var LModule := FDocument.Imports[AImportModuleIndex];
+  ShowImportModuleDetail(FDocument.Imports[AImportModuleIndex],
+    tdkImportModule);
+end;
+
+procedure TFrame1.ShowImportModuleDetail(AImportModule: TDumpImportModule;
+  ADetailKind: TTreeDetailKind);
+begin
+  if AImportModule = nil then
+    Exit;
+
+  var LModule := AImportModule;
   var LModuleName := LModule.Name;
   if LModuleName = '' then
     LModuleName := 'Unnamed import module';
 
-  var LControl := EnsureHighlighterDetailControl(tdkImportModule);
+  var LControl := EnsureHighlighterDetailControl(ADetailKind);
+  FHighlighterCards[ADetailKind].Caption := LModuleName;
+  if ADetailKind = tdkDelayedImportModule then
+  begin
+    LControl.ParserMode := tpmTDumpValues;
+    LControl.BeginUpdate;
+    try
+      LControl.Clear;
+      LControl.SetColumnHeaders(['Property', 'Value']);
+      LControl.SetColumnDataTypes([thdtAuto, thdtHexadecimal]);
+      for var LProperty in LModule.Properties do
+        LControl.AddColumns([LProperty.Name, LProperty.RawValue]);
+      for var LImport in LModule.Entries do
+      begin
+        var LImportText := Trim(LImport.RawText);
+        if LImportText = '' then
+          LImportText := LImport.Name;
+        var LFlagStart := LastDelimiter('(', LImportText);
+        var LMethodText := LImportText;
+        var LFlagsText := '';
+        if LFlagStart > 1 then
+        begin
+          LMethodText := Trim(Copy(LImportText, 1, LFlagStart - 1));
+          LFlagsText := Trim(Copy(LImportText, LFlagStart, MaxInt));
+        end;
+        LControl.AddColumns([LMethodText, LFlagsText], tpmCppBuilderMethod);
+      end;
+      if LModule.Entries.Count = 0 then
+        LControl.AddColumns(['Imports', 'No imported methods.']);
+    finally
+      LControl.EndUpdate;
+    end;
+    cpViews.ActiveCard := FHighlighterCards[ADetailKind];
+    Exit;
+  end;
+
   LControl.ParserMode := tpmCppBuilderMethod;
-  FHighlighterCards[tdkImportModule].Caption := LModuleName;
   var LText := TStringBuilder.Create;
   try
+    for var LProperty in LModule.Properties do
+      LText.AppendLine(Format('%-30s %s', [LProperty.Name,
+        LProperty.RawValue]));
+    if LModule.Properties.Count > 0 then
+      LText.AppendLine;
     if LModule.Entries.Count = 0 then
       LText.AppendLine('No imported methods.')
     else
@@ -1120,7 +1223,46 @@ begin
   finally
     LText.Free;
   end;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkImportModule];
+  cpViews.ActiveCard := FHighlighterCards[ADetailKind];
+end;
+
+procedure TFrame1.ShowDelayedImportTableDetails;
+begin
+  if (FDocument = nil) or (FDocument.DelayedImportTable = nil) then
+    Exit;
+
+  var LControl := EnsureHighlighterDetailControl(tdkDelayedImportTable);
+  LControl.ParserMode := tpmCppBuilderMethod;
+  var LText := TStringBuilder.Create;
+  try
+    LText.AppendLine('Delayed Load Import Table');
+    LText.AppendLine(Format('%d module(s)',
+      [FDocument.DelayedImportTable.Modules.Count]));
+    LText.AppendLine;
+    for var LModule in FDocument.DelayedImportTable.Modules do
+    begin
+      var LModuleName := LModule.Name;
+      if LModuleName = '' then
+        LModuleName := 'Unnamed delayed import module';
+      LText.AppendLine(Format('%s [%d imported methods]', [LModuleName,
+        LModule.Entries.Count]));
+    end;
+    LControl.SetText(LText.ToString);
+  finally
+    LText.Free;
+  end;
+  cpViews.ActiveCard := FHighlighterCards[tdkDelayedImportTable];
+end;
+
+procedure TFrame1.ShowDelayedImportModuleDetails(AImportModuleIndex: Integer);
+begin
+  if (FDocument = nil) or (FDocument.DelayedImportTable = nil) or
+    (AImportModuleIndex < 0) or
+    (AImportModuleIndex >= FDocument.DelayedImportTable.Modules.Count) then
+    Exit;
+
+  ShowImportModuleDetail(FDocument.DelayedImportTable.Modules[AImportModuleIndex],
+    tdkDelayedImportModule);
 end;
 
 procedure TFrame1.ShowExportDirectoryDetails;
@@ -1134,6 +1276,8 @@ begin
   try
     LControl.Clear;
     LControl.SetColumnHeaders(['RVA', 'Ord.', 'Hint', 'Name']);
+    LControl.SetColumnDataTypes([thdtHexadecimal, thdtInteger,
+      thdtHexadecimal, thdtAuto]);
     for var LExport in FDocument.ExportList do
     begin
       var LRVA := '';
@@ -1153,7 +1297,7 @@ begin
   finally
     LControl.EndUpdate;
   end;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkExportDirectory];
+  cpViews.ActiveCard := FHighlighterCards[tdkExportDirectory];
 end;
 
 procedure TFrame1.ShowResourceDirectoryDetails;
@@ -1167,6 +1311,7 @@ begin
   try
     LControl.Clear;
     LControl.SetColumnHeaders(['Type', 'Name', 'Lang', 'Id']);
+    LControl.SetColumnDataTypes([thdtText, thdtText, thdtText, thdtInteger]);
     for var LResource in FDocument.Resources do
     begin
       var LType := LResource.ResourceType;
@@ -1190,7 +1335,7 @@ begin
       [FDocument.ResourceMetadata.RootNamedEntryCount,
        FDocument.ResourceMetadata.RootIdEntryCount]);
   FHighlighterCards[tdkResourceDirectory].Caption := LCaption;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkResourceDirectory];
+  cpViews.ActiveCard := FHighlighterCards[tdkResourceDirectory];
 end;
 
 procedure TFrame1.ShowResourceDetails(AResource: TDumpResource);
@@ -1245,7 +1390,7 @@ begin
   end;
 
   FHighlighterCards[tdkResource].Caption := ResourceCaption(AResource);
-  CardPanel1.ActiveCard := FHighlighterCards[tdkResource];
+  cpViews.ActiveCard := FHighlighterCards[tdkResource];
 end;
 
 procedure TFrame1.ShowBorlandSubsectionDetails(ASubsectionIndex: Integer);
@@ -1263,6 +1408,7 @@ begin
     if SameText(LSubsection.SubsectionType, 'sstNames') then
     begin
       LControl.SetColumnHeaders(['Index', 'Name']);
+      LControl.SetColumnDataTypes([thdtHexadecimal, thdtAuto]);
       for var LBorlandName in FDocument.BorlandNames do
         if IsBorlandMethodName(LBorlandName.Value) then
           LControl.AddColumns([LBorlandName.RawIndex, LBorlandName.Value],
@@ -1355,7 +1501,7 @@ begin
 
   FHighlighterCards[tdkBorlandSubsection].Caption := Format('%s (module %d)',
     [LSubsection.SubsectionType, LSubsection.ModIndex]);
-  CardPanel1.ActiveCard := FHighlighterCards[tdkBorlandSubsection];
+  cpViews.ActiveCard := FHighlighterCards[tdkBorlandSubsection];
 end;
 
 procedure TFrame1.ShowBorlandSymbolRecordDetails(ADetailKind: TTreeDetailKind;
@@ -1401,7 +1547,7 @@ begin
   end;
 
   FHighlighterCards[ADetailKind].Caption := BorlandSymbolCaption(ARecord);
-  CardPanel1.ActiveCard := FHighlighterCards[ADetailKind];
+  cpViews.ActiveCard := FHighlighterCards[ADetailKind];
 end;
 
 procedure TFrame1.ShowBorlandGlobalTypeRecordDetails(
@@ -1475,7 +1621,7 @@ begin
 
   FHighlighterCards[tdkBorlandGlobalTypeRecord].Caption :=
     BorlandTypeCaption(ARecord);
-  CardPanel1.ActiveCard := FHighlighterCards[tdkBorlandGlobalTypeRecord];
+  cpViews.ActiveCard := FHighlighterCards[tdkBorlandGlobalTypeRecord];
 end;
 
 procedure TFrame1.ShowBorlandSourceFileDetails(ASourceFile: TDumpSourceFile);
@@ -1489,6 +1635,7 @@ begin
   try
     LControl.Clear;
     LControl.SetColumnHeaders(['Range', 'Line', 'Offset']);
+    LControl.SetColumnDataTypes([thdtText, thdtInteger, thdtHexadecimal]);
     for var LRange in ASourceFile.Ranges do
     begin
       var LRangeText := Format('%s:%s-%s', [LRange.RawSegment,
@@ -1524,7 +1671,7 @@ begin
   else
     LName := LName + '  Offset ' + IntToHex(ASourceFile.Offset, 5);
   FHighlighterCards[tdkBorlandSourceFile].Caption := LName;
-  CardPanel1.ActiveCard := FHighlighterCards[tdkBorlandSourceFile];
+  cpViews.ActiveCard := FHighlighterCards[tdkBorlandSourceFile];
 end;
 
 procedure TFrame1.ShowDiagnosticsDetails;
@@ -1538,6 +1685,7 @@ begin
   try
     LControl.Clear;
     LControl.SetColumnHeaders(['Severity', 'Line', 'Message']);
+    LControl.SetColumnDataTypes([thdtText, thdtInteger, thdtText]);
     for var LDiagnostic in FDocument.Diagnostics do
     begin
       var LSeverity := '';
@@ -1559,22 +1707,26 @@ begin
   end;
   FHighlighterCards[tdkDiagnostics].Caption := Format('Diagnostics [%d]',
     [FDocument.Diagnostics.Count]);
-  CardPanel1.ActiveCard := FHighlighterCards[tdkDiagnostics];
+  cpViews.ActiveCard := FHighlighterCards[tdkDiagnostics];
 end;
 
 procedure TFrame1.PopulateTree(ADocument: TDumpDocument);
 begin
   if FDocument <> ADocument then
   begin
+    frCrossReferences.Clear;
     FDocument.Free;
     FDocument := ADocument;
   end;
   if FDocument = nil then
     Exit;
 
-  CardPanel1.ActiveCard := Card1;
+  cpViews.ActiveCard := FSummaryCard;
+  frRawView.Populate(FDocument);
+  frCrossReferences.Populate(FDocument);
   Tree.BeginUpdate;
   try
+    FActiveDetailNode := nil;
     Tree.Clear;
     var LRootNode := AddTreeNode(nil, FileKindCaption(FDocument.FileKind),
       tdkDocumentSummary);
@@ -1597,7 +1749,8 @@ begin
       else
         AddTreeNode(LRootNode, Format('Object Table [%d]',
           [FDocument.Sections.Count]), tdkObjectTable);
-    if FDocument.Imports.Count > 0 then
+    if (FDocument.Imports.Count > 0) or
+      (FDocument.DelayedImportTable <> nil) then
     begin
       var LImportsNode := AddTreeNode(LRootNode,
         Format('Import Directory [%d modules]', [FDocument.Imports.Count]),
@@ -1610,6 +1763,23 @@ begin
           LModuleCaption := 'Unnamed import module';
         AddTreeNode(LImportsNode, LModuleCaption, tdkImportModule, -1,
           LModuleIndex);
+      end;
+      if FDocument.DelayedImportTable <> nil then
+      begin
+        var LDelayedImportsNode := AddTreeNode(LImportsNode,
+          Format('Delayed Load Import Table [%d modules]',
+            [FDocument.DelayedImportTable.Modules.Count]),
+          tdkDelayedImportTable);
+        for var LModuleIndex := 0 to
+          FDocument.DelayedImportTable.Modules.Count - 1 do
+        begin
+          var LModule := FDocument.DelayedImportTable.Modules[LModuleIndex];
+          var LModuleCaption := LModule.Name;
+          if LModuleCaption = '' then
+            LModuleCaption := 'Unnamed delayed import module';
+          AddTreeNode(LDelayedImportsNode, LModuleCaption,
+            tdkDelayedImportModule, -1, LModuleIndex);
+        end;
       end;
     end;
 
@@ -1848,7 +2018,7 @@ end;
 
 procedure TFrame1.SetStatus(const AStatus: string);
 begin
-  HighlighterControl1.SetText(AStatus);
+  FSummaryControl.SetText(AStatus);
   ProgressBar1.Min := 0;
   ProgressBar1.Max := 100;
   ProgressBar1.Position := 0;
@@ -1857,23 +2027,435 @@ end;
 
 procedure TFrame1.ShowSummary(const ASummary: string);
 begin
-  HighlighterControl1.SetText(ASummary);
+  FSummaryControl.SetText(ASummary);
   ProgressBar1.Position := ProgressBar1.Max;
   ProgressBar1.Update;
 end;
 
-procedure TFrame1.ActivateNode(ANode: PVirtualNode);
+procedure TFrame1.UpdateActiveView;
+begin
+  var LPropertiesView := tcViews.TabIndex = 0;
+  var LCrossReferencesView := tcViews.TabIndex = 1;
+
+  Tree.Visible := LPropertiesView;
+  Splitter1.Visible := LPropertiesView;
+  pnProperties.Visible := LPropertiesView;
+  frCrossReferences.Visible := LCrossReferencesView;
+
+  case tcViews.TabIndex of
+    0: pnProperties.BringToFront;
+    1: frCrossReferences.BringToFront;
+  end;
+end;
+
+function TFrame1.DetailControlForNode(
+  ANode: PVirtualNode): THighlighterControl;
+begin
+  Result := nil;
+  if ANode = nil then
+    Exit;
+
+  var LNodeData := PTreeItemData(Tree.GetNodeData(ANode));
+  if LNodeData = nil then
+    Exit;
+  if LNodeData.DetailKind = tdkDocumentSummary then
+    Result := FSummaryControl
+  else if LNodeData.DetailKind <> tdkNone then
+    Result := FHighlighterControls[LNodeData.DetailKind];
+end;
+
+procedure TFrame1.SaveActiveDetailItemIndex;
+begin
+  if FActiveDetailNode = nil then
+    Exit;
+
+  var LControl := DetailControlForNode(FActiveDetailNode);
+  if LControl <> nil then
+    PTreeItemData(Tree.GetNodeData(FActiveDetailNode))^.DetailItemIndex :=
+      LControl.ControlList1.ItemIndex;
+end;
+
+procedure TFrame1.RestoreDetailItemIndex(ANode: PVirtualNode);
+begin
+  var LControl := DetailControlForNode(ANode);
+  if LControl = nil then
+    Exit;
+
+  var LItemIndex := PTreeItemData(Tree.GetNodeData(ANode))^.DetailItemIndex;
+  if LItemIndex < 0 then
+    LItemIndex := 0;
+  LControl.SelectItem(LItemIndex);
+end;
+
+procedure TFrame1.ResolveNodeSourceSpan(const AData: PTreeItemData;
+  out AStartLine, AEndLine: Integer);
+  procedure UseSpan(AStart, AEnd: Integer);
+  begin
+    if AStart < 1 then
+      Exit;
+    AStartLine := AStart;
+    AEndLine := AEnd;
+    if AEndLine < AStartLine then
+      AEndLine := AStartLine;
+  end;
+
+  procedure ExtendRange(var AFirstLine, ALastLine: Integer;
+    AStartLine, AEndLine: Integer);
+  begin
+    if AStartLine < 1 then
+      Exit;
+    AFirstLine := Min(AFirstLine, AStartLine);
+    ALastLine := Max(ALastLine, Max(AStartLine, AEndLine));
+  end;
+
+  procedure UseDocumentNodeKind(AKind: TDumpNodeKind);
+    procedure CollectNodeRange(ANode: TDumpNode; var AFirstLine,
+      ALastLine: Integer);
+    begin
+      if ANode.Kind = AKind then
+        ExtendRange(AFirstLine, ALastLine, ANode.StartLine, ANode.EndLine);
+      for var LChild in ANode.Children do
+        CollectNodeRange(LChild, AFirstLine, ALastLine);
+    end;
+  begin
+    if FDocument = nil then
+      Exit;
+    var LFirstLine := MaxInt;
+    var LLastLine := 0;
+    for var LNode in FDocument.Nodes do
+      CollectNodeRange(LNode, LFirstLine, LLastLine);
+    if LFirstLine <> MaxInt then
+      UseSpan(LFirstLine, LLastLine);
+  end;
+
+begin
+  AStartLine := 0;
+  AEndLine := 0;
+  if (AData = nil) or (FDocument = nil) then
+    Exit;
+
+  case AData.DetailKind of
+    tdkDocumentSummary:
+      UseSpan(1, FDocument.Lines.Count);
+    tdkOldExecutableHeader, tdkPortableExecutableHeader, tdkELFHeader,
+    tdkMachHeader:
+      if (AData.HeaderIndex >= 0) and
+         (AData.HeaderIndex < FDocument.Headers.Count) then
+        UseSpan(FDocument.Headers[AData.HeaderIndex].StartLine,
+          FDocument.Headers[AData.HeaderIndex].EndLine)
+      else
+        UseDocumentNodeKind(nkHeader);
+    tdkDataDirectories:
+      if FDocument.DataDirectories.Count > 0 then
+      begin
+        var LFirstLine := MaxInt;
+        var LLastLine := 0;
+        for var LDirectory in FDocument.DataDirectories do
+          ExtendRange(LFirstLine, LLastLine, LDirectory.StartLine,
+            LDirectory.StartLine);
+        UseSpan(LFirstLine, LLastLine);
+      end
+      else
+        UseDocumentNodeKind(nkDataDirectory);
+    tdkObjectTable, tdkELFSectionHeaders:
+      UseDocumentNodeKind(nkSections);
+    tdkELFProgramHeaders:
+      if FDocument.ELFProgramHeaders.Count > 0 then
+      begin
+        var LFirstLine := MaxInt;
+        var LLastLine := 0;
+        for var LHeader in FDocument.ELFProgramHeaders do
+          ExtendRange(LFirstLine, LLastLine, LHeader.StartLine,
+            LHeader.EndLine);
+        UseSpan(LFirstLine, LLastLine);
+      end
+      else
+        UseDocumentNodeKind(nkSections);
+    tdkImportDirectory:
+      if FDocument.ImportMetadata <> nil then
+        UseSpan(FDocument.ImportMetadata.StartLine,
+          FDocument.ImportMetadata.EndLine)
+      else
+        UseDocumentNodeKind(nkImports);
+    tdkImportModule:
+      if (AData.ImportModuleIndex >= 0) and
+         (AData.ImportModuleIndex < FDocument.Imports.Count) then
+        UseSpan(FDocument.Imports[AData.ImportModuleIndex].StartLine,
+          FDocument.Imports[AData.ImportModuleIndex].EndLine)
+      else
+        UseDocumentNodeKind(nkImports);
+    tdkDelayedImportTable:
+      if FDocument.DelayedImportTable <> nil then
+        UseSpan(FDocument.DelayedImportTable.StartLine,
+          FDocument.DelayedImportTable.EndLine)
+      else
+        UseDocumentNodeKind(nkDelayedImports);
+    tdkDelayedImportModule:
+      if (FDocument.DelayedImportTable <> nil) and
+        (AData.ImportModuleIndex >= 0) and
+        (AData.ImportModuleIndex < FDocument.DelayedImportTable.Modules.Count) then
+        UseSpan(FDocument.DelayedImportTable.Modules[AData.ImportModuleIndex].StartLine,
+          FDocument.DelayedImportTable.Modules[AData.ImportModuleIndex].EndLine)
+      else
+        UseDocumentNodeKind(nkDelayedImports);
+    tdkExportDirectory:
+      if FDocument.ExportMetadata <> nil then
+        UseSpan(FDocument.ExportMetadata.StartLine,
+          FDocument.ExportMetadata.EndLine)
+      else
+        UseDocumentNodeKind(nkExports);
+    tdkResourceDirectory:
+      if FDocument.ResourceMetadata <> nil then
+        UseSpan(FDocument.ResourceMetadata.StartLine,
+          FDocument.ResourceMetadata.EndLine)
+      else
+        UseDocumentNodeKind(nkResources);
+    tdkResource:
+      if AData.Resource <> nil then
+        UseSpan(AData.Resource.StartLine, AData.Resource.EndLine);
+    tdkRelocations:
+      if FDocument.RelocationBlocks.Count > 0 then
+      begin
+        var LFirstLine := MaxInt;
+        var LLastLine := 0;
+        for var LBlock in FDocument.RelocationBlocks do
+          ExtendRange(LFirstLine, LLastLine, LBlock.StartLine, LBlock.EndLine);
+        UseSpan(LFirstLine, LLastLine);
+      end
+      else
+        UseDocumentNodeKind(nkRelocations);
+    tdkELFRelocations:
+      if FDocument.ELFRelocations.Count > 0 then
+      begin
+        var LFirstLine := MaxInt;
+        var LLastLine := 0;
+        for var LRelocation in FDocument.ELFRelocations do
+          if (AData.ELFRelocationSectionName = '') or
+            SameText(AData.ELFRelocationSectionName, LRelocation.SectionName) then
+            ExtendRange(LFirstLine, LLastLine, LRelocation.StartLine,
+              LRelocation.EndLine);
+        UseSpan(LFirstLine, LLastLine);
+      end
+      else
+        UseDocumentNodeKind(nkRelocations);
+    tdkRelocationBlock:
+      if AData.RelocationBlock <> nil then
+        UseSpan(AData.RelocationBlock.StartLine, AData.RelocationBlock.EndLine);
+    tdkStrings:
+      if FDocument.Strings.Count > 0 then
+      begin
+        var LFirstLine := MaxInt;
+        var LLastLine := 0;
+        for var LString in FDocument.Strings do
+          ExtendRange(LFirstLine, LLastLine, LString.StartLine,
+            LString.StartLine);
+        UseSpan(LFirstLine, LLastLine);
+      end
+      else
+        UseDocumentNodeKind(nkStrings);
+    tdkOMFRecords, tdkOMFRecord:
+      if AData.ObjectRecord <> nil then
+        UseSpan(AData.ObjectRecord.StartLine, AData.ObjectRecord.EndLine)
+      else if FDocument.ObjectRecords.Count > 0 then
+      begin
+        var LFirstLine := MaxInt;
+        var LLastLine := 0;
+        for var LRecord in FDocument.ObjectRecords do
+          ExtendRange(LFirstLine, LLastLine, LRecord.StartLine, LRecord.EndLine);
+        UseSpan(LFirstLine, LLastLine);
+      end
+      else
+        UseDocumentNodeKind(nkObjectRecord);
+    tdkOMFLibraryMembers:
+      if FDocument.LibraryMembers.Count > 0 then
+      begin
+        var LFirstLine := MaxInt;
+        var LLastLine := 0;
+        for var LMember in FDocument.LibraryMembers do
+        begin
+          LFirstLine := Min(LFirstLine, LMember.StartLine);
+          LLastLine := Max(LLastLine, LMember.StartLine);
+        end;
+        UseSpan(LFirstLine, LLastLine);
+      end
+      else
+        UseDocumentNodeKind(nkLibrary);
+    tdkOMFLibraryIndex:
+      if FDocument.OMFLibraryIndex <> nil then
+        UseSpan(FDocument.OMFLibraryIndex.StartLine,
+          FDocument.OMFLibraryIndex.EndLine)
+      else
+        UseDocumentNodeKind(nkLibrary);
+    tdkArchiveMembers:
+      if FDocument.ArchiveMembers.Count > 0 then
+      begin
+        var LFirstLine := MaxInt;
+        var LLastLine := 0;
+        for var LMember in FDocument.ArchiveMembers do
+        begin
+          LFirstLine := Min(LFirstLine, LMember.StartLine);
+          LLastLine := Max(LLastLine, LMember.StartLine);
+        end;
+        UseSpan(LFirstLine, LLastLine);
+      end
+      else
+        UseDocumentNodeKind(nkLibrary);
+    tdkArchiveSymbols:
+      if FDocument.ArchiveSymbols.Count > 0 then
+      begin
+        var LFirstLine := MaxInt;
+        var LLastLine := 0;
+        for var LSymbol in FDocument.ArchiveSymbols do
+        begin
+          LFirstLine := Min(LFirstLine, LSymbol.StartLine);
+          LLastLine := Max(LLastLine, LSymbol.StartLine);
+        end;
+        UseSpan(LFirstLine, LLastLine);
+      end
+      else
+        UseDocumentNodeKind(nkLibrary);
+    tdkBorlandSubsection:
+      if (AData.BorlandSubsectionIndex >= 0) and
+         (AData.BorlandSubsectionIndex < FDocument.BorlandSubsections.Count) then
+        UseSpan(FDocument.BorlandSubsections[AData.BorlandSubsectionIndex].StartLine,
+          FDocument.BorlandSubsections[AData.BorlandSubsectionIndex].EndLine)
+      else
+        UseDocumentNodeKind(nkDebug);
+    tdkBorlandSourceFile:
+      if AData.SourceFile <> nil then
+        UseSpan(AData.SourceFile.StartLine, AData.SourceFile.StartLine);
+    tdkBorlandAlignSymbolRecord:
+      if AData.AlignSymbolRecord <> nil then
+        UseSpan(AData.AlignSymbolRecord.StartLine, AData.AlignSymbolRecord.EndLine);
+    tdkBorlandGlobalSymbolRecord:
+      if AData.GlobalSymbolRecord <> nil then
+        UseSpan(AData.GlobalSymbolRecord.StartLine, AData.GlobalSymbolRecord.EndLine);
+    tdkBorlandGlobalTypeRecord:
+      if AData.GlobalTypeRecord <> nil then
+        UseSpan(AData.GlobalTypeRecord.StartLine, AData.GlobalTypeRecord.EndLine);
+    tdkMachArchitecture:
+      if AData.MachArchitecture <> nil then
+        UseSpan(AData.MachArchitecture.StartLine, AData.MachArchitecture.EndLine);
+    tdkMachLoadCommand:
+      if AData.MachLoadCommand <> nil then
+        UseSpan(AData.MachLoadCommand.StartLine, AData.MachLoadCommand.EndLine);
+    tdkMachSection:
+      if AData.MachSection <> nil then
+        UseSpan(AData.MachSection.StartLine, AData.MachSection.EndLine);
+    tdkMachArchitectures:
+      if FDocument.MachArchitectures.Count > 0 then
+      begin
+        var LFirstLine := MaxInt; var LLastLine := 0;
+        for var LArchitecture in FDocument.MachArchitectures do
+          ExtendRange(LFirstLine, LLastLine, LArchitecture.StartLine,
+            LArchitecture.EndLine);
+        UseSpan(LFirstLine, LLastLine);
+      end;
+    tdkMachLoadCommands:
+      if FDocument.MachLoadCommands.Count > 0 then
+      begin
+        var LFirstLine := MaxInt; var LLastLine := 0;
+        for var LCommand in FDocument.MachLoadCommands do
+          ExtendRange(LFirstLine, LLastLine, LCommand.StartLine, LCommand.EndLine);
+        UseSpan(LFirstLine, LLastLine);
+      end;
+    tdkMachSymbolTable:
+      if FDocument.MachSymbols.Count > 0 then
+      begin
+        var LFirstLine := MaxInt; var LLastLine := 0;
+        for var LSymbol in FDocument.MachSymbols do
+          ExtendRange(LFirstLine, LLastLine, LSymbol.StartLine, LSymbol.EndLine);
+        UseSpan(LFirstLine, LLastLine);
+      end;
+    tdkMachDynamicImports:
+      if FDocument.MachDynamicImports.Count > 0 then
+      begin
+        var LFirstLine := MaxInt; var LLastLine := 0;
+        for var LSymbol in FDocument.MachDynamicImports do
+          ExtendRange(LFirstLine, LLastLine, LSymbol.StartLine, LSymbol.EndLine);
+        UseSpan(LFirstLine, LLastLine);
+      end;
+    tdkMachIndirectSymbols:
+      if FDocument.MachIndirectSymbols.Count > 0 then
+      begin
+        var LFirstLine := MaxInt; var LLastLine := 0;
+        for var LSymbol in FDocument.MachIndirectSymbols do
+          ExtendRange(LFirstLine, LLastLine, LSymbol.StartLine, LSymbol.EndLine);
+        UseSpan(LFirstLine, LLastLine);
+      end;
+    tdkMachDynamicSymbolMetadata:
+      if FDocument.MachDynamicSymbolTableCommand <> nil then
+        UseSpan(FDocument.MachDynamicSymbolTableCommand.StartLine,
+          FDocument.MachDynamicSymbolTableCommand.EndLine);
+    tdkELFSymbolTable:
+      if FDocument.Symbols.Count > 0 then
+      begin
+        var LFirstLine := MaxInt; var LLastLine := 0;
+        for var LSymbol in FDocument.Symbols do
+          ExtendRange(LFirstLine, LLastLine, LSymbol.StartLine, LSymbol.StartLine);
+        UseSpan(LFirstLine, LLastLine);
+      end;
+    tdkELFDynamicSection:
+      if FDocument.ELFDynamicEntries.Count > 0 then
+      begin
+        var LFirstLine := MaxInt; var LLastLine := 0;
+        for var LEntry in FDocument.ELFDynamicEntries do
+          ExtendRange(LFirstLine, LLastLine, LEntry.StartLine, LEntry.EndLine);
+        UseSpan(LFirstLine, LLastLine);
+      end;
+    tdkDiagnostics:
+      begin
+        var LFirstLine := MaxInt; var LLastLine := 0;
+        for var LDiagnostic in FDocument.Diagnostics do
+          ExtendRange(LFirstLine, LLastLine, LDiagnostic.LineNumber,
+            LDiagnostic.LineNumber);
+        UseSpan(LFirstLine, LLastLine);
+      end;
+  end;
+end;
+
+procedure TFrame1.SyncRawViewToNode(ANode: PVirtualNode);
 begin
   if ANode = nil then
   begin
-    CardPanel1.ActiveCard := Card1;
+    frRawView.ShowLines(1, 1);
+    Exit;
+  end;
+
+  var LNodeData := PTreeItemData(Tree.GetNodeData(ANode));
+  var LStartLine: Integer;
+  var LEndLine: Integer;
+  ResolveNodeSourceSpan(LNodeData, LStartLine, LEndLine);
+  frRawView.ShowLines(LStartLine, LEndLine);
+end;
+
+procedure TFrame1.RawViewSyncWithSelectedNodeChanged(Sender: TObject);
+begin
+  if not frRawView.SyncWithSelectedNode then
+    Exit;
+
+  var LSelectedNode := FActiveDetailNode;
+  if LSelectedNode = nil then
+    LSelectedNode := Tree.FocusedNode;
+  if LSelectedNode <> nil then
+    SyncRawViewToNode(LSelectedNode);
+end;
+
+procedure TFrame1.ActivateNode(ANode: PVirtualNode);
+begin
+  SaveActiveDetailItemIndex;
+  if ANode = nil then
+  begin
+    cpViews.ActiveCard := FSummaryCard;
+    FActiveDetailNode := nil;
+    SyncRawViewToNode(nil);
     Exit;
   end;
 
   var LNodeData := PTreeItemData(Tree.GetNodeData(ANode));
   case LNodeData.DetailKind of
     tdkDocumentSummary:
-      CardPanel1.ActiveCard := Card1;
+      cpViews.ActiveCard := FSummaryCard;
     tdkOldExecutableHeader, tdkPortableExecutableHeader, tdkMachHeader,
     tdkELFHeader:
       ShowHeaderDetails(LNodeData.DetailKind, LNodeData.HeaderIndex);
@@ -1913,6 +2495,10 @@ begin
       ShowImportDirectoryDetails;
     tdkImportModule:
       ShowImportModuleDetails(LNodeData.ImportModuleIndex);
+    tdkDelayedImportTable:
+      ShowDelayedImportTableDetails;
+    tdkDelayedImportModule:
+      ShowDelayedImportModuleDetails(LNodeData.ImportModuleIndex);
     tdkExportDirectory:
       ShowExportDirectoryDetails;
     tdkResourceDirectory:
@@ -1950,12 +2536,17 @@ begin
     tdkDiagnostics:
       ShowDiagnosticsDetails;
   else
-    CardPanel1.ActiveCard := Card1;
+    cpViews.ActiveCard := FSummaryCard;
   end;
+  RestoreDetailItemIndex(ANode);
+  FActiveDetailNode := ANode;
+  SyncRawViewToNode(ANode);
 end;
 
 procedure TFrame1.TreeFreeNode(Sender: TBaseVirtualTree; Node: PVirtualNode);
 begin
+  if FActiveDetailNode = Node then
+    FActiveDetailNode := nil;
   Finalize(PTreeItemData(Sender.GetNodeData(Node))^);
 end;
 
@@ -1978,6 +2569,11 @@ begin
     Exit;
 
   ActivateNode(Tree.GetNodeAt(X, Y));
+end;
+
+procedure TFrame1.tcViewsChange(Sender: TObject);
+begin
+  UpdateActiveView;
 end;
 
 end.

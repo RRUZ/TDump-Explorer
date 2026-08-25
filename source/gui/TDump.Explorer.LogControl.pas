@@ -21,7 +21,7 @@ type
 
   TLogControl = class(TFrame)
     ControlList1: TControlList;
-    Panel1: TPanel;
+    pnToolbar: TPanel;
     SearchFilterBox: TSearchBox;
   private
     const
@@ -63,7 +63,7 @@ begin
   ControlList1.MultiSelect := True;
   ControlList1.OnBeforeDrawItem := ControlList1BeforeDrawItem;
   ControlList1.OnKeyDown := ControlList1KeyDown;
-  Panel1.Alignment := taLeftJustify;
+  pnToolbar.Alignment := taLeftJustify;
   UpdateControlList;
 end;
 
@@ -254,7 +254,7 @@ end;
 procedure TLogControl.UpdateControlList;
 begin
   ControlList1.ItemCount := FEntries.Count;
-  Panel1.Caption := Format('General activity (%d)', [FEntries.Count]);
+  //pnToolbar.Caption := Format('General activity (%d)', [FEntries.Count]);
   ControlList1.Invalidate;
 end;
 
