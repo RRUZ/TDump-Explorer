@@ -1,4 +1,4 @@
-object Frame1: TFrame1
+object DumpDocumentFrame: TDumpDocumentFrame
   Left = 0
   Top = 0
   Width = 640
@@ -37,9 +37,18 @@ object Frame1: TFrame1
     Width = 250
     Height = 331
     Align = alLeft
+    DefaultNodeHeight = 17
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -11
+    Font.Name = 'Segoe UI'
+    Font.Style = []
     Header.AutoSizeIndex = 0
-    Header.Height = 15
+    Header.Height = 13
     Header.MainColumn = -1
+    ParentFont = False
+    SelectionBlendFactor = 255
+    StyleElements = [seClient, seBorder]
     TabOrder = 1
     Touch.InteractiveGestures = [igPan, igPressAndTap]
     Touch.InteractiveGestureOptions = [igoPanSingleFingerHorizontal, igoPanSingleFingerVertical, igoPanInertia, igoPanGutter, igoParentPassthrough]
@@ -98,18 +107,29 @@ object Frame1: TFrame1
     Align = alTop
     BevelOuter = bvNone
     TabOrder = 3
-    Visible = False
+    ExplicitTop = -6
+    object VirtualImage1: TVirtualImage
+      Left = 8
+      Top = 3
+      Width = 32
+      Height = 32
+      ImageCollection = DataModule1.ImageCollection1
+      ImageWidth = 0
+      ImageHeight = 0
+      ImageIndex = 40
+      ImageName = 'file-magnifying-glass_dark'
+    end
     object tcViews: TTabControl
-      Left = 0
-      Top = 0
-      Width = 640
+      Left = 443
+      Top = -6
+      Width = 246
       Height = 41
-      Align = alClient
       TabOrder = 0
       Tabs.Strings = (
         'Properties View'
         'Cross References')
       TabIndex = 0
+      Visible = False
     end
   end
   inline frRawView: TRawViewFrame

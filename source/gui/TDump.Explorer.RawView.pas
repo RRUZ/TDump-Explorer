@@ -3,7 +3,10 @@ unit TDump.Explorer.RawView;
 interface
 
 uses
-  System.Classes, System.Math, Vcl.Controls, Vcl.Forms,
+  Winapi.Windows,
+  Winapi.Messages,
+  System.Classes, System.SysUtils, System.Math, System.StrUtils, System.Generics.Collections,
+  Vcl.Controls, Vcl.Forms,
   TDump.Explorer.HighlighterControl, TDump.Explorer.Parser, Vcl.ExtCtrls,
   Vcl.StdCtrls, Vcl.WinXCtrls;
 
@@ -15,9 +18,18 @@ type
     cbFollowSelection: TCheckBox;
   private
     FHighlighterControl: THighlighterControl;
+    FSourceLines: TStringList;
+    FSourceParserModes: TList<Integer>;
+    FVisibleSourceLineIndexes: TList<Integer>;
     FSyncWithSelectedNode: Boolean;
     FOnSyncWithSelectedNodeChanged: TNotifyEvent;
+    FLastSourceStartLine: Integer;
+    FLastSourceEndLine: Integer;
+    procedure ApplyFilter;
     procedure cbFollowSelectionClick(Sender: TObject);
+    procedure SearchFilterBoxChange(Sender: TObject);
+    procedure SearchFilterBoxKeyDown(Sender: TObject; var Key: Word;
+      Shift: TShiftState);
     procedure SetSyncWithSelectedNode(const AValue: Boolean);
   public
     constructor Create(AOwner: TComponent); override;
@@ -42,6 +54,9 @@ uses
 constructor TRawViewFrame.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  FSourceLines := TStringList.Create;
+  FSourceParserModes := TList<Integer>.Create;
+  FVisibleSourceLineIndexes := TList<Integer>.Create;
   FHighlighterControl := THighlighterControl.Create(nil);
   FHighlighterControl.Parent := Self;
   FHighlighterControl.Align := alClient;
@@ -54,18 +69,29 @@ begin
   FHighlighterControl.Font.Size := 8;
   FHighlighterControl.ControlList1.MultiSelect := True;
   cbFollowSelection.OnClick := cbFollowSelectionClick;
+  SearchFilterBox.OnChange := SearchFilterBoxChange;
+  SearchFilterBox.OnKeyDown := SearchFilterBoxKeyDown;
   SetSyncWithSelectedNode(cbFollowSelection.Checked);
   Clear;
 end;
 
 destructor TRawViewFrame.Destroy;
 begin
+  FVisibleSourceLineIndexes.Free;
+  FSourceParserModes.Free;
+  FSourceLines.Free;
   FHighlighterControl.Free;
   inherited;
 end;
 
 procedure TRawViewFrame.Clear;
 begin
+  FSourceLines.Clear;
+  FSourceParserModes.Clear;
+  FVisibleSourceLineIndexes.Clear;
+  FLastSourceStartLine := 0;
+  FLastSourceEndLine := 0;
+  FHighlighterControl.FilterText := '';
   FHighlighterControl.SetText('No TDUMP report is loaded.');
 end;
 
@@ -77,22 +103,68 @@ begin
     Exit;
   end;
 
+  FSourceLines.Text := ADocument.RawText;
+  FSourceParserModes.Clear;
+  for var LSourceIndex := 0 to FSourceLines.Count - 1 do
+    if (LSourceIndex < ADocument.Lines.Count) and
+      (ADocument.Lines[LSourceIndex].SourceSpan.SyntaxHint =
+        rshCppBuilderMethod) then
+      FSourceParserModes.Add(Ord(tpmCppBuilderMethod))
+    else
+      FSourceParserModes.Add(-1);
+  FLastSourceStartLine := 0;
+  FLastSourceEndLine := 0;
+  ApplyFilter;
+end;
+
+procedure TRawViewFrame.ApplyFilter;
+begin
+  var LFilterText := Trim(SearchFilterBox.Text);
+  FVisibleSourceLineIndexes.Clear;
   FHighlighterControl.BeginUpdate;
   try
-    FHighlighterControl.SetText(ADocument.RawText);
-    for var LItemIndex := 0 to Min(FHighlighterControl.Items.Count,
-      ADocument.Lines.Count) - 1 do
-      if ADocument.Lines[LItemIndex].SourceSpan.SyntaxHint =
-        rshCppBuilderMethod then
-        FHighlighterControl.SetItemParserMode(LItemIndex, tpmCppBuilderMethod);
+    FHighlighterControl.Clear;
+    FHighlighterControl.FilterText := LFilterText;
+    for var LSourceIndex := 0 to FSourceLines.Count - 1 do
+      if (LFilterText = '') or ContainsText(FSourceLines[LSourceIndex],
+        LFilterText) then
+      begin
+        if (LSourceIndex < FSourceParserModes.Count) and
+          (FSourceParserModes[LSourceIndex] >= 0) then
+          FHighlighterControl.Add(FSourceLines[LSourceIndex],
+            TTinyParserMode(FSourceParserModes[LSourceIndex]))
+        else
+          FHighlighterControl.Add(FSourceLines[LSourceIndex]);
+        FHighlighterControl.SetLineNumber(FHighlighterControl.Items.Count - 1,
+          LSourceIndex);
+        FVisibleSourceLineIndexes.Add(LSourceIndex);
+      end;
   finally
     FHighlighterControl.EndUpdate;
   end;
+
+  if FSyncWithSelectedNode and (FLastSourceStartLine > 0) then
+    ShowLines(FLastSourceStartLine, FLastSourceEndLine);
 end;
 
 procedure TRawViewFrame.cbFollowSelectionClick(Sender: TObject);
 begin
   SetSyncWithSelectedNode(cbFollowSelection.Checked);
+end;
+
+procedure TRawViewFrame.SearchFilterBoxChange(Sender: TObject);
+begin
+  ApplyFilter;
+end;
+
+procedure TRawViewFrame.SearchFilterBoxKeyDown(Sender: TObject; var Key: Word;
+  Shift: TShiftState);
+begin
+  if (Shift = []) and (Key in [VK_UP, VK_DOWN]) then
+  begin
+    FHighlighterControl.ControlList1.Perform(WM_KEYDOWN, Key, 0);
+    Key := 0;
+  end;
 end;
 
 procedure TRawViewFrame.SetSyncWithSelectedNode(const AValue: Boolean);
@@ -109,18 +181,32 @@ end;
 
 procedure TRawViewFrame.ShowLines(AStartLine, AEndLine: Integer);
 begin
+  FLastSourceStartLine := AStartLine;
+  FLastSourceEndLine := AEndLine;
   if not FSyncWithSelectedNode then
     Exit;
 
-  var LItemIndex := AStartLine - 1;
-  if (LItemIndex < 0) or (LItemIndex >= FHighlighterControl.Items.Count) then
+  var LFirstSourceIndex := AStartLine - 1;
+  var LLastSourceIndex := Max(LFirstSourceIndex, AEndLine - 1);
+  var LFirstVisibleIndex := -1;
+  var LLastVisibleIndex := -1;
+  for var LVisibleIndex := 0 to FVisibleSourceLineIndexes.Count - 1 do
+    if (FVisibleSourceLineIndexes[LVisibleIndex] >= LFirstSourceIndex) and
+      (FVisibleSourceLineIndexes[LVisibleIndex] <= LLastSourceIndex) then
+    begin
+      if LFirstVisibleIndex < 0 then
+        LFirstVisibleIndex := LVisibleIndex;
+      LLastVisibleIndex := LVisibleIndex;
+    end;
+  if LFirstVisibleIndex < 0 then
+  begin
+    FHighlighterControl.ClearHighlightedItems;
     Exit;
+  end;
 
-  var LLastItemIndex := Min(AEndLine - 1, FHighlighterControl.Items.Count - 1);
-  if LLastItemIndex < LItemIndex then
-    LLastItemIndex := LItemIndex;
-  FHighlighterControl.SetHighlightedRange(LItemIndex, LLastItemIndex);
-  FHighlighterControl.ScrollItemToTop(LItemIndex);
+  FHighlighterControl.SetHighlightedRange(LFirstVisibleIndex,
+    LLastVisibleIndex);
+  FHighlighterControl.ScrollItemToTop(LFirstVisibleIndex);
 end;
 
 end.

@@ -6,8 +6,7 @@
 //
 // https://github.com/RRUZ/TDump-Explorer
 //
-// The Initial Developer of the Original Code is Rodrigo Ruz V.
-// Portions created by Rodrigo Ruz V. are Copyright (C) 2026 Rodrigo Ruz V.
+// The Initial Developer of the Original Code is Rodrigo Ruz  Copyright (C) 2026
 // All Rights Reserved.
 //
 //**************************************************************************************************

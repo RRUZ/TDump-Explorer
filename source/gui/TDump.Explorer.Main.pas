@@ -22,7 +22,7 @@ type
     ReloadRequested: Boolean;
     Discarded: Boolean;
     TabSheet: TTabSheet;
-    Frame: TFrame1;
+    Frame: TDumpDocumentFrame;
   end;
 
 const
@@ -741,7 +741,7 @@ begin
   Result.TabSheet.Caption := ExtractFileName(AFileName);
   if Result.TabSheet.Caption = '' then
     Result.TabSheet.Caption := AFileName;
-  Result.Frame := TFrame1.Create(Result.TabSheet);
+  Result.Frame := TDumpDocumentFrame.Create(Result.TabSheet);
   Result.Frame.Parent := Result.TabSheet;
   Result.Frame.Align := alClient;
   Result.Frame.SetStatus('Opening: ' + AFileName);

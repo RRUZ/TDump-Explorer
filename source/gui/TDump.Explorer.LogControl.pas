@@ -120,9 +120,9 @@ begin
 
   if (odSelected in AState) then
   begin
-    LFillColor := ColorBlendRGB(LStyle.GetSystemColor(clHighlight), LStyle.GetSystemColor(clWindow), 0.9);
+    LFillColor := ColorBlendRGB(TExplorerTheme.ActiveTheme.SelectionColor, TExplorerTheme.ActiveTheme.BackgroundColor, 0.9);
     if IsWindows11 then
-      DrawSelectionBar(ACanvas, ARect, LFillColor, LStyle.GetSystemColor(clHighlight))
+      DrawSelectionBar(ACanvas, ARect, LFillColor, TExplorerTheme.ActiveTheme.SelectionColor)
     else
     begin
       ACanvas.Brush.Color := LFillColor;
@@ -224,7 +224,7 @@ begin
     letProfile:
       Result := ColorBlendRGB(LStyle.GetSystemColor(clWindowText), clWebBlue, 0.5);
   else
-    Result := ColorBlendRGB(LStyle.GetSystemColor(clWindowText), LStyle.GetSystemColor(clWindow), 0.3);
+    Result := TExplorerTheme.ActiveTheme.TextColor
   end;
 end;
 

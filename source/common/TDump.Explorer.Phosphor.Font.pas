@@ -1,3 +1,15 @@
+//**************************************************************************************************
+//
+// Unit TDump.Explorer.Phosphor.Font
+//
+// Phosphor font support
+//
+// https://github.com/RRUZ/TDump-Explorer
+//
+// The Initial Developer of the Original Code is Rodrigo Ruz  Copyright (C) 2026
+// All Rights Reserved.
+//
+//**************************************************************************************************
 unit TDump.Explorer.Phosphor.Font;
 
 interface
@@ -25,6 +37,7 @@ type
     destructor Destroy; override;
     procedure DrawIcon(ADC: HDC; ACode: Word; const ADestRect: TRect;
       AColor: TColor; AWeight: TPhosphorFontWeight = pfwRegular);
+    function GetIconCodes(AWeight: TPhosphorFontWeight = pfwRegular): TArray<Word>;
   end;
 
   TPhosphorIcon = class(TCustomControl)
@@ -161,6 +174,55 @@ begin
     end;
   finally
     LGraphics.Free;
+  end;
+end;
+
+function TPhosphorFont.GetIconCodes(
+  AWeight: TPhosphorFontWeight): TArray<Word>;
+const
+  CPrivateUseFirst = $E000;
+  CPrivateUseLast = $F8FF;
+begin
+  var LDC := GetDC(0);
+  if LDC = 0 then
+    RaiseLastOSError;
+  try
+    var LFont := CreateFont(32, 0, 0, 0, FW_NORMAL, 0, 0, 0,
+      DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+      ANTIALIASED_QUALITY, DEFAULT_PITCH, PChar(CFontNames[AWeight]));
+    if LFont = 0 then
+      RaiseLastOSError;
+    try
+      var LOldFont := SelectObject(LDC, LFont);
+      try
+        var LCharacterCount := CPrivateUseLast - CPrivateUseFirst + 1;
+        var LCharacters: TArray<WideChar>;
+        var LGlyphIndexes: TArray<Word>;
+        SetLength(LCharacters, LCharacterCount);
+        SetLength(LGlyphIndexes, LCharacterCount);
+        for var LIndex := 0 to LCharacterCount - 1 do
+          LCharacters[LIndex] := WideChar(CPrivateUseFirst + LIndex);
+        if GetGlyphIndicesW(LDC, PWideChar(@LCharacters[0]), LCharacterCount,
+          @LGlyphIndexes[0], GGI_MARK_NONEXISTING_GLYPHS) = GDI_ERROR then
+          RaiseLastOSError;
+
+        SetLength(Result, LCharacterCount);
+        var LResultIndex := 0;
+        for var LIndex := 0 to LCharacterCount - 1 do
+          if LGlyphIndexes[LIndex] <> $FFFF then
+          begin
+            Result[LResultIndex] := Word(LCharacters[LIndex]);
+            Inc(LResultIndex);
+          end;
+        SetLength(Result, LResultIndex);
+      finally
+        SelectObject(LDC, LOldFont);
+      end;
+    finally
+      DeleteObject(LFont);
+    end;
+  finally
+    ReleaseDC(0, LDC);
   end;
 end;
 

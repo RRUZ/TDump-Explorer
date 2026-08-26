@@ -15,7 +15,7 @@ unit TDump.Explorer.Relations;
 
 
 
-// TDump.Explorer.Parser deliberately preserves TDUMP's output as independent
+// TDump.Explorer.Parser preserves TDUMP's output as independent
 // projections: PE headers, section table, source modules, aligned symbols,
 // global symbols, types, exports and resources.  A TDUMP file seldom states
 // how all of those projections relate to one another.  This unit builds the

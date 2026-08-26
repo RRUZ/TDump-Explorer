@@ -1,31 +1,25 @@
+//**************************************************************************************************
+//
+// Unit TDump.Explorer.Highlighter
+//
+// Highlighter for Tdump Values and C++Builder-style demangled syntax
+//
+// https://github.com/RRUZ/TDump-Explorer
+//
+// The Initial Developer of the Original Code is Rodrigo Ruz  Copyright (C) 2026
+// All Rights Reserved.
+//
+//**************************************************************************************************
+
 unit TDump.Explorer.Highlighter;
+
 
 interface
 
 uses
-  Winapi.Windows,
-  System.Types,
-  Vcl.Graphics,
-  TDump.Explorer.TinyParser;
+  Winapi.Windows, System.Types, Vcl.Graphics, TDump.Explorer.TinyParser, TDump.Explorer.UI;
 
 type
-  TTinyHighlightTheme = record
-    BackgroundColor: TColor;
-    TextColor: TColor;
-    StringColor: TColor;
-    StringLiteralColor: TColor;
-    NumberColor: TColor;
-    HexadecimalColor: TColor;
-    DateTimeColor: TColor;
-    SymbolColor: TColor;
-    KeywordColor: TColor;
-    NamespaceColor: TColor;
-    TypeColor: TColor;
-    MethodColor: TColor;
-  end;
-
-  TTinyHighlightThemeKind = (thtLight, thtDark);
-
   // Allows a table cell to use a declared semantic type instead of relying on
   // lexical inference. thdtAuto preserves the tokenizer's mixed-content mode.
   TTinyHighlightDataType = (thdtAuto, thdtText, thdtStringLiteral,
@@ -38,37 +32,36 @@ type
     function FitText(ACanvas: TCanvas; const AText: string; AMaximumWidth: Integer;
       ATextFormat: TTextFormat): string;
     function TokenColor(ATokenKind: TTinyTokenKind;
-      const ATheme: TTinyHighlightTheme): TColor;
+      const ATheme: TExplorerTheme): TColor;
   public
     constructor Create;
     destructor Destroy; override;
-    class function DarkTheme: TTinyHighlightTheme; static;
-    class function LightTheme: TTinyHighlightTheme; static;
-    class function Theme(AThemeKind: TTinyHighlightThemeKind): TTinyHighlightTheme;
-      static;
     procedure TextRect(ACanvas: TCanvas; const ARect: TRect; AX, AY: Integer;
-      const AText: string; const ATheme: TTinyHighlightTheme;
+      const AText: string; const ATheme: TExplorerTheme;
       ATextFormat: TTextFormat = [];
       AParserMode: TTinyParserMode = tpmTDumpValues;
       ADataType: TTinyHighlightDataType = thdtAuto); overload;
     procedure TextRect(ACanvas: TCanvas; const ARect: TRect; AX, AY: Integer;
-      const AText: string; AThemeKind: TTinyHighlightThemeKind;
+      const AText: string; AThemeKind: TExplorerThemeKind;
       ATextFormat: TTextFormat = [];
       AParserMode: TTinyParserMode = tpmTDumpValues;
       ADataType: TTinyHighlightDataType = thdtAuto); overload;
     procedure TextRect(ACanvas: TCanvas; const ARect: TRect;
-      const AText: string; const ATheme: TTinyHighlightTheme;
+      const AText: string; const ATheme: TExplorerTheme;
       ATextFormat: TTextFormat = [];
       AParserMode: TTinyParserMode = tpmTDumpValues;
       ADataType: TTinyHighlightDataType = thdtAuto); overload;
     procedure TextRect(ACanvas: TCanvas; const ARect: TRect;
-      const AText: string; AThemeKind: TTinyHighlightThemeKind;
+      const AText: string; AThemeKind: TExplorerThemeKind;
       ATextFormat: TTextFormat = [];
       AParserMode: TTinyParserMode = tpmTDumpValues;
       ADataType: TTinyHighlightDataType = thdtAuto); overload;
   end;
 
 implementation
+
+uses
+  Vcl.Themes;
 
 constructor TTinyHighlighter.Create;
 begin
@@ -103,51 +96,8 @@ begin
   Result := Result + CEllipsis;
 end;
 
-class function TTinyHighlighter.DarkTheme: TTinyHighlightTheme;
-begin
-  Result.BackgroundColor := TColor(RGB(31, 34, 40));
-  Result.TextColor := TColor(RGB(220, 225, 230));
-  Result.StringColor := TColor(RGB(205, 220, 170));
-  Result.StringLiteralColor := TColor(RGB(165, 225, 120));
-  Result.NumberColor := TColor(RGB(130, 195, 255));
-  Result.HexadecimalColor := TColor(RGB(95, 220, 210));
-  Result.DateTimeColor := TColor(RGB(205, 155, 255));
-  Result.SymbolColor := TColor(RGB(145, 155, 165));
-  Result.KeywordColor := TColor(RGB(255, 170, 110));
-  Result.NamespaceColor := TColor(RGB(135, 190, 250));
-  Result.TypeColor := TColor(RGB(130, 220, 205));
-  Result.MethodColor := TColor(RGB(245, 205, 125));
-end;
-
-class function TTinyHighlighter.LightTheme: TTinyHighlightTheme;
-begin
-  Result.BackgroundColor := clWindow;
-  Result.TextColor := TColor(RGB(40, 45, 50));
-  Result.StringColor := TColor(RGB(85, 110, 40));
-  Result.StringLiteralColor := TColor(RGB(35, 125, 70));
-  Result.NumberColor := TColor(RGB(20, 85, 175));
-  Result.HexadecimalColor := TColor(RGB(0, 120, 115));
-  Result.DateTimeColor := TColor(RGB(125, 55, 165));
-  Result.SymbolColor := TColor(RGB(110, 110, 110));
-  Result.KeywordColor := TColor(RGB(175, 75, 20));
-  Result.NamespaceColor := TColor(RGB(30, 85, 175));
-  Result.TypeColor := TColor(RGB(0, 115, 105));
-  Result.MethodColor := TColor(RGB(145, 95, 15));
-end;
-
-class function TTinyHighlighter.Theme(
-  AThemeKind: TTinyHighlightThemeKind): TTinyHighlightTheme;
-begin
-  case AThemeKind of
-    thtDark:
-      Result := DarkTheme;
-  else
-    Result := LightTheme;
-  end;
-end;
-
 procedure TTinyHighlighter.TextRect(ACanvas: TCanvas; const ARect: TRect;
-  AX, AY: Integer; const AText: string; const ATheme: TTinyHighlightTheme;
+  AX, AY: Integer; const AText: string; const ATheme: TExplorerTheme;
   ATextFormat: TTextFormat; AParserMode: TTinyParserMode;
   ADataType: TTinyHighlightDataType);
 begin
@@ -202,16 +152,16 @@ begin
 end;
 
 procedure TTinyHighlighter.TextRect(ACanvas: TCanvas; const ARect: TRect;
-  AX, AY: Integer; const AText: string; AThemeKind: TTinyHighlightThemeKind;
+  AX, AY: Integer; const AText: string; AThemeKind: TExplorerThemeKind;
   ATextFormat: TTextFormat; AParserMode: TTinyParserMode;
   ADataType: TTinyHighlightDataType);
 begin
-  TextRect(ACanvas, ARect, AX, AY, AText, Theme(AThemeKind), ATextFormat,
+  TextRect(ACanvas, ARect, AX, AY, AText, TExplorerTheme.ActiveTheme, ATextFormat,
     AParserMode, ADataType);
 end;
 
 procedure TTinyHighlighter.TextRect(ACanvas: TCanvas; const ARect: TRect;
-  const AText: string; const ATheme: TTinyHighlightTheme;
+  const AText: string; const ATheme: TExplorerTheme;
   ATextFormat: TTextFormat; AParserMode: TTinyParserMode;
   ADataType: TTinyHighlightDataType);
 begin
@@ -226,25 +176,23 @@ begin
     LY := ARect.Bottom - ACanvas.TextHeight(LText)
   else if tfVerticalCenter in ATextFormat then
     LY := ARect.Top + ((ARect.Height - ACanvas.TextHeight(LText)) div 2);
-  TextRect(ACanvas, ARect, LX, LY, LText, ATheme, ATextFormat, AParserMode,
-    ADataType);
+  TextRect(ACanvas, ARect, LX, LY, LText, ATheme, ATextFormat, AParserMode, ADataType);
 end;
 
 procedure TTinyHighlighter.TextRect(ACanvas: TCanvas; const ARect: TRect;
-  const AText: string; AThemeKind: TTinyHighlightThemeKind;
+  const AText: string; AThemeKind: TExplorerThemeKind;
   ATextFormat: TTextFormat; AParserMode: TTinyParserMode;
   ADataType: TTinyHighlightDataType);
 begin
-  TextRect(ACanvas, ARect, AText, Theme(AThemeKind), ATextFormat,
-    AParserMode, ADataType);
+  TextRect(ACanvas, ARect, AText, TExplorerTheme.ActiveTheme, ATextFormat, AParserMode, ADataType);
 end;
 
 function TTinyHighlighter.TokenColor(ATokenKind: TTinyTokenKind;
-  const ATheme: TTinyHighlightTheme): TColor;
+  const ATheme: TExplorerTheme): TColor;
 begin
   case ATokenKind of
     ttkString:
-      Result := ATheme.StringColor;
+      Result := ATheme.TextColor;
     ttkStringLiteral:
       Result := ATheme.StringLiteralColor;
     ttkInteger, ttkFloat:

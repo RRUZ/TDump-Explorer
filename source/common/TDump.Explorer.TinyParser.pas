@@ -1,3 +1,15 @@
+//**************************************************************************************************
+//
+// Unit TDump.Explorer.TinyParser
+//
+// Tiny parser for Tdump Values and C++Builder-style demangled syntax
+//
+// https://github.com/RRUZ/TDump-Explorer
+//
+// The Initial Developer of the Original Code is Rodrigo Ruz  Copyright (C) 2026
+// All Rights Reserved.
+//
+//**************************************************************************************************
 unit TDump.Explorer.TinyParser;
 
 interface

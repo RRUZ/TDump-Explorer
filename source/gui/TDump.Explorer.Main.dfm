@@ -36,7 +36,7 @@ object FrmMain: TFrmMain
     TabHeight = 28
     TabOrder = 0
     ExplicitWidth = 680
-    ExplicitHeight = 300
+    ExplicitHeight = 369
   end
   inline LogControl1: TLogControl
     AlignWithMargins = True
@@ -51,20 +51,21 @@ object FrmMain: TFrmMain
     Align = alBottom
     TabOrder = 1
     ExplicitLeft = 4
-    ExplicitTop = 392
-    ExplicitWidth = 682
+    ExplicitTop = 384
+    ExplicitWidth = 680
     ExplicitHeight = 127
     inherited ControlList1: TControlList
       Width = 682
       Height = 86
       ExplicitWidth = 680
-      ExplicitHeight = 158
+      ExplicitHeight = 86
     end
     inherited pnToolbar: TPanel
       Width = 682
       ExplicitWidth = 680
       inherited SearchFilterBox: TSearchBox
         Left = 509
+        Height = 25
         ExplicitLeft = 507
       end
     end

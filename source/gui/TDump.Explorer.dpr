@@ -8,7 +8,7 @@ uses
   TDump.Explorer.Parser in '..\parser\TDump.Explorer.Parser.pas',
   TDump.Explorer.Runner in '..\common\TDump.Explorer.Runner.pas',
   TDump.Explorer.Main in 'TDump.Explorer.Main.pas' {FrmMain},
-  TDump.Explorer.Frame in 'TDump.Explorer.Frame.pas' {Frame1: TFrame},
+  TDump.Explorer.Frame in 'TDump.Explorer.Frame.pas' {DumpDocumentFrame: TFrame},
   TDump.Explorer.CrossReferences in 'TDump.Explorer.CrossReferences.pas' {CrossReferencesFrame: TFrame},
   TDump.Explorer.RawView in 'TDump.Explorer.RawView.pas' {RawViewFrame: TFrame},
   TDump.Explorer.HighlighterControl in 'TDump.Explorer.HighlighterControl.pas' {HighlighterControl: TFrame},
@@ -18,7 +18,8 @@ uses
   Vcl.Themes,
   Vcl.Styles,
   TDump.Explorer.LogControl in 'TDump.Explorer.LogControl.pas' {LogControl: TFrame},
-  TDump.Explorer.Relations in '..\common\TDump.Explorer.Relations.pas';
+  TDump.Explorer.Relations in '..\common\TDump.Explorer.Relations.pas',
+  TDump.Explorer.Resources in 'TDump.Explorer.Resources.pas' {DataModule1: TDataModule};
 
 {$R *.res}
 
@@ -26,8 +27,9 @@ begin
   ReportMemoryLeaksOnShutdown := True;
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
-  TStyleManager.TrySetStyle('Glow');
+  TStyleManager.TrySetStyle('Glossy');
   Application.CreateForm(TFrmMain, FrmMain);
+  Application.CreateForm(TDataModule1, DataModule1);
   if ParamCount > 0 then
   begin
     var LInputFileName := ParamStr(1);

@@ -11,7 +11,7 @@ uses
   VirtualTrees.BaseAncestorVCL,
   VirtualTrees.BaseTree, VirtualTrees.AncestorVCL, VirtualTrees,
   TDump.Explorer.Parser, TDump.Explorer.TinyParser, Vcl.WinXPanels,
-  TDump.Explorer.CrossReferences, TDump.Explorer.RawView;
+  TDump.Explorer.CrossReferences, TDump.Explorer.RawView, Vcl.VirtualImage;
 
 type
   TTreeDetailKind = (tdkNone, tdkDocumentSummary,
@@ -51,7 +51,7 @@ type
     DetailItemIndex: Integer;
   end;
 
-  TFrame1 = class(TFrame)
+  TDumpDocumentFrame = class(TFrame)
     ProgressBar1: TProgressBar;
     Tree: TVirtualStringTree;
     pnCards: TPanel;
@@ -63,6 +63,7 @@ type
     frCrossReferences: TCrossReferencesFrame;
     Splitter2: TSplitter;
     frRawView: TRawViewFrame;
+    VirtualImage1: TVirtualImage;
   private
     FDocument: TDumpDocument;
     FSummaryCard: TCard;
@@ -164,6 +165,9 @@ type
 
 implementation
 
+uses
+  TDump.Explorer.UI, Vcl.GraphUtil, TDump.Explorer.Resources;
+
 {$R *.dfm}
 
 function IsBorlandMethodName(const AValue: string): Boolean;
@@ -214,7 +218,7 @@ begin
   Result := '';
 end;
 
-constructor TFrame1.Create(AOwner: TComponent);
+constructor TDumpDocumentFrame.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   FSummaryCard := TCard.Create(cpViews);
@@ -229,21 +233,32 @@ begin
   Tree.OnFreeNode := TreeFreeNode;
   Tree.OnFocusChanged := TreeFocusChanged;
   Tree.OnMouseUp := TreeMouseUp;
-  frRawView.OnSyncWithSelectedNodeChanged :=
-    RawViewSyncWithSelectedNodeChanged;
+
+  Tree.Font.Color := TExplorerTheme.ActiveTheme.TextColor;
+
+  var LFillColor := ColorBlendRGB(TExplorerTheme.ActiveTheme.SelectionColor, TExplorerTheme.ActiveTheme.BackgroundColor, 0.9);
+      {
+  Tree.Colors.SelectionRectangleBlendColor := clGReen;//LFillColor;
+  Tree.Colors.SelectionRectangleBorderColor := clRed;
+        }
+  Tree.Colors.FocusedSelectionColor := LFillColor;
+  Tree.Colors.FocusedSelectionBorderColor := TExplorerTheme.ActiveTheme.SelectionColor;
+
+
+  frRawView.OnSyncWithSelectedNodeChanged := RawViewSyncWithSelectedNodeChanged;
   tcViews.OnChange := tcViewsChange;
   tcViews.TabIndex := 0;
   UpdateActiveView;
 end;
 
-destructor TFrame1.Destroy;
+destructor TDumpDocumentFrame.Destroy;
 begin
   frCrossReferences.Clear;
   FDocument.Free;
   inherited;
 end;
 
-function TFrame1.AddTreeNode(AParent: PVirtualNode;
+function TDumpDocumentFrame.AddTreeNode(AParent: PVirtualNode;
   const ACaption: string; ADetailKind: TTreeDetailKind;
   AHeaderIndex, AImportModuleIndex: Integer;
   AResource: TDumpResource;
@@ -280,7 +295,7 @@ begin
   PTreeItemData(Tree.GetNodeData(Result))^.DetailItemIndex := -1;
 end;
 
-procedure TFrame1.AddAlignSymbolRecordNode(AParent: PVirtualNode;
+procedure TDumpDocumentFrame.AddAlignSymbolRecordNode(AParent: PVirtualNode;
   ARecord: TDumpAlignSymbolRecord);
 begin
   var LRecordNode := AddTreeNode(AParent, BorlandSymbolCaption(ARecord),
@@ -289,7 +304,7 @@ begin
     AddAlignSymbolRecordNode(LRecordNode, TDumpAlignSymbolRecord(LChild));
 end;
 
-procedure TFrame1.AddResourceNodes(AParent: PVirtualNode;
+procedure TDumpDocumentFrame.AddResourceNodes(AParent: PVirtualNode;
   const AResources: TObjectList<TDumpResource>);
 begin
   for var LResource in AResources do
@@ -302,7 +317,7 @@ begin
   end;
 end;
 
-function TFrame1.FileKindCaption(AFileKind: TDumpFileKind): string;
+function TDumpDocumentFrame.FileKindCaption(AFileKind: TDumpFileKind): string;
 begin
   case AFileKind of
     dfDOS: Result := 'DOS Executable';
@@ -324,7 +339,7 @@ begin
   end;
 end;
 
-function TFrame1.EnsureHighlighterDetailControl(
+function TDumpDocumentFrame.EnsureHighlighterDetailControl(
   ADetailKind: TTreeDetailKind): THighlighterControl;
 begin
   if FHighlighterControls[ADetailKind] = nil then
@@ -423,7 +438,7 @@ begin
   Result := FHighlighterControls[ADetailKind];
 end;
 
-function TFrame1.HeaderDetailKind(
+function TDumpDocumentFrame.HeaderDetailKind(
   const AHeader: TDumpHeader): TTreeDetailKind;
 begin
   if SameText(AHeader.Name, 'Old Executable Header') then
@@ -437,7 +452,7 @@ begin
   Result := tdkNone;
 end;
 
-function TFrame1.HasBorlandSymbolTable: Boolean;
+function TDumpDocumentFrame.HasBorlandSymbolTable: Boolean;
 begin
   Result := FDocument.BorlandSubsections.Count > 0;
   if Result then
@@ -448,7 +463,7 @@ begin
       Exit(True);
 end;
 
-function TFrame1.ResourceCaption(const AResource: TDumpResource): string;
+function TDumpDocumentFrame.ResourceCaption(const AResource: TDumpResource): string;
 begin
   Result := AResource.Name;
   if Result = '' then
@@ -461,7 +476,7 @@ begin
     Result := Result + ' (' + AResource.Language + ')';
 end;
 
-procedure TFrame1.ShowHeaderDetails(ADetailKind: TTreeDetailKind;
+procedure TDumpDocumentFrame.ShowHeaderDetails(ADetailKind: TTreeDetailKind;
   AHeaderIndex: Integer);
 begin
   if (FDocument = nil) or (AHeaderIndex < 0) or
@@ -483,7 +498,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[ADetailKind];
 end;
 
-procedure TFrame1.ShowMachArchitecturesDetails;
+procedure TDumpDocumentFrame.ShowMachArchitecturesDetails;
 begin
   if FDocument = nil then
     Exit;
@@ -509,7 +524,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkMachArchitectures];
 end;
 
-procedure TFrame1.ShowMachArchitectureDetails(
+procedure TDumpDocumentFrame.ShowMachArchitectureDetails(
   AArchitecture: TDumpMachArchitecture);
 begin
   if AArchitecture = nil then
@@ -532,7 +547,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkMachArchitecture];
 end;
 
-procedure TFrame1.ShowMachLoadCommandsDetails;
+procedure TDumpDocumentFrame.ShowMachLoadCommandsDetails;
 begin
   if FDocument = nil then
     Exit;
@@ -553,7 +568,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkMachLoadCommands];
 end;
 
-procedure TFrame1.ShowMachLoadCommandDetails(ACommand: TDumpMachLoadCommand);
+procedure TDumpDocumentFrame.ShowMachLoadCommandDetails(ACommand: TDumpMachLoadCommand);
 begin
   if ACommand = nil then
     Exit;
@@ -578,7 +593,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkMachLoadCommand];
 end;
 
-procedure TFrame1.ShowMachSectionDetails(ASection: TDumpMachSection);
+procedure TDumpDocumentFrame.ShowMachSectionDetails(ASection: TDumpMachSection);
 begin
   if ASection = nil then
     Exit;
@@ -598,7 +613,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkMachSection];
 end;
 
-procedure TFrame1.ShowMachSymbolTableDetails;
+procedure TDumpDocumentFrame.ShowMachSymbolTableDetails;
 begin
   if FDocument = nil then
     Exit;
@@ -621,7 +636,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkMachSymbolTable];
 end;
 
-procedure TFrame1.ShowMachDynamicSymbolsDetails(ADetailKind: TTreeDetailKind);
+procedure TDumpDocumentFrame.ShowMachDynamicSymbolsDetails(ADetailKind: TTreeDetailKind);
 begin
   if FDocument = nil then
     Exit;
@@ -647,7 +662,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[ADetailKind];
 end;
 
-procedure TFrame1.ShowMachDynamicSymbolMetadataDetails;
+procedure TDumpDocumentFrame.ShowMachDynamicSymbolMetadataDetails;
 begin
   if (FDocument = nil) or (FDocument.MachDynamicSymbolTableCommand = nil) then
     Exit;
@@ -673,7 +688,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkMachDynamicSymbolMetadata];
 end;
 
-procedure TFrame1.ShowDataDirectoriesDetails;
+procedure TDumpDocumentFrame.ShowDataDirectoriesDetails;
 begin
   if FDocument = nil then
     Exit;
@@ -701,7 +716,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkDataDirectories];
 end;
 
-procedure TFrame1.ShowObjectTableDetails;
+procedure TDumpDocumentFrame.ShowObjectTableDetails;
 begin
   if FDocument = nil then
     Exit;
@@ -729,7 +744,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkObjectTable];
 end;
 
-procedure TFrame1.ShowELFSectionHeadersDetails;
+procedure TDumpDocumentFrame.ShowELFSectionHeadersDetails;
 begin
   if FDocument = nil then
     Exit;
@@ -761,7 +776,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkELFSectionHeaders];
 end;
 
-procedure TFrame1.ShowELFProgramHeadersDetails;
+procedure TDumpDocumentFrame.ShowELFProgramHeadersDetails;
 begin
   if FDocument = nil then
     Exit;
@@ -787,7 +802,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkELFProgramHeaders];
 end;
 
-procedure TFrame1.ShowELFSymbolTableDetails;
+procedure TDumpDocumentFrame.ShowELFSymbolTableDetails;
 begin
   if FDocument = nil then
     Exit;
@@ -816,7 +831,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkELFSymbolTable];
 end;
 
-procedure TFrame1.ShowELFDynamicSectionDetails;
+procedure TDumpDocumentFrame.ShowELFDynamicSectionDetails;
 begin
   if FDocument = nil then
     Exit;
@@ -838,7 +853,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkELFDynamicSection];
 end;
 
-procedure TFrame1.ShowELFRelocationsDetails(const ASectionName: string);
+procedure TDumpDocumentFrame.ShowELFRelocationsDetails(const ASectionName: string);
 begin
   if FDocument = nil then
     Exit;
@@ -893,7 +908,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkELFRelocations];
 end;
 
-procedure TFrame1.ShowRelocationsDetails;
+procedure TDumpDocumentFrame.ShowRelocationsDetails;
 begin
   if FDocument = nil then
     Exit;
@@ -916,7 +931,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkRelocations];
 end;
 
-procedure TFrame1.ShowRelocationBlockDetails(ABlock: TDumpRelocationBlock);
+procedure TDumpDocumentFrame.ShowRelocationBlockDetails(ABlock: TDumpRelocationBlock);
 begin
   if ABlock = nil then
     Exit;
@@ -944,7 +959,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkRelocationBlock];
 end;
 
-procedure TFrame1.ShowStringsDetails;
+procedure TDumpDocumentFrame.ShowStringsDetails;
 begin
   if FDocument = nil then
     Exit;
@@ -969,7 +984,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkStrings];
 end;
 
-procedure TFrame1.ShowOMFRecordsDetails;
+procedure TDumpDocumentFrame.ShowOMFRecordsDetails;
 begin
   if FDocument = nil then
     Exit;
@@ -999,7 +1014,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkOMFRecords];
 end;
 
-procedure TFrame1.ShowOMFLibraryMembersDetails;
+procedure TDumpDocumentFrame.ShowOMFLibraryMembersDetails;
 begin
   if FDocument = nil then
     Exit;
@@ -1022,7 +1037,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkOMFLibraryMembers];
 end;
 
-procedure TFrame1.ShowOMFLibraryIndexDetails;
+procedure TDumpDocumentFrame.ShowOMFLibraryIndexDetails;
 begin
   if (FDocument = nil) or (FDocument.OMFLibraryIndex = nil) then
     Exit;
@@ -1047,7 +1062,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkOMFLibraryIndex];
 end;
 
-procedure TFrame1.ShowArchiveMembersDetails;
+procedure TDumpDocumentFrame.ShowArchiveMembersDetails;
 begin
   if FDocument = nil then
     Exit;
@@ -1071,7 +1086,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkArchiveMembers];
 end;
 
-procedure TFrame1.ShowArchiveSymbolsDetails;
+procedure TDumpDocumentFrame.ShowArchiveSymbolsDetails;
 begin
   if FDocument = nil then
     Exit;
@@ -1093,7 +1108,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkArchiveSymbols];
 end;
 
-procedure TFrame1.ShowOMFRecordDetails(ARecord: TDumpObjectRecord);
+procedure TDumpDocumentFrame.ShowOMFRecordDetails(ARecord: TDumpObjectRecord);
 begin
   if ARecord = nil then
     Exit;
@@ -1118,7 +1133,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkOMFRecord];
 end;
 
-procedure TFrame1.ShowImportDirectoryDetails;
+procedure TDumpDocumentFrame.ShowImportDirectoryDetails;
 begin
   if FDocument = nil then
     Exit;
@@ -1146,7 +1161,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkImportDirectory];
 end;
 
-procedure TFrame1.ShowImportModuleDetails(AImportModuleIndex: Integer);
+procedure TDumpDocumentFrame.ShowImportModuleDetails(AImportModuleIndex: Integer);
 begin
   if (FDocument = nil) or (AImportModuleIndex < 0) or
     (AImportModuleIndex >= FDocument.Imports.Count) then
@@ -1156,7 +1171,7 @@ begin
     tdkImportModule);
 end;
 
-procedure TFrame1.ShowImportModuleDetail(AImportModule: TDumpImportModule;
+procedure TDumpDocumentFrame.ShowImportModuleDetail(AImportModule: TDumpImportModule;
   ADetailKind: TTreeDetailKind);
 begin
   if AImportModule = nil then
@@ -1226,7 +1241,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[ADetailKind];
 end;
 
-procedure TFrame1.ShowDelayedImportTableDetails;
+procedure TDumpDocumentFrame.ShowDelayedImportTableDetails;
 begin
   if (FDocument = nil) or (FDocument.DelayedImportTable = nil) then
     Exit;
@@ -1254,7 +1269,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkDelayedImportTable];
 end;
 
-procedure TFrame1.ShowDelayedImportModuleDetails(AImportModuleIndex: Integer);
+procedure TDumpDocumentFrame.ShowDelayedImportModuleDetails(AImportModuleIndex: Integer);
 begin
   if (FDocument = nil) or (FDocument.DelayedImportTable = nil) or
     (AImportModuleIndex < 0) or
@@ -1265,7 +1280,7 @@ begin
     tdkDelayedImportModule);
 end;
 
-procedure TFrame1.ShowExportDirectoryDetails;
+procedure TDumpDocumentFrame.ShowExportDirectoryDetails;
 begin
   if FDocument = nil then
     Exit;
@@ -1300,7 +1315,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkExportDirectory];
 end;
 
-procedure TFrame1.ShowResourceDirectoryDetails;
+procedure TDumpDocumentFrame.ShowResourceDirectoryDetails;
 begin
   if FDocument = nil then
     Exit;
@@ -1338,7 +1353,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkResourceDirectory];
 end;
 
-procedure TFrame1.ShowResourceDetails(AResource: TDumpResource);
+procedure TDumpDocumentFrame.ShowResourceDetails(AResource: TDumpResource);
 begin
   if AResource = nil then
     Exit;
@@ -1393,7 +1408,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkResource];
 end;
 
-procedure TFrame1.ShowBorlandSubsectionDetails(ASubsectionIndex: Integer);
+procedure TDumpDocumentFrame.ShowBorlandSubsectionDetails(ASubsectionIndex: Integer);
 begin
   if (FDocument = nil) or (ASubsectionIndex < 0) or
     (ASubsectionIndex >= FDocument.BorlandSubsections.Count) then
@@ -1504,7 +1519,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkBorlandSubsection];
 end;
 
-procedure TFrame1.ShowBorlandSymbolRecordDetails(ADetailKind: TTreeDetailKind;
+procedure TDumpDocumentFrame.ShowBorlandSymbolRecordDetails(ADetailKind: TTreeDetailKind;
   ARecord: TDumpBorlandSymbolRecord);
 begin
   if ARecord = nil then
@@ -1550,7 +1565,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[ADetailKind];
 end;
 
-procedure TFrame1.ShowBorlandGlobalTypeRecordDetails(
+procedure TDumpDocumentFrame.ShowBorlandGlobalTypeRecordDetails(
   ARecord: TDumpGlobalTypeRecord);
 begin
   if ARecord = nil then
@@ -1624,7 +1639,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkBorlandGlobalTypeRecord];
 end;
 
-procedure TFrame1.ShowBorlandSourceFileDetails(ASourceFile: TDumpSourceFile);
+procedure TDumpDocumentFrame.ShowBorlandSourceFileDetails(ASourceFile: TDumpSourceFile);
 begin
   if ASourceFile = nil then
     Exit;
@@ -1674,7 +1689,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkBorlandSourceFile];
 end;
 
-procedure TFrame1.ShowDiagnosticsDetails;
+procedure TDumpDocumentFrame.ShowDiagnosticsDetails;
 begin
   if FDocument = nil then
     Exit;
@@ -1710,7 +1725,7 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkDiagnostics];
 end;
 
-procedure TFrame1.PopulateTree(ADocument: TDumpDocument);
+procedure TDumpDocumentFrame.PopulateTree(ADocument: TDumpDocument);
 begin
   if FDocument <> ADocument then
   begin
@@ -2001,7 +2016,7 @@ begin
   end;
 end;
 
-procedure TFrame1.SetProgress(ACompletedLines, ATotalLines: Integer);
+procedure TDumpDocumentFrame.SetProgress(ACompletedLines, ATotalLines: Integer);
 begin
   if ATotalLines <= 0 then
     Exit;
@@ -2016,7 +2031,7 @@ begin
   ProgressBar1.Update;
 end;
 
-procedure TFrame1.SetStatus(const AStatus: string);
+procedure TDumpDocumentFrame.SetStatus(const AStatus: string);
 begin
   FSummaryControl.SetText(AStatus);
   ProgressBar1.Min := 0;
@@ -2025,14 +2040,14 @@ begin
   ProgressBar1.Update;
 end;
 
-procedure TFrame1.ShowSummary(const ASummary: string);
+procedure TDumpDocumentFrame.ShowSummary(const ASummary: string);
 begin
   FSummaryControl.SetText(ASummary);
   ProgressBar1.Position := ProgressBar1.Max;
   ProgressBar1.Update;
 end;
 
-procedure TFrame1.UpdateActiveView;
+procedure TDumpDocumentFrame.UpdateActiveView;
 begin
   var LPropertiesView := tcViews.TabIndex = 0;
   var LCrossReferencesView := tcViews.TabIndex = 1;
@@ -2048,7 +2063,7 @@ begin
   end;
 end;
 
-function TFrame1.DetailControlForNode(
+function TDumpDocumentFrame.DetailControlForNode(
   ANode: PVirtualNode): THighlighterControl;
 begin
   Result := nil;
@@ -2064,7 +2079,7 @@ begin
     Result := FHighlighterControls[LNodeData.DetailKind];
 end;
 
-procedure TFrame1.SaveActiveDetailItemIndex;
+procedure TDumpDocumentFrame.SaveActiveDetailItemIndex;
 begin
   if FActiveDetailNode = nil then
     Exit;
@@ -2075,7 +2090,7 @@ begin
       LControl.ControlList1.ItemIndex;
 end;
 
-procedure TFrame1.RestoreDetailItemIndex(ANode: PVirtualNode);
+procedure TDumpDocumentFrame.RestoreDetailItemIndex(ANode: PVirtualNode);
 begin
   var LControl := DetailControlForNode(ANode);
   if LControl = nil then
@@ -2087,7 +2102,7 @@ begin
   LControl.SelectItem(LItemIndex);
 end;
 
-procedure TFrame1.ResolveNodeSourceSpan(const AData: PTreeItemData;
+procedure TDumpDocumentFrame.ResolveNodeSourceSpan(const AData: PTreeItemData;
   out AStartLine, AEndLine: Integer);
   procedure UseSpan(AStart, AEnd: Integer);
   begin
@@ -2414,7 +2429,7 @@ begin
   end;
 end;
 
-procedure TFrame1.SyncRawViewToNode(ANode: PVirtualNode);
+procedure TDumpDocumentFrame.SyncRawViewToNode(ANode: PVirtualNode);
 begin
   if ANode = nil then
   begin
@@ -2429,7 +2444,7 @@ begin
   frRawView.ShowLines(LStartLine, LEndLine);
 end;
 
-procedure TFrame1.RawViewSyncWithSelectedNodeChanged(Sender: TObject);
+procedure TDumpDocumentFrame.RawViewSyncWithSelectedNodeChanged(Sender: TObject);
 begin
   if not frRawView.SyncWithSelectedNode then
     Exit;
@@ -2441,7 +2456,7 @@ begin
     SyncRawViewToNode(LSelectedNode);
 end;
 
-procedure TFrame1.ActivateNode(ANode: PVirtualNode);
+procedure TDumpDocumentFrame.ActivateNode(ANode: PVirtualNode);
 begin
   SaveActiveDetailItemIndex;
   if ANode = nil then
@@ -2543,26 +2558,26 @@ begin
   SyncRawViewToNode(ANode);
 end;
 
-procedure TFrame1.TreeFreeNode(Sender: TBaseVirtualTree; Node: PVirtualNode);
+procedure TDumpDocumentFrame.TreeFreeNode(Sender: TBaseVirtualTree; Node: PVirtualNode);
 begin
   if FActiveDetailNode = Node then
     FActiveDetailNode := nil;
   Finalize(PTreeItemData(Sender.GetNodeData(Node))^);
 end;
 
-procedure TFrame1.TreeGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
+procedure TDumpDocumentFrame.TreeGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
   Column: TColumnIndex; TextType: TVSTTextType; var CellText: string);
 begin
   CellText := PTreeItemData(Sender.GetNodeData(Node))^.Caption;
 end;
 
-procedure TFrame1.TreeFocusChanged(Sender: TBaseVirtualTree;
+procedure TDumpDocumentFrame.TreeFocusChanged(Sender: TBaseVirtualTree;
   Node: PVirtualNode; Column: TColumnIndex);
 begin
   ActivateNode(Node);
 end;
 
-procedure TFrame1.TreeMouseUp(Sender: TObject; Button: TMouseButton;
+procedure TDumpDocumentFrame.TreeMouseUp(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
   if Button <> mbLeft then
@@ -2571,7 +2586,7 @@ begin
   ActivateNode(Tree.GetNodeAt(X, Y));
 end;
 
-procedure TFrame1.tcViewsChange(Sender: TObject);
+procedure TDumpDocumentFrame.tcViewsChange(Sender: TObject);
 begin
   UpdateActiveView;
 end;
