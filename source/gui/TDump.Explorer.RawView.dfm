@@ -3,6 +3,7 @@ object RawViewFrame: TRawViewFrame
   Top = 0
   Width = 640
   Height = 240
+  ParentBackground = False
   TabOrder = 0
   object pnToolbar: TPanel
     Left = 0
@@ -11,6 +12,7 @@ object RawViewFrame: TRawViewFrame
     Height = 41
     Align = alTop
     BevelOuter = bvNone
+    ParentBackground = False
     TabOrder = 0
     object Label1: TLabel
       Left = 8

@@ -15,11 +15,13 @@ uses
   TDump.Explorer.TinyParser in '..\common\TDump.Explorer.TinyParser.pas',
   TDump.Explorer.Highlighter in '..\common\TDump.Explorer.Highlighter.pas',
   TDump.Explorer.UI in '..\common\TDump.Explorer.UI.pas',
+  TDump.Explorer.GlassTabs in '..\common\TDump.Explorer.GlassTabs.pas',
   Vcl.Themes,
   Vcl.Styles,
   TDump.Explorer.LogControl in 'TDump.Explorer.LogControl.pas' {LogControl: TFrame},
   TDump.Explorer.Relations in '..\common\TDump.Explorer.Relations.pas',
-  TDump.Explorer.Resources in 'TDump.Explorer.Resources.pas' {DataModule1: TDataModule};
+  TDump.Explorer.Resources in 'TDump.Explorer.Resources.pas' {DataModule1: TDataModule},
+  TDump.Explorer.Utils in '..\common\TDump.Explorer.Utils.pas';
 
 {$R *.res}
 
@@ -27,9 +29,10 @@ begin
   ReportMemoryLeaksOnShutdown := True;
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
-  TStyleManager.TrySetStyle('Glossy');
+  TStyleManager.TrySetStyle('Glow');
   Application.CreateForm(TFrmMain, FrmMain);
   Application.CreateForm(TDataModule1, DataModule1);
+  FrmMain.InitializeTabImages;
   if ParamCount > 0 then
   begin
     var LInputFileName := ParamStr(1);

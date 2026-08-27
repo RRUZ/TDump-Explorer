@@ -3,7 +3,7 @@ unit TDump.Explorer.CrossReferences;
 interface
 
 uses
-  System.Classes, System.Generics.Collections, Vcl.Controls, Vcl.ExtCtrls,
+  System.Classes, System.Generics.Collections, Vcl.Controls, Vcl.ExtCtrls, Vcl.Graphics,
   Vcl.Forms,
   TDump.Explorer.HighlighterControl, TDump.Explorer.Parser,
   TDump.Explorer.Relations;
@@ -19,6 +19,7 @@ type
     procedure AddRelationItem(const ACategory, ASubject, ATarget,
       ADetails: string);
     procedure RelationControlSelectionChanged(Sender: TObject);
+    procedure SplitterPaint(Sender: TObject);
     function LocationCaption(const ALocation: TDumpAddressLocation): string;
   public
     constructor Create(AOwner: TComponent); override;
@@ -30,7 +31,7 @@ type
 implementation
 
 uses
-  System.SysUtils, TDump.Explorer.TinyParser;
+  System.SysUtils, TDump.Explorer.TinyParser, TDump.Explorer.UI;
 
 {$R *.dfm}
 
@@ -61,6 +62,7 @@ end;
 constructor TCrossReferencesFrame.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  Splitter1.OnPaint := SplitterPaint;
   FRelationDetails := TList<string>.Create;
 
   FRelationControl := THighlighterControl.Create(nil);
@@ -83,6 +85,18 @@ begin
   FRelationDetailsControl.ParserMode := tpmTDumpValues;
   FRelationDetailsControl.ControlList1.MultiSelect := False;
   Clear;
+end;
+
+procedure TCrossReferencesFrame.SplitterPaint(Sender: TObject);
+var
+  LSplitter: TSplitter;
+begin
+  if not (Sender is TSplitter) then
+    Exit;
+
+  LSplitter := TSplitter(Sender);
+  DrawSplitterLine(LSplitter.Canvas, LSplitter.ClientRect,
+    LSplitter.Align in [alLeft, alRight], TExplorerTheme.ActiveTheme.InactiveText);
 end;
 
 destructor TCrossReferencesFrame.Destroy;

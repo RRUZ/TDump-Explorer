@@ -23,6 +23,7 @@ type
     ControlList1: TControlList;
     pnToolbar: TPanel;
     SearchFilterBox: TSearchBox;
+    Label1: TLabel;
   private
     const
       CTextPadding = 8;
@@ -39,6 +40,8 @@ type
     function EntryText(const AEntry: TLogEntry): string;
     function EntryTypeText(AEntryType: TLogEntryType): string;
     procedure UpdateControlList;
+    procedure CMStyleChanged(var AMessage: TMessage); message CM_STYLECHANGED;
+    procedure ApplyTheme;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -65,6 +68,7 @@ begin
   ControlList1.OnKeyDown := ControlList1KeyDown;
   pnToolbar.Alignment := taLeftJustify;
   UpdateControlList;
+  ApplyTheme;
 end;
 
 destructor TLogControl.Destroy;
@@ -96,10 +100,22 @@ begin
   ControlList1.ItemIndex := FEntries.Count - 1;
 end;
 
+procedure TLogControl.ApplyTheme;
+begin
+  pnToolbar.StyleElements := pnToolbar.StyleElements - [seClient];
+  pnToolbar.Color := TExplorerTheme.ActiveTheme.BackgroundColor;
+end;
+
 procedure TLogControl.Clear;
 begin
   FEntries.Clear;
   UpdateControlList;
+end;
+
+procedure TLogControl.CMStyleChanged(var AMessage: TMessage);
+begin
+  inherited;
+  ApplyTheme;
 end;
 
 procedure TLogControl.ControlList1BeforeDrawItem(AIndex: Integer;
@@ -116,8 +132,6 @@ begin
   if (AIndex < 0) or (AIndex >= FEntries.Count) then
     Exit;
 
-  var LStyle := StyleServices;
-
   if (odSelected in AState) then
   begin
     LFillColor := ColorBlendRGB(TExplorerTheme.ActiveTheme.SelectionColor, TExplorerTheme.ActiveTheme.BackgroundColor, 0.9);
@@ -128,14 +142,14 @@ begin
       ACanvas.Brush.Color := LFillColor;
       ACanvas.FillRect(ARect);
 
-      LFillColor := LStyle.GetSystemColor(clHighlight);
+      LFillColor := TExplorerTheme.ActiveTheme.SelectionColor;
       ACanvas.Brush.Color := LFillColor;
       ACanvas.FrameRect(ARect);
     end;
   end
   else if (odHotLight in AState) then
   begin
-    LFillColor := ColorBlendRGB(LStyle.GetSystemColor(clHighlight), LStyle.GetSystemColor(clWindow), 0.95);
+    LFillColor := ColorBlendRGB(TExplorerTheme.ActiveTheme.SelectionColor, TExplorerTheme.ActiveTheme.BackgroundColor, 0.95);
     ACanvas.Brush.Color := LFillColor;
     ACanvas.FillRect(ARect);
   end;

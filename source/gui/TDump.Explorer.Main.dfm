@@ -2,72 +2,105 @@ object FrmMain: TFrmMain
   Left = 0
   Top = 0
   Caption = 'TDump Explorer'
-  ClientHeight = 519
-  ClientWidth = 690
+  ClientHeight = 711
+  ClientWidth = 1072
   Color = clBtnFace
+  CustomTitleBar.Control = TitleBarPanel1
+  CustomTitleBar.Enabled = True
+  CustomTitleBar.Height = 40
+  CustomTitleBar.SystemHeight = False
+  CustomTitleBar.SystemColors = False
+  CustomTitleBar.BackgroundColor = clWhite
+  CustomTitleBar.ForegroundColor = 65793
+  CustomTitleBar.InactiveBackgroundColor = clWhite
+  CustomTitleBar.InactiveForegroundColor = 10066329
+  CustomTitleBar.ButtonForegroundColor = 65793
+  CustomTitleBar.ButtonBackgroundColor = clWhite
+  CustomTitleBar.ButtonHoverForegroundColor = 65793
+  CustomTitleBar.ButtonHoverBackgroundColor = 16053492
+  CustomTitleBar.ButtonPressedForegroundColor = 65793
+  CustomTitleBar.ButtonPressedBackgroundColor = 15395562
+  CustomTitleBar.ButtonInactiveForegroundColor = 10066329
+  CustomTitleBar.ButtonInactiveBackgroundColor = clWhite
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
   Font.Height = -12
   Font.Name = 'Segoe UI'
   Font.Style = []
+  GlassFrame.Enabled = True
+  GlassFrame.Top = 40
   Position = poDesktopCenter
+  StyleElements = [seFont, seClient]
   TextHeight = 15
   object Splitter1: TSplitter
     Left = 0
-    Top = 385
-    Width = 690
-    Height = 3
+    Top = 576
+    Width = 1072
+    Height = 4
     Cursor = crVSplit
     Align = alBottom
-    ExplicitTop = 0
-    ExplicitWidth = 316
-  end
-  object PageControl1: TPageControl
-    AlignWithMargins = True
-    Left = 4
-    Top = 4
-    Width = 682
-    Height = 377
-    Margins.Left = 4
-    Margins.Top = 4
-    Margins.Right = 4
-    Margins.Bottom = 4
-    Align = alClient
-    TabHeight = 28
-    TabOrder = 0
-    ExplicitWidth = 680
-    ExplicitHeight = 369
+    ExplicitTop = 581
   end
   inline LogControl1: TLogControl
     AlignWithMargins = True
     Left = 4
-    Top = 392
-    Width = 682
+    Top = 580
+    Width = 1064
     Height = 127
     Margins.Left = 4
-    Margins.Top = 4
+    Margins.Top = 0
     Margins.Right = 4
     Margins.Bottom = 0
     Align = alBottom
-    TabOrder = 1
+    TabOrder = 0
     ExplicitLeft = 4
-    ExplicitTop = 384
-    ExplicitWidth = 680
+    ExplicitTop = 580
+    ExplicitWidth = 1064
     ExplicitHeight = 127
     inherited ControlList1: TControlList
-      Width = 682
-      Height = 86
-      ExplicitWidth = 680
-      ExplicitHeight = 86
+      Width = 1064
+      Height = 95
+      ExplicitWidth = 1064
+      ExplicitHeight = 95
     end
     inherited pnToolbar: TPanel
-      Width = 682
-      ExplicitWidth = 680
+      Width = 1064
+      ExplicitWidth = 1064
+      inherited Label1: TLabel
+        Height = 32
+      end
       inherited SearchFilterBox: TSearchBox
-        Left = 509
-        Height = 25
-        ExplicitLeft = 507
+        Left = 891
+        Height = 24
+        ExplicitLeft = 891
       end
     end
+  end
+  object TitleBarPanel1: TTitleBarPanel
+    Left = 0
+    Top = 0
+    Width = 1072
+    Height = 39
+    CustomButtons = <>
+  end
+  object CardPanel1: TCardPanel
+    Left = 0
+    Top = 39
+    Width = 1072
+    Height = 537
+    Align = alClient
+    BevelOuter = bvNone
+    Caption = 'CardPanel1'
+    ParentBackground = False
+    TabOrder = 2
+  end
+  object ProgressBar1: TProgressBar
+    Left = 0
+    Top = 707
+    Width = 1072
+    Height = 4
+    Align = alBottom
+    TabOrder = 3
+    Visible = False
   end
 end

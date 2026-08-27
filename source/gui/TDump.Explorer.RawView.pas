@@ -31,6 +31,8 @@ type
     procedure SearchFilterBoxKeyDown(Sender: TObject; var Key: Word;
       Shift: TShiftState);
     procedure SetSyncWithSelectedNode(const AValue: Boolean);
+    procedure CMStyleChanged(var AMessage: TMessage); message CM_STYLECHANGED;
+    procedure ApplyTheme;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -47,7 +49,7 @@ type
 implementation
 
 uses
-  TDump.Explorer.TinyParser;
+  TDump.Explorer.TinyParser, TDump.Explorer.UI, Vcl.Graphics;
 
 {$R *.dfm}
 
@@ -73,6 +75,7 @@ begin
   SearchFilterBox.OnKeyDown := SearchFilterBoxKeyDown;
   SetSyncWithSelectedNode(cbFollowSelection.Checked);
   Clear;
+  ApplyTheme;
 end;
 
 destructor TRawViewFrame.Destroy;
@@ -93,6 +96,12 @@ begin
   FLastSourceEndLine := 0;
   FHighlighterControl.FilterText := '';
   FHighlighterControl.SetText('No TDUMP report is loaded.');
+end;
+
+procedure TRawViewFrame.CMStyleChanged(var AMessage: TMessage);
+begin
+  inherited;
+  ApplyTheme;
 end;
 
 procedure TRawViewFrame.Populate(ADocument: TDumpDocument);
@@ -145,6 +154,13 @@ begin
 
   if FSyncWithSelectedNode and (FLastSourceStartLine > 0) then
     ShowLines(FLastSourceStartLine, FLastSourceEndLine);
+end;
+
+procedure TRawViewFrame.ApplyTheme;
+begin
+  pnToolbar.ParentBackground := False;
+  pnToolbar.StyleElements := pnToolbar.StyleElements - [seClient];
+  pnToolbar.Color := TExplorerTheme.ActiveTheme.BackgroundColor;
 end;
 
 procedure TRawViewFrame.cbFollowSelectionClick(Sender: TObject);

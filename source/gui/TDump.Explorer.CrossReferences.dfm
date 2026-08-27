@@ -9,6 +9,7 @@ object CrossReferencesFrame: TCrossReferencesFrame
     Top = 280
     Width = 640
     Height = 4
+    Cursor = crVSplit
     Align = alTop
   end
 end

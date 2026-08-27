@@ -1144,6 +1144,11 @@ type
     function ParseFile(const AFileName: string): TDumpDocument;
   end;
 
+
+function IsBorlandMethodName(const AValue: string): Boolean;
+function BorlandSymbolCaption(const ARecord: TDumpBorlandSymbolRecord): string;
+function BorlandTypeCaption(const ARecord: TDumpGlobalTypeRecord): string;
+
 implementation
 
 const
@@ -1152,6 +1157,46 @@ const
   SGlobalSymbolHeaderLabels: array[0..8] of string = ('cbSymbols:',
     'cNamespaces:', 'cUDTs:', 'cOthers:', 'Total:', 'SymHash:',
     'cbSymHash:', 'AddrHash:', 'cbAddrHash:');
+
+function IsBorlandMethodName(const AValue: string): Boolean;
+var
+  LValue: string;
+begin
+  LValue := Trim(AValue);
+  Result := (LValue <> '') and
+    ((LValue[1] = '@') or
+     ((Pos('(', LValue) > 1) and
+      (LastDelimiter(')', LValue) > Pos('(', LValue))) or
+     ContainsText(LValue, '__fastcall') or
+     ContainsText(LValue, '__cdecl') or
+     ContainsText(LValue, '__stdcall') or
+     ContainsText(LValue, '__linkproc'));
+end;
+
+function BorlandSymbolCaption(const ARecord: TDumpBorlandSymbolRecord): string;
+begin
+  Result := ARecord.ResolvedName;
+  if Result = '' then
+    Result := ARecord.Name;
+  if Result = '' then
+    Result := ARecord.RecordKind;
+  if Result = '' then
+    Result := 'Symbol record';
+  if (ARecord.RecordKind <> '') and not SameText(Result, ARecord.RecordKind) then
+    Result := ARecord.RecordKind + '  ' + Result;
+end;
+
+function BorlandTypeCaption(const ARecord: TDumpGlobalTypeRecord): string;
+begin
+  Result := 'Type ' + ARecord.RawTypeIndex;
+  if ARecord.TypeKind <> '' then
+    Result := Result + '  ' + ARecord.TypeKind;
+  if ARecord.ResolvedName <> '' then
+    Result := Result + '  ' + ARecord.ResolvedName
+  else if ARecord.Name <> '' then
+    Result := Result + '  ' + ARecord.Name;
+end;
+
 
 // Keep token parsing independent of TDUMP's whitespace-aligned columns.
 function NormalizeLineBreaks(const S: string): string;

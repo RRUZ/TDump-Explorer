@@ -23,7 +23,7 @@ type
   TExplorerTheme = record
     BackgroundColor: TColor;
     TextColor: TColor;
-
+    InactiveText: TColor;
     StringLiteralColor: TColor;
     NumberColor: TColor;
     HexadecimalColor: TColor;
@@ -33,7 +33,6 @@ type
     NamespaceColor: TColor;
     TypeColor: TColor;
     MethodColor: TColor;
-
     SelectionColor: TColor;
     class function DarkTheme: TExplorerTheme; static;
     class function LightTheme: TExplorerTheme; static;
@@ -42,6 +41,7 @@ type
 
 procedure DrawRoundedBar(const Canvas: TCanvas; const ARect: TRect; FillColor, BorderColor: TColor);
 procedure DrawSelectionBar(const Canvas: TCanvas; const ARect: TRect; FillColor, BorderColor: TColor);
+procedure DrawSplitterLine(const ACanvas: TCanvas; const ARect: TRect; AIsVertical: Boolean; AColor: TColor);
 function IsWindows11: Boolean;
 
 implementation
@@ -53,7 +53,8 @@ class function TExplorerTheme.DarkTheme: TExplorerTheme;
 begin
   var LStyle := StyleServices;
   Result.BackgroundColor := LStyle.GetSystemColor(clWindow);
-  Result.TextColor := ColorBlendRGB(LStyle.GetSystemColor(clWindowText), LStyle.GetSystemColor(clWindow), 0.3);
+  Result.TextColor := ColorBlendRGB(LStyle.GetSystemColor(clWindowText), LStyle.GetSystemColor(clWindow), 0.2);
+  Result.InactiveText := ColorBlendRGB(LStyle.GetSystemColor(clWindowText), LStyle.GetSystemColor(clWindow), 0.5);
   Result.SelectionColor := LStyle.GetSystemColor(clHighlight);
 
   Result.StringLiteralColor := TColor(RGB(165, 225, 120));
@@ -71,7 +72,8 @@ class function TExplorerTheme.LightTheme: TExplorerTheme;
 begin
   var LStyle := StyleServices;
   Result.BackgroundColor := LStyle.GetSystemColor(clWindow);
-  Result.TextColor := ColorBlendRGB(LStyle.GetSystemColor(clWindowText), LStyle.GetSystemColor(clWindow), 0.3);
+  Result.TextColor := ColorBlendRGB(LStyle.GetSystemColor(clWindowText), LStyle.GetSystemColor(clWindow), 0.2);
+  Result.InactiveText := ColorBlendRGB(LStyle.GetSystemColor(clWindowText), LStyle.GetSystemColor(clWindow), 0.5);
   Result.SelectionColor := LStyle.GetSystemColor(clHighlight);
 
   Result.StringLiteralColor := TColor(RGB(35, 125, 70));
@@ -155,6 +157,44 @@ begin
     Canvas.FillRect(ARect);
     Canvas.Brush.Color := BorderColor;
     Canvas.FrameRect(ARect);
+  end;
+end;
+
+procedure DrawSplitterLine(const ACanvas: TCanvas; const ARect: TRect;  AIsVertical: Boolean; AColor: TColor);
+var
+  LColor: ARGB;
+  LGraphics: TGPGraphics;
+  LPen: TGPPen;
+  LRGBColor: TColor;
+  LCenter: Single;
+begin
+  if (ARect.Width <= 0) or (ARect.Height <= 0) then
+    Exit;
+
+  LRGBColor := ColorToRGB(AColor);
+  LColor := MakeColor(GetRValue(LRGBColor), GetGValue(LRGBColor),
+    GetBValue(LRGBColor));
+  LGraphics := TGPGraphics.Create(ACanvas.Handle);
+  try
+    LGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
+    LGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);
+    LPen := TGPPen.Create(LColor, 1.0);
+    try
+      if AIsVertical then
+      begin
+        LCenter := (ARect.Left + ARect.Right) / 2.0;
+        LGraphics.DrawLine(LPen, LCenter, ARect.Top, LCenter, ARect.Bottom);
+      end
+      else
+      begin
+        LCenter := (ARect.Top + ARect.Bottom) / 2.0;
+        LGraphics.DrawLine(LPen, ARect.Left, LCenter, ARect.Right, LCenter);
+      end;
+    finally
+      LPen.Free;
+    end;
+  finally
+    LGraphics.Free;
   end;
 end;
 

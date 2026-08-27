@@ -4,14 +4,15 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
-  System.Math,
+  System.Math, System.IOUtils,
   System.Generics.Collections, System.StrUtils, Vcl.Graphics, Vcl.Controls,
   Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ComCtrls,
   TDump.Explorer.HighlighterControl, TDump.Explorer.Highlighter, Vcl.ExtCtrls,
+  VirtualTrees.Types,
   VirtualTrees.BaseAncestorVCL,
   VirtualTrees.BaseTree, VirtualTrees.AncestorVCL, VirtualTrees,
   TDump.Explorer.Parser, TDump.Explorer.TinyParser, Vcl.WinXPanels,
-  TDump.Explorer.CrossReferences, TDump.Explorer.RawView, Vcl.VirtualImage;
+  TDump.Explorer.RawView, Vcl.VirtualImage;
 
 type
   TTreeDetailKind = (tdkNone, tdkDocumentSummary,
@@ -52,18 +53,27 @@ type
   end;
 
   TDumpDocumentFrame = class(TFrame)
-    ProgressBar1: TProgressBar;
     Tree: TVirtualStringTree;
     pnCards: TPanel;
     Splitter1: TSplitter;
     cpViews: TCardPanel;
     pnProperties: TPanel;
     pnTop: TPanel;
-    tcViews: TTabControl;
-    frCrossReferences: TCrossReferencesFrame;
     Splitter2: TSplitter;
     frRawView: TRawViewFrame;
     VirtualImage1: TVirtualImage;
+    lblDocumentName: TLabel;
+    lblSourcePath: TLabel;
+    lblFormatCaption: TLabel;
+    lblFormatValue: TLabel;
+    lblArchitectureCaption: TLabel;
+    lblArchitectureValue: TLabel;
+    lblTimestampCaption: TLabel;
+    lblTimestampValue: TLabel;
+    lblSizeCaption: TLabel;
+    lblSizeValue: TLabel;
+    pnDocument: TPanel;
+    gpHeader: TGridPanel;
   private
     FDocument: TDumpDocument;
     FSummaryCard: TCard;
@@ -71,25 +81,19 @@ type
     FHighlighterCards: array[TTreeDetailKind] of TCard;
     FHighlighterControls: array[TTreeDetailKind] of THighlighterControl;
     FActiveDetailNode: PVirtualNode;
+    FTreeSelectionFillColor: TColor;
+    FTreeSelectionBorderColor: TColor;
     function AddTreeNode(AParent: PVirtualNode; const ACaption: string;
-      ADetailKind: TTreeDetailKind = tdkNone;
-      AHeaderIndex: Integer = -1; AImportModuleIndex: Integer = -1;
-      AResource: TDumpResource = nil;
-      ABorlandSubsectionIndex: Integer = -1;
-      ASourceFile: TDumpSourceFile = nil;
-      AAlignSymbolRecord: TDumpAlignSymbolRecord = nil;
-      AGlobalSymbolRecord: TDumpGlobalSymbolRecord = nil;
-      AGlobalTypeRecord: TDumpGlobalTypeRecord = nil;
-      AMachArchitecture: TDumpMachArchitecture = nil;
-      AMachLoadCommand: TDumpMachLoadCommand = nil;
-      AMachSection: TDumpMachSection = nil;
-      AObjectRecord: TDumpObjectRecord = nil;
-      ARelocationBlock: TDumpRelocationBlock = nil): PVirtualNode;
+      ADetailKind: TTreeDetailKind = tdkNone): PVirtualNode;
     procedure AddAlignSymbolRecordNode(AParent: PVirtualNode;
       ARecord: TDumpAlignSymbolRecord);
     procedure AddResourceNodes(AParent: PVirtualNode;
       const AResources: TObjectList<TDumpResource>);
     function FileKindCaption(AFileKind: TDumpFileKind): string;
+    function HeaderFormatCaption: string;
+    function HeaderArchitectureCaption: string;
+    function FormatFileSize(AByteCount: Int64): string;
+    procedure UpdateDocumentHeader;
     function HasBorlandSymbolTable: Boolean;
     function ResourceCaption(const AResource: TDumpResource): string;
     function EnsureHighlighterDetailControl(
@@ -136,7 +140,6 @@ type
     procedure ShowMachDynamicSymbolsDetails(ADetailKind: TTreeDetailKind);
     procedure ShowMachDynamicSymbolMetadataDetails;
     procedure ShowDiagnosticsDetails;
-    procedure UpdateActiveView;
     function DetailControlForNode(ANode: PVirtualNode): THighlighterControl;
     procedure SaveActiveDetailItemIndex;
     procedure RestoreDetailItemIndex(ANode: PVirtualNode);
@@ -150,16 +153,22 @@ type
       Column: TColumnIndex);
     procedure TreeGetText(Sender: TBaseVirtualTree; Node: PVirtualNode;
       Column: TColumnIndex; TextType: TVSTTextType; var CellText: string);
+    procedure TreeBeforeCellPaint(Sender: TBaseVirtualTree;
+      TargetCanvas: TCanvas; Node: PVirtualNode; Column: TColumnIndex;
+      CellPaintMode: TVTCellPaintMode; CellRect: TRect;
+      var ContentRect: TRect);
     procedure TreeMouseUp(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
-    procedure tcViewsChange(Sender: TObject);
+    procedure pnTopResize(Sender: TObject);
+    procedure SplitterPaint(Sender: TObject);
+    procedure CMStyleChanged(var AMessage: TMessage); message CM_STYLECHANGED;
+    procedure ApplyTreeTheme;
+    procedure ApplyTheme;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     // Takes ownership of ADocument.
     procedure PopulateTree(ADocument: TDumpDocument);
-    procedure SetProgress(ACompletedLines, ATotalLines: Integer);
-    procedure SetStatus(const AStatus: string);
     procedure ShowSummary(const ASummary: string);
   end;
 
@@ -170,44 +179,6 @@ uses
 
 {$R *.dfm}
 
-function IsBorlandMethodName(const AValue: string): Boolean;
-var
-  LValue: string;
-begin
-  LValue := Trim(AValue);
-  Result := (LValue <> '') and
-    ((LValue[1] = '@') or
-     ((Pos('(', LValue) > 1) and
-      (LastDelimiter(')', LValue) > Pos('(', LValue))) or
-     ContainsText(LValue, '__fastcall') or
-     ContainsText(LValue, '__cdecl') or
-     ContainsText(LValue, '__stdcall') or
-     ContainsText(LValue, '__linkproc'));
-end;
-
-function BorlandSymbolCaption(const ARecord: TDumpBorlandSymbolRecord): string;
-begin
-  Result := ARecord.ResolvedName;
-  if Result = '' then
-    Result := ARecord.Name;
-  if Result = '' then
-    Result := ARecord.RecordKind;
-  if Result = '' then
-    Result := 'Symbol record';
-  if (ARecord.RecordKind <> '') and not SameText(Result, ARecord.RecordKind) then
-    Result := ARecord.RecordKind + '  ' + Result;
-end;
-
-function BorlandTypeCaption(const ARecord: TDumpGlobalTypeRecord): string;
-begin
-  Result := 'Type ' + ARecord.RawTypeIndex;
-  if ARecord.TypeKind <> '' then
-    Result := Result + '  ' + ARecord.TypeKind;
-  if ARecord.ResolvedName <> '' then
-    Result := Result + '  ' + ARecord.ResolvedName
-  else if ARecord.Name <> '' then
-    Result := Result + '  ' + ARecord.Name;
-end;
 
 function PropertyValue(const AProperties: TList<TDumpProperty>;
   const AName: string): string;
@@ -218,9 +189,56 @@ begin
   Result := '';
 end;
 
+procedure TDumpDocumentFrame.ApplyTheme;
+begin
+  pnTop.StyleElements := pnTop.StyleElements - [seClient];
+  pnTop.Color := TExplorerTheme.ActiveTheme.BackgroundColor;
+  pnDocument.StyleElements := pnDocument.StyleElements - [seClient];
+  pnDocument.Color := TExplorerTheme.ActiveTheme.BackgroundColor;
+  gpHeader.StyleElements := gpHeader.StyleElements - [seClient];
+  gpHeader.Color := TExplorerTheme.ActiveTheme.BackgroundColor;
+
+  lblSourcePath.StyleName := 'Windows';
+  lblSourcePath.Font.Color := TExplorerTheme.ActiveTheme.InactiveText;
+
+  lblFormatCaption.StyleName := 'Windows';
+  lblFormatCaption.Font.Color := TExplorerTheme.ActiveTheme.InactiveText;
+
+  lblArchitectureCaption.StyleName := 'Windows';
+  lblArchitectureCaption.Font.Color := TExplorerTheme.ActiveTheme.InactiveText;
+
+  lblTimestampCaption.StyleName := 'Windows';
+  lblTimestampCaption.Font.Color := TExplorerTheme.ActiveTheme.InactiveText;
+
+  lblSizeCaption.StyleName := 'Windows';
+  lblSizeCaption.Font.Color := TExplorerTheme.ActiveTheme.InactiveText;
+
+  ApplyTreeTheme;
+end;
+
+procedure TDumpDocumentFrame.ApplyTreeTheme;
+begin
+  var LTheme := TExplorerTheme.ActiveTheme;
+  FTreeSelectionFillColor := ColorBlendRGB(LTheme.SelectionColor,
+    LTheme.BackgroundColor, 0.9);
+  FTreeSelectionBorderColor := LTheme.SelectionColor;
+
+  Tree.Color := LTheme.BackgroundColor;
+  Tree.Font.Color := LTheme.TextColor;
+  Tree.Colors.FocusedSelectionColor := FTreeSelectionFillColor;
+  Tree.Colors.FocusedSelectionBorderColor := FTreeSelectionBorderColor;
+  Tree.Colors.UnfocusedSelectionColor := FTreeSelectionFillColor;
+  Tree.Colors.UnfocusedSelectionBorderColor := FTreeSelectionBorderColor;
+  Tree.Colors.SelectionTextColor := LTheme.TextColor;
+  Tree.Colors.UnfocusedColor := LTheme.TextColor;
+  Tree.Invalidate;
+end;
+
 constructor TDumpDocumentFrame.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  Splitter1.OnPaint := SplitterPaint;
+  Splitter2.OnPaint := SplitterPaint;
   FSummaryCard := TCard.Create(cpViews);
   FSummaryCard.Parent := cpViews;
   FSummaryCard.Caption := 'Summary';
@@ -232,74 +250,53 @@ begin
   Tree.OnGetText := TreeGetText;
   Tree.OnFreeNode := TreeFreeNode;
   Tree.OnFocusChanged := TreeFocusChanged;
+  Tree.OnBeforeCellPaint := TreeBeforeCellPaint;
   Tree.OnMouseUp := TreeMouseUp;
+  var LPaintOptions := Tree.TreeOptions.PaintOptions +
+    [toAlwaysHideSelection, toHideFocusRect];
+  Tree.TreeOptions.PaintOptions := LPaintOptions;
+  var LSelectionOptions := Tree.TreeOptions.SelectionOptions + [toFullRowSelect];
+  Tree.TreeOptions.SelectionOptions := LSelectionOptions;
 
-  Tree.Font.Color := TExplorerTheme.ActiveTheme.TextColor;
-
-  var LFillColor := ColorBlendRGB(TExplorerTheme.ActiveTheme.SelectionColor, TExplorerTheme.ActiveTheme.BackgroundColor, 0.9);
-      {
-  Tree.Colors.SelectionRectangleBlendColor := clGReen;//LFillColor;
-  Tree.Colors.SelectionRectangleBorderColor := clRed;
-        }
-  Tree.Colors.FocusedSelectionColor := LFillColor;
-  Tree.Colors.FocusedSelectionBorderColor := TExplorerTheme.ActiveTheme.SelectionColor;
-
+  ApplyTheme;
 
   frRawView.OnSyncWithSelectedNodeChanged := RawViewSyncWithSelectedNodeChanged;
-  tcViews.OnChange := tcViewsChange;
-  tcViews.TabIndex := 0;
-  UpdateActiveView;
+  pnTop.OnResize := pnTopResize;
+  UpdateDocumentHeader;
+end;
+
+procedure TDumpDocumentFrame.CMStyleChanged(var AMessage: TMessage);
+begin
+  inherited;
+  ApplyTheme;
 end;
 
 destructor TDumpDocumentFrame.Destroy;
 begin
-  frCrossReferences.Clear;
   FDocument.Free;
   inherited;
 end;
 
 function TDumpDocumentFrame.AddTreeNode(AParent: PVirtualNode;
-  const ACaption: string; ADetailKind: TTreeDetailKind;
-  AHeaderIndex, AImportModuleIndex: Integer;
-  AResource: TDumpResource;
-  ABorlandSubsectionIndex: Integer;
-  ASourceFile: TDumpSourceFile;
-  AAlignSymbolRecord: TDumpAlignSymbolRecord;
-  AGlobalSymbolRecord: TDumpGlobalSymbolRecord;
-  AGlobalTypeRecord: TDumpGlobalTypeRecord;
-  AMachArchitecture: TDumpMachArchitecture;
-  AMachLoadCommand: TDumpMachLoadCommand;
-  AMachSection: TDumpMachSection;
-  AObjectRecord: TDumpObjectRecord;
-  ARelocationBlock: TDumpRelocationBlock): PVirtualNode;
+  const ACaption: string; ADetailKind: TTreeDetailKind): PVirtualNode;
 begin
   Result := Tree.AddChild(AParent);
-  PTreeItemData(Tree.GetNodeData(Result))^.Caption := ACaption;
-  PTreeItemData(Tree.GetNodeData(Result))^.DetailKind := ADetailKind;
-  PTreeItemData(Tree.GetNodeData(Result))^.HeaderIndex := AHeaderIndex;
-  PTreeItemData(Tree.GetNodeData(Result))^.ImportModuleIndex := AImportModuleIndex;
-  PTreeItemData(Tree.GetNodeData(Result))^.Resource := AResource;
-  PTreeItemData(Tree.GetNodeData(Result))^.BorlandSubsectionIndex :=
-    ABorlandSubsectionIndex;
-  PTreeItemData(Tree.GetNodeData(Result))^.SourceFile := ASourceFile;
-  PTreeItemData(Tree.GetNodeData(Result))^.AlignSymbolRecord :=
-    AAlignSymbolRecord;
-  PTreeItemData(Tree.GetNodeData(Result))^.GlobalSymbolRecord :=
-    AGlobalSymbolRecord;
-  PTreeItemData(Tree.GetNodeData(Result))^.GlobalTypeRecord := AGlobalTypeRecord;
-  PTreeItemData(Tree.GetNodeData(Result))^.MachArchitecture := AMachArchitecture;
-  PTreeItemData(Tree.GetNodeData(Result))^.MachLoadCommand := AMachLoadCommand;
-  PTreeItemData(Tree.GetNodeData(Result))^.MachSection := AMachSection;
-  PTreeItemData(Tree.GetNodeData(Result))^.ObjectRecord := AObjectRecord;
-  PTreeItemData(Tree.GetNodeData(Result))^.RelocationBlock := ARelocationBlock;
-  PTreeItemData(Tree.GetNodeData(Result))^.DetailItemIndex := -1;
+  var LNodeData := PTreeItemData(Tree.GetNodeData(Result));
+  LNodeData^ := Default(TTreeItemData);
+  LNodeData.Caption := ACaption;
+  LNodeData.DetailKind := ADetailKind;
+  LNodeData.HeaderIndex := -1;
+  LNodeData.ImportModuleIndex := -1;
+  LNodeData.BorlandSubsectionIndex := -1;
+  LNodeData.DetailItemIndex := -1;
 end;
 
 procedure TDumpDocumentFrame.AddAlignSymbolRecordNode(AParent: PVirtualNode;
   ARecord: TDumpAlignSymbolRecord);
 begin
   var LRecordNode := AddTreeNode(AParent, BorlandSymbolCaption(ARecord),
-    tdkBorlandAlignSymbolRecord, -1, -1, nil, -1, nil, ARecord);
+    tdkBorlandAlignSymbolRecord);
+  PTreeItemData(Tree.GetNodeData(LRecordNode))^.AlignSymbolRecord := ARecord;
   for var LChild in ARecord.ScopeChildren do
     AddAlignSymbolRecordNode(LRecordNode, TDumpAlignSymbolRecord(LChild));
 end;
@@ -312,7 +309,8 @@ begin
     if SameText(LResource.ResourceType, 'Unknown') then
       Continue;
     var LResourceNode := AddTreeNode(AParent, ResourceCaption(LResource),
-      tdkResource, -1, -1, LResource);
+      tdkResource);
+    PTreeItemData(Tree.GetNodeData(LResourceNode))^.Resource := LResource;
     AddResourceNodes(LResourceNode, LResource.Children);
   end;
 end;
@@ -336,6 +334,116 @@ begin
     dfASCII: Result := 'ASCII Text';
   else
     Result := 'TDUMP Document';
+  end;
+end;
+
+function TDumpDocumentFrame.FormatFileSize(AByteCount: Int64): string;
+const
+  CUnits: array[0..4] of string = ('B', 'KB', 'MB', 'GB', 'TB');
+var
+  LSize: Double;
+  LUnitIndex: Integer;
+begin
+  LSize := AByteCount;
+  LUnitIndex := 0;
+  while (LSize >= 1024) and (LUnitIndex < High(CUnits)) do
+  begin
+    LSize := LSize / 1024;
+    Inc(LUnitIndex);
+  end;
+
+  if LUnitIndex = 0 then
+    Result := Format('%d %s', [AByteCount, CUnits[LUnitIndex]])
+  else
+    Result := Format('%.2f %s', [LSize, CUnits[LUnitIndex]]);
+end;
+
+function TDumpDocumentFrame.HeaderArchitectureCaption: string;
+begin
+  Result := '';
+  if FDocument = nil then
+    Exit;
+
+  Result := Trim(FDocument.Architecture);
+  if Result <> '' then
+    Exit;
+
+  for var LHeader in FDocument.Headers do
+  begin
+    Result := PropertyValue(LHeader.Properties, 'CPU type');
+    if Result = '' then
+      Result := PropertyValue(LHeader.Properties, 'Machine');
+    if Result <> '' then
+      Exit;
+  end;
+end;
+
+function TDumpDocumentFrame.HeaderFormatCaption: string;
+begin
+  if FDocument = nil then
+    Exit('');
+
+  case FDocument.FileKind of
+    dfPE:
+      Result := 'PE';
+    dfELFObject:
+      Result := 'ELF';
+    dfMach:
+      Result := 'Mach-O';
+  else
+    Result := FileKindCaption(FDocument.FileKind);
+  end;
+end;
+
+procedure TDumpDocumentFrame.pnTopResize(Sender: TObject);
+begin
+end;
+
+procedure TDumpDocumentFrame.SplitterPaint(Sender: TObject);
+var
+  LSplitter: TSplitter;
+begin
+  if not (Sender is TSplitter) then
+    Exit;
+
+  LSplitter := TSplitter(Sender);
+  DrawSplitterLine(LSplitter.Canvas, LSplitter.ClientRect,
+    LSplitter.Align in [alLeft, alRight], TExplorerTheme.ActiveTheme.InactiveText);
+end;
+
+procedure TDumpDocumentFrame.UpdateDocumentHeader;
+var
+  LSourceFileName: string;
+begin
+  if FDocument = nil then
+  begin
+    lblDocumentName.Caption := '';
+    lblSourcePath.Caption := '';
+    lblFormatValue.Caption := '';
+    lblArchitectureValue.Caption := '';
+    lblTimestampValue.Caption := '';
+    lblSizeValue.Caption := '';
+    Exit;
+  end;
+
+  LSourceFileName := FDocument.SourceFileName;
+  lblDocumentName.Caption := ExtractFileName(LSourceFileName);
+  if lblDocumentName.Caption = '' then
+    lblDocumentName.Caption := FileKindCaption(FDocument.FileKind);
+  lblSourcePath.Caption := LSourceFileName;
+  lblFormatValue.Caption := HeaderFormatCaption;
+  lblArchitectureValue.Caption := HeaderArchitectureCaption;
+
+  if FileExists(LSourceFileName) then
+  begin
+    lblTimestampValue.Caption := FormatDateTime('yyyy-mm-dd hh:nn:ss',
+      TFile.GetLastWriteTime(LSourceFileName));
+    lblSizeValue.Caption := FormatFileSize(TFile.GetSize(LSourceFileName));
+  end
+  else
+  begin
+    lblTimestampValue.Caption := '';
+    lblSizeValue.Caption := '';
   end;
 end;
 
@@ -1729,16 +1837,19 @@ procedure TDumpDocumentFrame.PopulateTree(ADocument: TDumpDocument);
 begin
   if FDocument <> ADocument then
   begin
-    frCrossReferences.Clear;
     FDocument.Free;
     FDocument := ADocument;
   end;
   if FDocument = nil then
+  begin
+    UpdateDocumentHeader;
     Exit;
+  end;
+
+  UpdateDocumentHeader;
 
   cpViews.ActiveCard := FSummaryCard;
   frRawView.Populate(FDocument);
-  frCrossReferences.Populate(FDocument);
   Tree.BeginUpdate;
   try
     FActiveDetailNode := nil;
@@ -1750,8 +1861,12 @@ begin
     begin
       var LHeader := FDocument.Headers[LHeaderIndex];
       if LHeader.Properties.Count > 0 then
-        AddTreeNode(LRootNode, LHeader.Name, HeaderDetailKind(LHeader),
-          LHeaderIndex);
+      begin
+        var LHeaderNode := AddTreeNode(LRootNode, LHeader.Name,
+          HeaderDetailKind(LHeader));
+        PTreeItemData(Tree.GetNodeData(LHeaderNode))^.HeaderIndex :=
+          LHeaderIndex;
+      end;
     end;
 
     if FDocument.DataDirectories.Count > 0 then
@@ -1776,8 +1891,10 @@ begin
         var LModuleCaption := LModule.Name;
         if LModuleCaption = '' then
           LModuleCaption := 'Unnamed import module';
-        AddTreeNode(LImportsNode, LModuleCaption, tdkImportModule, -1,
-          LModuleIndex);
+        var LModuleNode := AddTreeNode(LImportsNode, LModuleCaption,
+          tdkImportModule);
+        PTreeItemData(Tree.GetNodeData(LModuleNode))^.ImportModuleIndex :=
+          LModuleIndex;
       end;
       if FDocument.DelayedImportTable <> nil then
       begin
@@ -1792,8 +1909,10 @@ begin
           var LModuleCaption := LModule.Name;
           if LModuleCaption = '' then
             LModuleCaption := 'Unnamed delayed import module';
-          AddTreeNode(LDelayedImportsNode, LModuleCaption,
-            tdkDelayedImportModule, -1, LModuleIndex);
+          var LModuleNode := AddTreeNode(LDelayedImportsNode, LModuleCaption,
+            tdkDelayedImportModule);
+          PTreeItemData(Tree.GetNodeData(LModuleNode))^.ImportModuleIndex :=
+            LModuleIndex;
         end;
       end;
     end;
@@ -1813,11 +1932,13 @@ begin
       var LRelocationsNode := AddTreeNode(LRootNode, Format('Relocations [%d blocks]',
         [FDocument.RelocationBlocks.Count]), tdkRelocations);
       for var LBlock in FDocument.RelocationBlocks do
-        AddTreeNode(LRelocationsNode, Format(
+      begin
+        var LBlockNode := AddTreeNode(LRelocationsNode, Format(
           'Block #%d: Page RVA = %s, block size = %s', [LBlock.Index,
           IntToHex(LBlock.PageRVA, 8), IntToHex(LBlock.BlockSize, 8)]),
-          tdkRelocationBlock, -1, -1, nil, -1, nil, nil, nil, nil, nil,
-          nil, nil, nil, LBlock);
+          tdkRelocationBlock);
+        PTreeItemData(Tree.GetNodeData(LBlockNode))^.RelocationBlock := LBlock;
+      end;
     end
     else if FDocument.Relocations.Count > 0 then
       AddTreeNode(LRootNode, Format('Relocations [%d]',
@@ -1871,8 +1992,9 @@ begin
         var LRecordCaption := LRecord.RawOffset + ' ' + LRecord.RecordKind;
         if LRecord.Name <> '' then
           LRecordCaption := LRecordCaption + '  ' + LRecord.Name;
-        AddTreeNode(LRecordsNode, LRecordCaption, tdkOMFRecord, -1, -1, nil,
-          -1, nil, nil, nil, nil, nil, nil, nil, LRecord);
+        var LRecordNode := AddTreeNode(LRecordsNode, LRecordCaption,
+          tdkOMFRecord);
+        PTreeItemData(Tree.GetNodeData(LRecordNode))^.ObjectRecord := LRecord;
       end;
     end;
     if FDocument.LibraryMembers.Count > 0 then
@@ -1899,9 +2021,10 @@ begin
         if LArchitecture.CPUSubtype <> '' then
           LArchitectureCaption := LArchitectureCaption + ' (' +
             LArchitecture.CPUSubtype + ')';
-        AddTreeNode(LArchitecturesNode, LArchitectureCaption,
-          tdkMachArchitecture, -1, -1, nil, -1, nil, nil, nil, nil,
-          LArchitecture);
+        var LArchitectureNode := AddTreeNode(LArchitecturesNode,
+          LArchitectureCaption, tdkMachArchitecture);
+        PTreeItemData(Tree.GetNodeData(LArchitectureNode))^.MachArchitecture :=
+          LArchitecture;
       end;
     end;
 
@@ -1914,15 +2037,18 @@ begin
       begin
         var LCommandNode := AddTreeNode(LLoadCommandsNode,
           Format('#%d %s', [LCommand.Index, LCommand.Name]),
-          tdkMachLoadCommand, -1, -1, nil, -1, nil, nil, nil, nil, nil,
-          LCommand);
+          tdkMachLoadCommand);
+        PTreeItemData(Tree.GetNodeData(LCommandNode))^.MachLoadCommand :=
+          LCommand;
         for var LSection in LCommand.Sections do
         begin
           var LSectionCaption := LSection.Name;
           if LSection.SegmentName <> '' then
             LSectionCaption := LSectionCaption + ' (' + LSection.SegmentName + ')';
-          AddTreeNode(LCommandNode, LSectionCaption, tdkMachSection, -1, -1,
-            nil, -1, nil, nil, nil, nil, nil, nil, LSection);
+          var LSectionNode := AddTreeNode(LCommandNode, LSectionCaption,
+            tdkMachSection);
+          PTreeItemData(Tree.GetNodeData(LSectionNode))^.MachSection :=
+            LSection;
         end;
       end;
     end;
@@ -1964,8 +2090,9 @@ begin
         if LSubsectionCaption = '' then
           LSubsectionCaption := 'Subsection';
         var LSubsectionNode := AddTreeNode(LBorlandNode, Format('%s (module %d)',
-          [LSubsectionCaption, LSubsection.ModIndex]), tdkBorlandSubsection,
-          -1, -1, nil, LSubsectionIndex);
+          [LSubsectionCaption, LSubsection.ModIndex]), tdkBorlandSubsection);
+        PTreeItemData(Tree.GetNodeData(LSubsectionNode))^.BorlandSubsectionIndex :=
+          LSubsectionIndex;
         if SameText(LSubsection.SubsectionType, 'sstSrcModule') then
           for var LSourceModule in FDocument.SourceModules do
             if (LSourceModule.ModIndex = LSubsection.ModIndex) and
@@ -1977,8 +2104,10 @@ begin
                   LSourceFileCaption := LSourceFile.Name;
                 if LSourceFileCaption = '' then
                   LSourceFileCaption := 'Source file';
-                AddTreeNode(LSubsectionNode, LSourceFileCaption,
-                  tdkBorlandSourceFile, -1, -1, nil, -1, LSourceFile);
+                var LSourceFileNode := AddTreeNode(LSubsectionNode,
+                  LSourceFileCaption, tdkBorlandSourceFile);
+                PTreeItemData(Tree.GetNodeData(LSourceFileNode))^.SourceFile :=
+                  LSourceFile;
               end;
         if SameText(LSubsection.SubsectionType, 'sstAlignSym') then
           for var LAlignSection in FDocument.AlignSymbolSections do
@@ -1992,18 +2121,25 @@ begin
             if (LGlobalSymbolSection.ModIndex = LSubsection.ModIndex) and
               (LGlobalSymbolSection.FileOffset = LSubsection.FileOffset) then
               for var LGlobalSymbolRecord in LGlobalSymbolSection.Records do
-                AddTreeNode(LSubsectionNode,
+              begin
+                var LGlobalSymbolNode := AddTreeNode(LSubsectionNode,
                   BorlandSymbolCaption(LGlobalSymbolRecord),
-                  tdkBorlandGlobalSymbolRecord, -1, -1, nil, -1, nil, nil,
-                  LGlobalSymbolRecord);
+                  tdkBorlandGlobalSymbolRecord);
+                PTreeItemData(Tree.GetNodeData(LGlobalSymbolNode))^.GlobalSymbolRecord :=
+                  LGlobalSymbolRecord;
+              end;
         if SameText(LSubsection.SubsectionType, 'sstGlobalTypes') then
           for var LGlobalTypeSection in FDocument.GlobalTypeSections do
             if (LGlobalTypeSection.ModIndex = LSubsection.ModIndex) and
               (LGlobalTypeSection.FileOffset = LSubsection.FileOffset) then
               for var LGlobalTypeRecord in LGlobalTypeSection.Records do
-                AddTreeNode(LSubsectionNode, BorlandTypeCaption(LGlobalTypeRecord),
-                  tdkBorlandGlobalTypeRecord, -1, -1, nil, -1, nil, nil, nil,
-                  LGlobalTypeRecord);
+              begin
+                var LGlobalTypeNode := AddTreeNode(LSubsectionNode,
+                  BorlandTypeCaption(LGlobalTypeRecord),
+                  tdkBorlandGlobalTypeRecord);
+                PTreeItemData(Tree.GetNodeData(LGlobalTypeNode))^.GlobalTypeRecord :=
+                  LGlobalTypeRecord;
+              end;
       end;
     end;
     if FDocument.Diagnostics.Count > 0 then
@@ -2016,51 +2152,9 @@ begin
   end;
 end;
 
-procedure TDumpDocumentFrame.SetProgress(ACompletedLines, ATotalLines: Integer);
-begin
-  if ATotalLines <= 0 then
-    Exit;
-
-  ProgressBar1.Max := ATotalLines;
-  var LPosition := ACompletedLines;
-  if LPosition < ProgressBar1.Min then
-    LPosition := ProgressBar1.Min
-  else if LPosition > ProgressBar1.Max then
-    LPosition := ProgressBar1.Max;
-  ProgressBar1.Position := LPosition;
-  ProgressBar1.Update;
-end;
-
-procedure TDumpDocumentFrame.SetStatus(const AStatus: string);
-begin
-  FSummaryControl.SetText(AStatus);
-  ProgressBar1.Min := 0;
-  ProgressBar1.Max := 100;
-  ProgressBar1.Position := 0;
-  ProgressBar1.Update;
-end;
-
 procedure TDumpDocumentFrame.ShowSummary(const ASummary: string);
 begin
   FSummaryControl.SetText(ASummary);
-  ProgressBar1.Position := ProgressBar1.Max;
-  ProgressBar1.Update;
-end;
-
-procedure TDumpDocumentFrame.UpdateActiveView;
-begin
-  var LPropertiesView := tcViews.TabIndex = 0;
-  var LCrossReferencesView := tcViews.TabIndex = 1;
-
-  Tree.Visible := LPropertiesView;
-  Splitter1.Visible := LPropertiesView;
-  pnProperties.Visible := LPropertiesView;
-  frCrossReferences.Visible := LCrossReferencesView;
-
-  case tcViews.TabIndex of
-    0: pnProperties.BringToFront;
-    1: frCrossReferences.BringToFront;
-  end;
 end;
 
 function TDumpDocumentFrame.DetailControlForNode(
@@ -2571,6 +2665,22 @@ begin
   CellText := PTreeItemData(Sender.GetNodeData(Node))^.Caption;
 end;
 
+procedure TDumpDocumentFrame.TreeBeforeCellPaint(Sender: TBaseVirtualTree;
+  TargetCanvas: TCanvas; Node: PVirtualNode; Column: TColumnIndex;
+  CellPaintMode: TVTCellPaintMode; CellRect: TRect;
+  var ContentRect: TRect);
+begin
+  if CellPaintMode <> cpmPaint then
+    Exit;
+  if not Sender.Selected[Node] then
+    Exit;
+  if (CellRect.Width <= 0) or (CellRect.Height <= 0) then
+    Exit;
+
+  DrawSelectionBar(TargetCanvas, CellRect, FTreeSelectionFillColor,
+    FTreeSelectionBorderColor);
+end;
+
 procedure TDumpDocumentFrame.TreeFocusChanged(Sender: TBaseVirtualTree;
   Node: PVirtualNode; Column: TColumnIndex);
 begin
@@ -2584,11 +2694,6 @@ begin
     Exit;
 
   ActivateNode(Tree.GetNodeAt(X, Y));
-end;
-
-procedure TDumpDocumentFrame.tcViewsChange(Sender: TObject);
-begin
-  UpdateActiveView;
 end;
 
 end.

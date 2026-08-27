@@ -6,9 +6,9 @@ object LogControl: TLogControl
   TabOrder = 0
   object ControlList1: TControlList
     Left = 0
-    Top = 41
+    Top = 32
     Width = 640
-    Height = 439
+    Height = 448
     Align = alClient
     ItemHeight = 20
     ItemMargins.Left = 0
@@ -28,20 +28,42 @@ object LogControl: TLogControl
     Left = 0
     Top = 0
     Width = 640
-    Height = 41
+    Height = 32
     Align = alTop
     BevelOuter = bvNone
+    ParentBackground = False
     TabOrder = 1
+    object Label1: TLabel
+      AlignWithMargins = True
+      Left = 8
+      Top = 0
+      Width = 23
+      Height = 32
+      Margins.Left = 8
+      Margins.Top = 0
+      Margins.Right = 8
+      Margins.Bottom = 0
+      Align = alLeft
+      Caption = 'Log'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -13
+      Font.Name = 'Segoe UI'
+      Font.Style = [fsBold]
+      ParentFont = False
+      Layout = tlCenter
+      ExplicitHeight = 17
+    end
     object SearchFilterBox: TSearchBox
       AlignWithMargins = True
       Left = 467
-      Top = 8
+      Top = 4
       Width = 169
-      Height = 25
+      Height = 24
       Margins.Left = 4
-      Margins.Top = 8
+      Margins.Top = 4
       Margins.Right = 4
-      Margins.Bottom = 8
+      Margins.Bottom = 4
       Align = alRight
       TabOrder = 0
       ExplicitHeight = 23
