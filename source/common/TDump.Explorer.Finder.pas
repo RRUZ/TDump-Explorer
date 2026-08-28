@@ -141,7 +141,9 @@ begin
       LRegistry.GetKeyNames(LVersionNames);
       for var LVersionName in LVersionNames do
       begin
-        var LKeyName := CBDSRegistryPath + '\' + LVersionName;
+        // The BDS key is already open, so use an absolute path here rather
+        // than resolving the version key below it a second time.
+        var LKeyName := '\' + CBDSRegistryPath + '\' + LVersionName;
         if not LRegistry.OpenKeyReadOnly(LKeyName) then
           Continue;
         try

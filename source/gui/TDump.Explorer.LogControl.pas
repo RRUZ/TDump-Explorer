@@ -25,10 +25,6 @@ type
     SearchFilterBox: TSearchBox;
     Label1: TLabel;
   private
-    const
-      CTextPadding = 8;
-      CTimestampColumnWidth = 92;
-      CStatusColumnWidth = 78;
     var
       FEntries: TLogEntryList;
     procedure ControlList1BeforeDrawItem(AIndex: Integer; ACanvas: TCanvas;
@@ -120,6 +116,10 @@ end;
 
 procedure TLogControl.ControlList1BeforeDrawItem(AIndex: Integer;
   ACanvas: TCanvas; ARect: TRect; AState: TOwnerDrawState);
+const
+  cTextPadding = 8;
+  cTimestampColumnWidth = 92;
+  cStatusColumnWidth = 78;
 var
   LEntry: TLogEntry;
   LTimestampText: string;
@@ -158,19 +158,19 @@ begin
   LTimestampText := FormatDateTime('hh:nn:ss.zzz', LEntry.Timestamp);
   LStatusText := EntryTypeText(LEntry.EntryType);
   LTimestampRect := ARect;
-  LTimestampRect.Left := LTimestampRect.Left + CTextPadding;
-  LTimestampRect.Right := LTimestampRect.Left + CTimestampColumnWidth;
+  LTimestampRect.Left := LTimestampRect.Left + cTextPadding;
+  LTimestampRect.Right := LTimestampRect.Left + cTimestampColumnWidth;
   LStatusRect := ARect;
   LStatusRect.Left := LTimestampRect.Right;
-  LStatusRect.Right := LStatusRect.Left + CStatusColumnWidth;
+  LStatusRect.Right := LStatusRect.Left + cStatusColumnWidth;
   LMessageRect := ARect;
   LMessageRect.Left := LStatusRect.Right;
-  LMessageRect.Right := LMessageRect.Right - CTextPadding;
+  LMessageRect.Right := LMessageRect.Right - cTextPadding;
   if LMessageRect.Right < LMessageRect.Left then
     LMessageRect.Right := LMessageRect.Left;
 
-  ACanvas.Font.Name := 'Segoe UI';
-  ACanvas.Font.Size := 9;
+  ACanvas.Font.Name := TExplorerTheme.FontName;
+  ACanvas.Font.Size := TExplorerTheme.FontSize;
   {
   if (odSelected in AState) or (odFocused in AState) then
     ACanvas.Font.Color := LStyle.GetSystemColor(clHighlightText)

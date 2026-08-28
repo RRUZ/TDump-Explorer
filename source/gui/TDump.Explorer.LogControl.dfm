@@ -38,7 +38,7 @@ object LogControl: TLogControl
       Left = 8
       Top = 0
       Width = 23
-      Height = 32
+      Height = 17
       Margins.Left = 8
       Margins.Top = 0
       Margins.Right = 8
@@ -52,21 +52,19 @@ object LogControl: TLogControl
       Font.Style = [fsBold]
       ParentFont = False
       Layout = tlCenter
-      ExplicitHeight = 17
     end
     object SearchFilterBox: TSearchBox
       AlignWithMargins = True
       Left = 467
       Top = 4
       Width = 169
-      Height = 24
+      Height = 23
       Margins.Left = 4
       Margins.Top = 4
       Margins.Right = 4
       Margins.Bottom = 4
       Align = alRight
       TabOrder = 0
-      ExplicitHeight = 23
     end
   end
 end

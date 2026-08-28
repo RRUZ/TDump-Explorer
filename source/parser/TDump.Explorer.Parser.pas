@@ -986,6 +986,7 @@ type
     TurboDumpHeaderLine: Integer;
     ToolVersion: string;
     CommandLine: string;
+    PackageDescription: string;
     FileKind: TDumpFileKind;
     Architecture: string;
     RawText: string;
@@ -2883,6 +2884,19 @@ begin
         CharInSet(LTrimmedLine[1], ['A'..'Z', 'a'..'z']) and
         (LTrimmedLine[2] = ' ') and (LTrimmedLine[3] = '-') then
         Continue;
+
+      // TDUMP writes package metadata after the section-flag legend and
+      // before the first "Section:" block. It is not an object-table row.
+      if StartsWithText(LTrimmedLine, 'Description:') then
+      begin
+        var LDescriptionProperty: TDumpProperty;
+        if TryParsePropertyLine(LLine, LIndex + 1, LDescriptionProperty) then
+        begin
+          LNode.Properties.Add(LDescriptionProperty);
+          FDocument.PackageDescription := LDescriptionProperty.TextValue;
+        end;
+        Continue;
+      end;
 
       var LSection: TDumpSection;
       var LProperty: TDumpProperty;

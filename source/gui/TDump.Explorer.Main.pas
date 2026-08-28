@@ -26,6 +26,17 @@ type
     Discarded: Boolean;
   end;
 
+  TEmptyStateDropZone = class(TCustomPanel)
+  private
+    FBorderColor: TColor;
+    procedure SetBorderColor(const AValue: TColor);
+  protected
+    procedure Paint; override;
+  public
+    constructor Create(AOwner: TComponent); override;
+    property BorderColor: TColor read FBorderColor write SetBorderColor;
+  end;
+
 const
   CWMAnalysisProgress = WM_APP + $241;
   CWMAnalysisCompleted = WM_APP + $242;
@@ -37,6 +48,7 @@ type
     TitleBarPanel1: TTitleBarPanel;
     CardPanel1: TCardPanel;
     ProgressBar1: TProgressBar;
+    procedure FormShow(Sender: TObject);
   private
     FAnalysisId: Integer;
     FAnalysisTask: ITask;
@@ -45,6 +57,13 @@ type
     FTDumpAvailable: Boolean;
     FPendingFiles: TQueue<TAnalysisRequest>;
     FPhosphorIcon: TPhosphorIcon;
+    FEmptyStateHost: TPanel;
+    FEmptyStateDropZone: TEmptyStateDropZone;
+    FEmptyStateLayout: TGridPanel;
+    FEmptyStateIconHost: TGridPanel;
+    FEmptyStateTitle: TLabel;
+    FEmptyStateMessage: TLabel;
+    FEmptyStateHint: TLabel;
     FTabs: TGlassTabStrip;
     FTabImages: TVirtualImageList;
     FDocumentStagingPanel: TCardPanel;
@@ -55,6 +74,7 @@ type
     FProgressCompletedFiles: Integer;
     FCurrentFileProgress: Integer;
     procedure ApplyTabsTheme;
+    procedure ApplyEmptyStateTheme;
     procedure AddAnalysisProgressItem;
     procedure AdvanceAnalysisProgress;
     procedure BeginAnalysis(ARequest: TAnalysisRequest);
@@ -77,6 +97,7 @@ type
     function CreateAnalysisRequest(const AFileName: string;
       AKind: TAnalysisKind): TAnalysisRequest;
     procedure CreateTabs;
+    procedure CreateEmptyState;
     function DocumentTabImageName: System.UITypes.TImageName;
     function IsTextFile(const AFileName: string): Boolean;
     procedure PhosphorIconClick(Sender: TObject);
@@ -98,6 +119,7 @@ type
     procedure TabsChanged(Sender: TObject; ANewIndex: Integer);
     procedure TabsChevronButtonClick(Sender: TObject);
     procedure UpdateOverallProgress;
+    procedure UpdateEmptyState;
     procedure TabsClosing(Sender: TObject; AIndex: Integer;
       var ACanClose: Boolean);
     procedure CMStyleChanged(var AMessage: TMessage); message CM_STYLECHANGED;
@@ -130,6 +152,8 @@ uses
 
 const
   CTextProbeSize = 8192;
+  CReportValidationProbeSize = 64 * 1024;
+  CMaxOpenFileSize: Int64 = 100 * 1024 * 1024;
   CTitleBarHeight = 40;
   CTitleBarButtonMargin = 150;
   CTabIconSize = 16;
@@ -140,12 +164,56 @@ const
   CInactiveTextBlend = 0.35;
   CCloseHoverBlend = 0.72;
 
+{ TEmptyStateDropZone }
+
+constructor TEmptyStateDropZone.Create(AOwner: TComponent);
+begin
+  inherited Create(AOwner);
+  BevelOuter := bvNone;
+  ParentBackground := False;
+  DoubleBuffered := True;
+end;
+
+procedure TEmptyStateDropZone.Paint;
+begin
+  Canvas.Brush.Color := Color;
+  Canvas.FillRect(ClientRect);
+  DrawDashedRoundedRectangle(Canvas, ClientRect, FBorderColor,
+    ScaleValue(14));
+end;
+
+procedure TEmptyStateDropZone.SetBorderColor(const AValue: TColor);
+begin
+  if FBorderColor = AValue then
+    Exit;
+  FBorderColor := AValue;
+  Invalidate;
+end;
+
 function DescribeCard(ACard: TCard): string;
 begin
   if ACard = nil then
     Exit('(none)');
   Result := Format('"%s" index=%d visible=%s', [ACard.Caption,
     ACard.CardIndex, BoolToStr(ACard.Visible, True)]);
+end;
+
+function IsTDumpReportFile(const AFileName: string): Boolean;
+begin
+  var LStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyWrite);
+  try
+    var LReadCount := CReportValidationProbeSize;
+    if LStream.Size < LReadCount then
+      LReadCount := Integer(LStream.Size);
+    if LReadCount <= 0 then
+      Exit(False);
+    var LBytes: TBytes;
+    SetLength(LBytes, LReadCount);
+    LStream.ReadBuffer(LBytes[0], LReadCount);
+    Result := IsTDumpReport(TEncoding.Default.GetString(LBytes));
+  finally
+    LStream.Free;
+  end;
 end;
 
 function ExplorerTabPalette(const ATheme: TExplorerTheme): TGlassTabPalette;
@@ -388,8 +456,12 @@ begin
   ADiagnosticCount := 0;
   ATDumpParameters := '';
   ADocument := nil;
-  var LText := TFile.ReadAllText(AFileName, TEncoding.Default);
-  if not IsTDumpReport(LText) then
+  if TFile.GetSize(AFileName) > CMaxOpenFileSize then
+  begin
+    Result := Format('%s exceeds the 100 MB file limit.', [AFileName]);
+    Exit;
+  end;
+  if not IsTDumpReportFile(AFileName) then
   begin
     Result := Format('%s is text, but it is not a TDUMP report.',
       [AFileName]);
@@ -405,9 +477,9 @@ begin
         CheckCurrentTaskCancellation;
         PostAnalysisProgress(AWindowHandle, AAnalysisId, APhase,
           ACompletedLines, ATotalLines);
-      end;
+    end;
     var LParseStopwatch := TStopwatch.StartNew;
-    ADocument := LParser.ParseText(LText, AFileName);
+    ADocument := LParser.ParseFile(AFileName);
     try
       LParseStopwatch.Stop;
       AParsingMilliseconds := LParseStopwatch.ElapsedMilliseconds;
@@ -460,6 +532,28 @@ begin
 
   TitleBarPanel1.AlphaValue := 255;
   TitleBarPanel1.Invalidate;
+  ApplyEmptyStateTheme;
+end;
+
+procedure TFrmMain.ApplyEmptyStateTheme;
+begin
+  if not Assigned(FEmptyStateHost) then
+    Exit;
+
+  var LTheme := TExplorerTheme.ActiveTheme;
+  FEmptyStateHost.Color := LTheme.BackgroundColor;
+  FEmptyStateDropZone.Color := LTheme.BackgroundColor;
+  FEmptyStateDropZone.BorderColor := ColorBlendRGB(LTheme.SelectionColor,
+    LTheme.BackgroundColor, 0.65);
+  FEmptyStateLayout.Color := LTheme.BackgroundColor;
+  FEmptyStateIconHost.Color := LTheme.BackgroundColor;
+  FPhosphorIcon.Color := LTheme.BackgroundColor;
+  FPhosphorIcon.IconColor := LTheme.SelectionColor;
+  FEmptyStateTitle.Font.Color := LTheme.TextColor;
+  FEmptyStateMessage.Font.Color := ColorBlendRGB(LTheme.TextColor,
+    LTheme.BackgroundColor, 0.32);
+  FEmptyStateHint.Font.Color := ColorBlendRGB(LTheme.TextColor,
+    LTheme.BackgroundColor, 0.65);
 end;
 
 procedure TFrmMain.CardsChanged(Sender: TObject; PrevCard, NextCard: TCard);
@@ -515,6 +609,145 @@ begin
   ApplyTabsTheme;
 end;
 
+procedure TFrmMain.CreateEmptyState;
+var
+  LIconColumn: TColumnItem;
+  LIconRow: TRowItem;
+  LColumn: TColumnItem;
+  LRow: TRowItem;
+begin
+  FEmptyStateHost := TPanel.Create(Self);
+  FEmptyStateHost.Parent := Self;
+  FEmptyStateHost.Align := alClient;
+  FEmptyStateHost.BevelOuter := bvNone;
+  FEmptyStateHost.ParentBackground := False;
+  FEmptyStateHost.StyleElements := FEmptyStateHost.StyleElements - [seClient];
+  FEmptyStateHost.Visible := False;
+
+  FEmptyStateDropZone := TEmptyStateDropZone.Create(Self);
+  FEmptyStateDropZone.Parent := FEmptyStateHost;
+  FEmptyStateDropZone.AlignWithMargins := True;
+  FEmptyStateDropZone.Margins.Left := ScaleValue(144);
+  FEmptyStateDropZone.Margins.Top := ScaleValue(96);
+  FEmptyStateDropZone.Margins.Right := ScaleValue(144);
+  FEmptyStateDropZone.Margins.Bottom := ScaleValue(56);
+  FEmptyStateDropZone.Align := alClient;
+  FEmptyStateDropZone.StyleElements := FEmptyStateDropZone.StyleElements - [seClient];
+
+  FEmptyStateLayout := TGridPanel.Create(Self);
+  FEmptyStateLayout.Parent := FEmptyStateDropZone;
+  FEmptyStateLayout.AlignWithMargins := True;
+  FEmptyStateLayout.Margins.Left := ScaleValue(2);
+  FEmptyStateLayout.Margins.Top := ScaleValue(2);
+  FEmptyStateLayout.Margins.Right := ScaleValue(2);
+  FEmptyStateLayout.Margins.Bottom := ScaleValue(2);
+  FEmptyStateLayout.Align := alClient;
+  FEmptyStateLayout.BevelOuter := bvNone;
+  FEmptyStateLayout.ParentBackground := False;
+  FEmptyStateLayout.StyleElements := FEmptyStateLayout.StyleElements - [seClient];
+  FEmptyStateLayout.ColumnCollection.Clear;
+  LColumn := FEmptyStateLayout.ColumnCollection.Add;
+  LColumn.SizeStyle := ssPercent;
+  LColumn.Value := 100;
+  FEmptyStateLayout.RowCollection.Clear;
+
+  LRow := FEmptyStateLayout.RowCollection.Add;
+  LRow.SizeStyle := ssPercent;
+  LRow.Value := 31;
+  LRow := FEmptyStateLayout.RowCollection.Add;
+  LRow.SizeStyle := ssPercent;
+  LRow.Value := 25;
+  LRow := FEmptyStateLayout.RowCollection.Add;
+  LRow.SizeStyle := ssPercent;
+  LRow.Value := 3;
+  LRow := FEmptyStateLayout.RowCollection.Add;
+  LRow.SizeStyle := ssPercent;
+  LRow.Value := 9;
+  LRow := FEmptyStateLayout.RowCollection.Add;
+  LRow.SizeStyle := ssPercent;
+  LRow.Value := 3;
+  LRow := FEmptyStateLayout.RowCollection.Add;
+  LRow.SizeStyle := ssPercent;
+  LRow.Value := 7;
+  LRow := FEmptyStateLayout.RowCollection.Add;
+  LRow.SizeStyle := ssPercent;
+  LRow.Value := 2;
+  LRow := FEmptyStateLayout.RowCollection.Add;
+  LRow.SizeStyle := ssPercent;
+  LRow.Value := 6;
+  LRow := FEmptyStateLayout.RowCollection.Add;
+  LRow.SizeStyle := ssPercent;
+  LRow.Value := 14;
+
+  FEmptyStateIconHost := TGridPanel.Create(Self);
+  FEmptyStateIconHost.Align := alClient;
+  FEmptyStateIconHost.BevelOuter := bvNone;
+  FEmptyStateIconHost.ParentBackground := False;
+  FEmptyStateIconHost.StyleElements := FEmptyStateIconHost.StyleElements - [seClient];
+  FEmptyStateIconHost.ColumnCollection.Clear;
+  LIconColumn := FEmptyStateIconHost.ColumnCollection.Add;
+  LIconColumn.SizeStyle := ssPercent;
+  LIconColumn.Value := 40;
+  LIconColumn := FEmptyStateIconHost.ColumnCollection.Add;
+  LIconColumn.SizeStyle := ssPercent;
+  LIconColumn.Value := 20;
+  LIconColumn := FEmptyStateIconHost.ColumnCollection.Add;
+  LIconColumn.SizeStyle := ssPercent;
+  LIconColumn.Value := 40;
+  FEmptyStateIconHost.RowCollection.Clear;
+  LIconRow := FEmptyStateIconHost.RowCollection.Add;
+  LIconRow.SizeStyle := ssPercent;
+  LIconRow.Value := 100;
+  FEmptyStateLayout.ControlCollection.AddControl(FEmptyStateIconHost, 0, 1);
+
+  FPhosphorIcon := TPhosphorIcon.Create(Self);
+  FPhosphorIcon.Align := alClient;
+  FPhosphorIcon.StyleElements := FPhosphorIcon.StyleElements - [seClient];
+  FPhosphorIcon.IconCode := ph_binary;
+  FPhosphorIcon.Weight := pfwRegular;
+  FEmptyStateIconHost.ControlCollection.AddControl(FPhosphorIcon, 1, 0);
+
+  FEmptyStateTitle := TLabel.Create(Self);
+  FEmptyStateTitle.Align := alClient;
+  FEmptyStateTitle.AutoSize := False;
+  FEmptyStateTitle.Alignment := taCenter;
+  FEmptyStateTitle.Layout := tlCenter;
+  FEmptyStateTitle.ParentFont := False;
+  FEmptyStateTitle.StyleName := 'Windows';
+  FEmptyStateTitle.Font.Assign(Font);
+  FEmptyStateTitle.Font.Size := TExplorerTheme.FontSize + 4;
+  FEmptyStateTitle.Font.Style := [fsBold];
+  FEmptyStateTitle.Caption := 'Drag && drop a report or binary';
+  FEmptyStateLayout.ControlCollection.AddControl(FEmptyStateTitle, 0, 3);
+
+  FEmptyStateMessage := TLabel.Create(Self);
+  FEmptyStateMessage.Align := alClient;
+  FEmptyStateMessage.AutoSize := False;
+  FEmptyStateMessage.Alignment := taCenter;
+  FEmptyStateMessage.Layout := tlCenter;
+  FEmptyStateMessage.ParentFont := False;
+  FEmptyStateMessage.StyleName := 'Windows';
+  FEmptyStateMessage.Font.Assign(Font);
+  FEmptyStateMessage.Font.Size := TExplorerTheme.FontSize;
+  FEmptyStateMessage.Caption :=
+    'Open a .tdump report, DLL, EXE, BPL, or other supported binary to start exploring.';
+  FEmptyStateLayout.ControlCollection.AddControl(FEmptyStateMessage, 0, 5);
+
+  FEmptyStateHint := TLabel.Create(Self);
+  FEmptyStateHint.Align := alClient;
+  FEmptyStateHint.AutoSize := False;
+  FEmptyStateHint.Alignment := taCenter;
+  FEmptyStateHint.Layout := tlCenter;
+  FEmptyStateHint.ParentFont := False;
+  FEmptyStateHint.StyleName := 'Windows';
+  FEmptyStateHint.Font.Assign(Font);
+  FEmptyStateHint.Font.Size := TExplorerTheme.FontSize;
+  FEmptyStateHint.Caption := 'You can also use the + button to open a file.';
+  FEmptyStateLayout.ControlCollection.AddControl(FEmptyStateHint, 0, 7);
+
+  ApplyEmptyStateTheme;
+end;
+
 function TFrmMain.DocumentTabImageName: System.UITypes.TImageName;
 begin
   if ColorIsBright(TExplorerTheme.ActiveTheme.BackgroundColor) then
@@ -553,6 +786,7 @@ begin
   finally
     CardPanel1.UnlockDrawing;
   end;
+  UpdateEmptyState;
 end;
 
 procedure TFrmMain.TabMenuItemClick(Sender: TObject);
@@ -593,7 +827,7 @@ begin
   try
     LOriginalFont.Assign(ACanvas.Font);
     ACanvas.Font.Assign(Font);
-    ACanvas.Font.Name := 'Segoe UI';
+    ACanvas.Font.Name := TExplorerTheme.FontName;
     ACanvas.Font.Height := -ScaleValue(CCaptionFontSize);
     ACanvas.Font.Style := [];
     ACanvas.Font.Color := FTabs.Palette.InactiveText;
@@ -695,6 +929,8 @@ begin
   FDocumentStagingPanel.SetBounds(-1, -1, 1, 1);
   FDocumentStagingPanel.Parent := Self;
   CreateTabs;
+  CreateEmptyState;
+  UpdateEmptyState;
   FDeferredTabActivationTimer := TTimer.Create(Self);
   FDeferredTabActivationTimer.Interval := 100;
   FDeferredTabActivationTimer.Enabled := False;
@@ -718,8 +954,10 @@ begin
     Exit;
 
   var LSplitter := TSplitter(Sender);
+  LSplitter.Canvas.Brush.Color := TExplorerTheme.ActiveTheme.BackgroundColor;
+  LSplitter.Canvas.FillRect(LSplitter.ClientRect);
   DrawSplitterLine(LSplitter.Canvas, LSplitter.ClientRect,
-    LSplitter.Align in [alLeft, alRight], TExplorerTheme.ActiveTheme.InactiveText);
+    LSplitter.Align in [alLeft, alRight], TExplorerTheme.ActiveTheme.GhostColor);
 end;
 
 procedure TFrmMain.CheckTDumpAvailability;
@@ -932,6 +1170,13 @@ begin
     DispatchMessage(LMessage);
 end;
 
+procedure TFrmMain.FormShow(Sender: TObject);
+begin
+  Font.Name := TExplorerTheme.FontName;
+  Font.Size := TExplorerTheme.FontSize;
+  Font.Height := MulDiv(Font.Height, CurrentPPI, Font.PixelsPerInch);
+end;
+
 procedure TFrmMain.CreateWnd;
 begin
   inherited CreateWnd;
@@ -1047,6 +1292,7 @@ procedure TFrmMain.AttachPendingDocumentCards;
 begin
   if FPendingDocumentCards.Count = 0 then
     Exit;
+  UpdateEmptyState;
   var LPreviousCard := CardPanel1.ActiveCard;
   //SendMessage(CardPanel1.Handle, WM_SETREDRAW, 0, 0);
   try
@@ -1164,11 +1410,41 @@ begin
   ProgressBar1.Visible := True;
 end;
 
+procedure TFrmMain.UpdateEmptyState;
+var
+  LShowEmptyState: Boolean;
+begin
+  if not Assigned(FEmptyStateHost) then
+    Exit;
+
+  LShowEmptyState := (CardPanel1.CardCount = 0) and
+    (FPendingDocumentCards.Count = 0);
+  if FEmptyStateHost.Visible = LShowEmptyState then
+    Exit;
+
+  if LShowEmptyState then
+  begin
+    CardPanel1.Visible := False;
+    FEmptyStateHost.Visible := True;
+  end
+  else
+  begin
+    FEmptyStateHost.Visible := False;
+    CardPanel1.Visible := True;
+  end;
+end;
+
 procedure TFrmMain.ProcessDroppedFile(const AFileName: string);
 begin
   var LExpandedFileName := ExpandFileName(AFileName);
   var LKind: TAnalysisKind;
   try
+    if TFile.GetSize(LExpandedFileName) > CMaxOpenFileSize then
+    begin
+      LogControl1.Add(Format('%s exceeds the 100 MB file limit.',
+        [LExpandedFileName]), letWarning);
+      Exit;
+    end;
     if IsTDumpBinaryFile(LExpandedFileName) or
       not IsTextFile(LExpandedFileName) then
     begin
@@ -1182,8 +1458,7 @@ begin
     end
     else
     begin
-      var LText := TFile.ReadAllText(LExpandedFileName, TEncoding.Default);
-      if not IsTDumpReport(LText) then
+      if not IsTDumpReportFile(LExpandedFileName) then
       begin
         LogControl1.Add(Format('%s is text, but it is not a TDUMP report.',
           [LExpandedFileName]), letWarning);

@@ -22,6 +22,8 @@ object FrmMain: TFrmMain
   CustomTitleBar.ButtonPressedBackgroundColor = 15395562
   CustomTitleBar.ButtonInactiveForegroundColor = 10066329
   CustomTitleBar.ButtonInactiveBackgroundColor = clWhite
+  Constraints.MinHeight = 600
+  Constraints.MinWidth = 950
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
   Font.Height = -12
@@ -31,6 +33,7 @@ object FrmMain: TFrmMain
   GlassFrame.Top = 40
   Position = poDesktopCenter
   StyleElements = [seFont, seClient]
+  OnShow = FormShow
   TextHeight = 15
   object Splitter1: TSplitter
     Left = 0

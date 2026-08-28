@@ -88,15 +88,15 @@ begin
 end;
 
 procedure TCrossReferencesFrame.SplitterPaint(Sender: TObject);
-var
-  LSplitter: TSplitter;
 begin
   if not (Sender is TSplitter) then
     Exit;
 
-  LSplitter := TSplitter(Sender);
+  var LSplitter := TSplitter(Sender);
+  LSplitter.Canvas.Brush.Color := TExplorerTheme.ActiveTheme.BackgroundColor;
+  LSplitter.Canvas.FillRect(LSplitter.ClientRect);
   DrawSplitterLine(LSplitter.Canvas, LSplitter.ClientRect,
-    LSplitter.Align in [alLeft, alRight], TExplorerTheme.ActiveTheme.InactiveText);
+    LSplitter.Align in [alLeft, alRight], TExplorerTheme.ActiveTheme.GhostColor);
 end;
 
 destructor TCrossReferencesFrame.Destroy;

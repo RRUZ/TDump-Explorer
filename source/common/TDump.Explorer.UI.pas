@@ -21,9 +21,19 @@ type
   TExplorerThemeKind = (thtLight, thtDark);
 
   TExplorerTheme = record
+    const FixedWidthFontName : string = 'Consolas';
+    const FixedWidthFontSize = 8;
+    const FontName = 'Segoe UI';
+    const FontSize = 9;
+   public
+    // Windows, controls colors
     BackgroundColor: TColor;
     TextColor: TColor;
     InactiveText: TColor;
+    SelectionColor: TColor;
+    GhostColor: TColor;
+
+    // token colors
     StringLiteralColor: TColor;
     NumberColor: TColor;
     HexadecimalColor: TColor;
@@ -33,13 +43,17 @@ type
     NamespaceColor: TColor;
     TypeColor: TColor;
     MethodColor: TColor;
-    SelectionColor: TColor;
+
+    //
+
     class function DarkTheme: TExplorerTheme; static;
     class function LightTheme: TExplorerTheme; static;
     class function ActiveTheme: TExplorerTheme; static;
   end;
 
 procedure DrawRoundedBar(const Canvas: TCanvas; const ARect: TRect; FillColor, BorderColor: TColor);
+procedure DrawDashedRoundedRectangle(const ACanvas: TCanvas;
+  const ARect: TRect; ABorderColor: TColor; ARadius: Integer);
 procedure DrawSelectionBar(const Canvas: TCanvas; const ARect: TRect; FillColor, BorderColor: TColor);
 procedure DrawSplitterLine(const ACanvas: TCanvas; const ARect: TRect; AIsVertical: Boolean; AColor: TColor);
 function IsWindows11: Boolean;
@@ -55,6 +69,7 @@ begin
   Result.BackgroundColor := LStyle.GetSystemColor(clWindow);
   Result.TextColor := ColorBlendRGB(LStyle.GetSystemColor(clWindowText), LStyle.GetSystemColor(clWindow), 0.2);
   Result.InactiveText := ColorBlendRGB(LStyle.GetSystemColor(clWindowText), LStyle.GetSystemColor(clWindow), 0.5);
+  Result.GhostColor := ColorBlendRGB(LStyle.GetSystemColor(clWindowText), LStyle.GetSystemColor(clWindow), 0.9);
   Result.SelectionColor := LStyle.GetSystemColor(clHighlight);
 
   Result.StringLiteralColor := TColor(RGB(165, 225, 120));
@@ -74,6 +89,7 @@ begin
   Result.BackgroundColor := LStyle.GetSystemColor(clWindow);
   Result.TextColor := ColorBlendRGB(LStyle.GetSystemColor(clWindowText), LStyle.GetSystemColor(clWindow), 0.2);
   Result.InactiveText := ColorBlendRGB(LStyle.GetSystemColor(clWindowText), LStyle.GetSystemColor(clWindow), 0.5);
+  Result.GhostColor := ColorBlendRGB(LStyle.GetSystemColor(clWindowText), LStyle.GetSystemColor(clWindow), 0.8);
   Result.SelectionColor := LStyle.GetSystemColor(clHighlight);
 
   Result.StringLiteralColor := TColor(RGB(35, 125, 70));
@@ -147,6 +163,75 @@ begin
   end;
 end;
 
+procedure DrawDashedRoundedRectangle(const ACanvas: TCanvas;
+  const ARect: TRect; ABorderColor: TColor; ARadius: Integer);
+var
+  LRect: TRect;
+  LRadius: Integer;
+  LColor: TGPColor;
+  LColorRGB: TColor;
+  LGraphics: TGPGraphics;
+  LPath: TGPGraphicsPath;
+  LPen: TGPPen;
+  L, T, R, B, D: Single;
+  LDashPattern: array[0..1] of Single;
+begin
+  LRect := ARect;
+  InflateRect(LRect, -1, -1);
+  if (LRect.Width <= 2) or (LRect.Height <= 2) then
+    Exit;
+
+  LRadius := ARadius;
+  if LRadius < 1 then
+    LRadius := 1;
+  if LRadius * 2 > LRect.Width then
+    LRadius := LRect.Width div 2;
+  if LRadius * 2 > LRect.Height then
+    LRadius := LRect.Height div 2;
+
+  LColorRGB := ColorToRGB(ABorderColor);
+  LColor := MakeColor(GetRValue(LColorRGB), GetGValue(LColorRGB),
+    GetBValue(LColorRGB));
+  LGraphics := TGPGraphics.Create(ACanvas.Handle);
+  try
+    LGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
+    LGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);
+    LPen := TGPPen.Create(LColor, 2.5);
+    try
+      LDashPattern[0] := 4.0;
+      LDashPattern[1] := 2.5;
+      LPen.SetDashStyle(DashStyleCustom);
+      LPen.SetDashPattern(@LDashPattern[0], Length(LDashPattern));
+      LPen.SetDashCap(DashCapFlat);
+      LPen.SetLineJoin(LineJoinRound);
+      L := LRect.Left + 0.5;
+      T := LRect.Top + 0.5;
+      R := LRect.Right - 0.5;
+      B := LRect.Bottom - 0.5;
+      D := LRadius * 2.0;
+      LPath := TGPGraphicsPath.Create;
+      try
+        LPath.AddArc(L, T, D, D, 180, 90);
+        LPath.AddLine(L + LRadius, T, R - LRadius, T);
+        LPath.AddArc(R - D, T, D, D, 270, 90);
+        LPath.AddLine(R, T + LRadius, R, B - LRadius);
+        LPath.AddArc(R - D, B - D, D, D, 0, 90);
+        LPath.AddLine(R - LRadius, B, L + LRadius, B);
+        LPath.AddArc(L, B - D, D, D, 90, 90);
+        LPath.AddLine(L, B - LRadius, L, T + LRadius);
+        LPath.CloseFigure;
+        LGraphics.DrawPath(LPen, LPath);
+      finally
+        LPath.Free;
+      end;
+    finally
+      LPen.Free;
+    end;
+  finally
+    LGraphics.Free;
+  end;
+end;
+
 procedure DrawSelectionBar(const Canvas: TCanvas; const ARect: TRect; FillColor, BorderColor: TColor);
 begin
   if IsWindows11 then
@@ -161,33 +246,27 @@ begin
 end;
 
 procedure DrawSplitterLine(const ACanvas: TCanvas; const ARect: TRect;  AIsVertical: Boolean; AColor: TColor);
-var
-  LColor: ARGB;
-  LGraphics: TGPGraphics;
-  LPen: TGPPen;
-  LRGBColor: TColor;
-  LCenter: Single;
 begin
   if (ARect.Width <= 0) or (ARect.Height <= 0) then
     Exit;
 
-  LRGBColor := ColorToRGB(AColor);
-  LColor := MakeColor(GetRValue(LRGBColor), GetGValue(LRGBColor),
+  var LRGBColor := ColorToRGB(AColor);
+  var LColor := MakeColor(GetRValue(LRGBColor), GetGValue(LRGBColor),
     GetBValue(LRGBColor));
-  LGraphics := TGPGraphics.Create(ACanvas.Handle);
+  var LGraphics := TGPGraphics.Create(ACanvas.Handle);
   try
     LGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
     LGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);
-    LPen := TGPPen.Create(LColor, 1.0);
+    var LPen := TGPPen.Create(LColor, 1.0);
     try
       if AIsVertical then
       begin
-        LCenter := (ARect.Left + ARect.Right) / 2.0;
+        var LCenter := (ARect.Left + ARect.Right) / 2.0;
         LGraphics.DrawLine(LPen, LCenter, ARect.Top, LCenter, ARect.Bottom);
       end
       else
       begin
-        LCenter := (ARect.Top + ARect.Bottom) / 2.0;
+        var LCenter := (ARect.Top + ARect.Bottom) / 2.0;
         LGraphics.DrawLine(LPen, ARect.Left, LCenter, ARect.Right, LCenter);
       end;
     finally

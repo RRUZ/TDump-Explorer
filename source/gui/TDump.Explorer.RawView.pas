@@ -67,8 +67,8 @@ begin
   FHighlighterControl.ShowLineNumbers := True;
   FHighlighterControl.UseEndEllipsis := False;
   FHighlighterControl.ParserMode := tpmTDumpValues;
-  FHighlighterControl.Font.Name := 'Consolas';
-  FHighlighterControl.Font.Size := 8;
+  FHighlighterControl.Font.Name := TExplorerTheme.FixedWidthFontName;
+  FHighlighterControl.Font.Size := TExplorerTheme.FixedWidthFontSize;
   FHighlighterControl.ControlList1.MultiSelect := True;
   cbFollowSelection.OnClick := cbFollowSelectionClick;
   SearchFilterBox.OnChange := SearchFilterBoxChange;

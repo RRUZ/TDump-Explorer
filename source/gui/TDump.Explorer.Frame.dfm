@@ -32,16 +32,9 @@ object DumpDocumentFrame: TDumpDocumentFrame
     Width = 297
     Height = 499
     Align = alLeft
-    DefaultNodeHeight = 17
-    Font.Charset = DEFAULT_CHARSET
-    Font.Color = clWindowText
-    Font.Height = -11
-    Font.Name = 'Segoe UI'
-    Font.Style = []
     Header.AutoSizeIndex = 0
-    Header.Height = 13
+    Header.Height = 15
     Header.MainColumn = -1
-    ParentFont = False
     SelectionBlendFactor = 255
     StyleElements = [seClient, seBorder]
     TabOrder = 0
@@ -109,13 +102,13 @@ object DumpDocumentFrame: TDumpDocumentFrame
       AlignWithMargins = True
       Left = 48
       Top = 0
-      Width = 377
+      Width = 584
       Height = 52
       Margins.Left = 8
       Margins.Top = 0
       Margins.Right = 8
       Margins.Bottom = 0
-      Align = alLeft
+      Align = alClient
       BevelOuter = bvNone
       DoubleBuffered = False
       ParentBackground = False
@@ -124,7 +117,7 @@ object DumpDocumentFrame: TDumpDocumentFrame
       object lblDocumentName: TLabel
         Left = 0
         Top = 0
-        Width = 377
+        Width = 584
         Height = 27
         Margins.Left = 0
         Margins.Top = 4
@@ -133,51 +126,53 @@ object DumpDocumentFrame: TDumpDocumentFrame
         Align = alClient
         AutoSize = False
         Caption = 'Document'
-        Font.Charset = DEFAULT_CHARSET
-        Font.Color = clWindowText
-        Font.Height = -15
-        Font.Name = 'Segoe UI'
-        Font.Style = [fsBold]
-        ParentFont = False
         Layout = tlBottom
-        ExplicitHeight = 32
+        ExplicitLeft = 8
+        ExplicitTop = -3
+        ExplicitWidth = 377
       end
       object lblSourcePath: TLabel
         Left = 0
         Top = 27
-        Width = 377
+        Width = 584
         Height = 25
         Align = alBottom
         AutoSize = False
         Caption = 'Source path'
         EllipsisPosition = epPathEllipsis
-        ExplicitTop = 26
+        ExplicitLeft = 5
+        ExplicitTop = 30
+        ExplicitWidth = 377
       end
     end
     object gpHeader: TGridPanel
       AlignWithMargins = True
-      Left = 441
+      Left = 648
       Top = 0
-      Width = 607
+      Width = 400
       Height = 52
       Margins.Left = 8
       Margins.Top = 0
       Margins.Right = 8
       Margins.Bottom = 0
-      Align = alClient
+      Align = alRight
       BevelOuter = bvNone
       ColumnCollection = <
         item
-          Value = 25.000000000000000000
+          SizeStyle = ssAbsolute
+          Value = 50.000000000000000000
         end
         item
-          Value = 25.000000000000000000
+          SizeStyle = ssAbsolute
+          Value = 100.000000000000000000
         end
         item
-          Value = 25.000000000000000000
+          SizeStyle = ssAbsolute
+          Value = 150.000000000000000000
         end
         item
-          Value = 25.000000000000000000
+          SizeStyle = ssAbsolute
+          Value = 100.000000000000000000
         end>
       ControlCollection = <
         item
@@ -232,22 +227,21 @@ object DumpDocumentFrame: TDumpDocumentFrame
       object lblFormatCaption: TLabel
         Left = 0
         Top = 0
-        Width = 152
+        Width = 50
         Height = 26
         Align = alClient
         AutoSize = False
         Caption = 'Format'
         Layout = tlBottom
-        ExplicitLeft = 109
-        ExplicitTop = 8
-        ExplicitWidth = 153
-        ExplicitHeight = 18
+        ExplicitLeft = -3
+        ExplicitTop = -3
+        ExplicitWidth = 152
       end
       object lblFormatValue: TLabel
         AlignWithMargins = True
         Left = 0
         Top = 28
-        Width = 152
+        Width = 50
         Height = 24
         Margins.Left = 0
         Margins.Top = 2
@@ -256,18 +250,14 @@ object DumpDocumentFrame: TDumpDocumentFrame
         Align = alClient
         AutoSize = False
         Caption = ' '
-        Font.Charset = DEFAULT_CHARSET
-        Font.Color = clWindowText
-        Font.Height = -12
-        Font.Name = 'Segoe UI'
-        Font.Style = [fsBold]
-        ParentFont = False
+        ExplicitLeft = -3
         ExplicitTop = 25
+        ExplicitWidth = 152
       end
       object lblArchitectureCaption: TLabel
-        Left = 152
+        Left = 50
         Top = 0
-        Width = 152
+        Width = 100
         Height = 26
         Align = alClient
         AutoSize = False
@@ -279,9 +269,9 @@ object DumpDocumentFrame: TDumpDocumentFrame
         ExplicitHeight = 18
       end
       object lblTimestampCaption: TLabel
-        Left = 304
+        Left = 150
         Top = 0
-        Width = 151
+        Width = 150
         Height = 26
         Align = alClient
         AutoSize = False
@@ -289,26 +279,27 @@ object DumpDocumentFrame: TDumpDocumentFrame
         Layout = tlBottom
         ExplicitLeft = 301
         ExplicitTop = -3
+        ExplicitWidth = 151
         ExplicitHeight = 32
       end
       object lblSizeCaption: TLabel
-        Left = 455
+        Left = 300
         Top = 0
-        Width = 152
+        Width = 100
         Height = 26
         Align = alClient
         AutoSize = False
         Caption = 'Size'
         Layout = tlBottom
-        ExplicitLeft = 562
-        ExplicitWidth = 20
-        ExplicitHeight = 15
+        ExplicitLeft = 458
+        ExplicitTop = -3
+        ExplicitWidth = 152
       end
       object lblArchitectureValue: TLabel
         AlignWithMargins = True
-        Left = 152
+        Left = 50
         Top = 28
-        Width = 152
+        Width = 100
         Height = 24
         Margins.Left = 0
         Margins.Top = 2
@@ -317,12 +308,6 @@ object DumpDocumentFrame: TDumpDocumentFrame
         Align = alClient
         AutoSize = False
         Caption = ' '
-        Font.Charset = DEFAULT_CHARSET
-        Font.Color = clWindowText
-        Font.Height = -12
-        Font.Name = 'Segoe UI'
-        Font.Style = [fsBold]
-        ParentFont = False
         ExplicitLeft = 545
         ExplicitTop = 82
         ExplicitWidth = 153
@@ -330,9 +315,9 @@ object DumpDocumentFrame: TDumpDocumentFrame
       end
       object lblTimestampValue: TLabel
         AlignWithMargins = True
-        Left = 304
+        Left = 150
         Top = 28
-        Width = 151
+        Width = 150
         Height = 24
         Margins.Left = 0
         Margins.Top = 2
@@ -341,12 +326,6 @@ object DumpDocumentFrame: TDumpDocumentFrame
         Align = alClient
         AutoSize = False
         Caption = ' '
-        Font.Charset = DEFAULT_CHARSET
-        Font.Color = clWindowText
-        Font.Height = -12
-        Font.Name = 'Segoe UI'
-        Font.Style = [fsBold]
-        ParentFont = False
         ExplicitLeft = 698
         ExplicitTop = 82
         ExplicitWidth = 153
@@ -354,9 +333,9 @@ object DumpDocumentFrame: TDumpDocumentFrame
       end
       object lblSizeValue: TLabel
         AlignWithMargins = True
-        Left = 455
+        Left = 300
         Top = 28
-        Width = 152
+        Width = 100
         Height = 24
         Margins.Left = 0
         Margins.Top = 2
@@ -365,12 +344,6 @@ object DumpDocumentFrame: TDumpDocumentFrame
         Align = alClient
         AutoSize = False
         Caption = ' '
-        Font.Charset = DEFAULT_CHARSET
-        Font.Color = clWindowText
-        Font.Height = -12
-        Font.Name = 'Segoe UI'
-        Font.Style = [fsBold]
-        ParentFont = False
         ExplicitLeft = 600
         ExplicitTop = 34
         ExplicitWidth = 153

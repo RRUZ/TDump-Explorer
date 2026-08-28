@@ -135,7 +135,7 @@ begin
   FUseEndEllipsis := True;
 
   FHighlightColor := ColorBlendRGB(clWhite, TExplorerTheme.ActiveTheme.BackgroundColor, 0.95);
-  FMatchColor := TExplorerTheme.ActiveTheme.TypeColor;//ColorBlendRGB(clRed, LStyle.GetSystemColor(clWindowText), 0.5);
+  FMatchColor := TExplorerTheme.ActiveTheme.TypeColor;
   HeaderControl1.Align := alTop;
   HeaderControl1.Visible := False;
   ControlList1.MultiSelect := True;
@@ -580,8 +580,8 @@ begin
 
   var LTextRect := ARect;
   InflateRect(LTextRect, -CTextPadding, 0);
-  ACanvas.Font.Name := Font.Name;
-  ACanvas.Font.Size := Font.Size;
+  ACanvas.Font.Name := Font.Name;//TExplorerTheme.FontName;
+  ACanvas.Font.Size := Font.Size;//TExplorerTheme.FontSize;
   if FShowLineNumbers then
   begin
     var LGutterWidth := LineNumberGutterWidth;
@@ -733,8 +733,8 @@ begin
   if not FAutoSizeColumns then
     Exit;
 
-  FMeasureBitmap.Canvas.Font.Name := Font.Name;
-  FMeasureBitmap.Canvas.Font.Size := Font.Size;
+  FMeasureBitmap.Canvas.Font.Name := Font.Name;//TExplorerTheme.FontName;
+  FMeasureBitmap.Canvas.Font.Size := Font.Size;//TExplorerTheme.FontSize;
   for var LColumnIndex := 0 to FColumnCount - 1 do
   begin
     var LWidth := CTextPadding * 2;

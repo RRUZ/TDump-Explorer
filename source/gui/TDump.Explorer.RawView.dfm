@@ -32,14 +32,13 @@ object RawViewFrame: TRawViewFrame
       Left = 467
       Top = 8
       Width = 169
-      Height = 25
+      Height = 23
       Margins.Left = 4
       Margins.Top = 8
       Margins.Right = 4
       Margins.Bottom = 8
       Align = alRight
       TabOrder = 0
-      ExplicitHeight = 23
     end
     object cbFollowSelection: TCheckBox
       Left = 320

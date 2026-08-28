@@ -164,6 +164,8 @@ type
     procedure CMStyleChanged(var AMessage: TMessage); message CM_STYLECHANGED;
     procedure ApplyTreeTheme;
     procedure ApplyTheme;
+  protected
+    procedure SetParent(AParent: TWinControl); override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -190,6 +192,13 @@ begin
 end;
 
 procedure TDumpDocumentFrame.ApplyTheme;
+
+   procedure SetLabelColor(ALabel: TLabel; AColor: TColor);
+   begin
+     ALabel.StyleName := 'Windows';
+     ALabel.Font.Color := AColor;
+   end;
+
 begin
   pnTop.StyleElements := pnTop.StyleElements - [seClient];
   pnTop.Color := TExplorerTheme.ActiveTheme.BackgroundColor;
@@ -198,20 +207,16 @@ begin
   gpHeader.StyleElements := gpHeader.StyleElements - [seClient];
   gpHeader.Color := TExplorerTheme.ActiveTheme.BackgroundColor;
 
-  lblSourcePath.StyleName := 'Windows';
-  lblSourcePath.Font.Color := TExplorerTheme.ActiveTheme.InactiveText;
+  SetLabelColor(lblSourcePath, TExplorerTheme.ActiveTheme.InactiveText);
+  SetLabelColor(lblFormatCaption, TExplorerTheme.ActiveTheme.InactiveText);
+  SetLabelColor(lblFormatValue, TExplorerTheme.ActiveTheme.StringLiteralColor);
+  SetLabelColor(lblArchitectureCaption, TExplorerTheme.ActiveTheme.InactiveText);
+  SetLabelColor(lblArchitectureValue, TExplorerTheme.ActiveTheme.InactiveText);
+  SetLabelColor(lblTimestampCaption, TExplorerTheme.ActiveTheme.InactiveText);
+  SetLabelColor(lblTimestampValue, TExplorerTheme.ActiveTheme.DateTimeColor);
+  SetLabelColor(lblSizeCaption, TExplorerTheme.ActiveTheme.InactiveText);
+  SetLabelColor(lblSizeValue, TExplorerTheme.ActiveTheme.NumberColor);
 
-  lblFormatCaption.StyleName := 'Windows';
-  lblFormatCaption.Font.Color := TExplorerTheme.ActiveTheme.InactiveText;
-
-  lblArchitectureCaption.StyleName := 'Windows';
-  lblArchitectureCaption.Font.Color := TExplorerTheme.ActiveTheme.InactiveText;
-
-  lblTimestampCaption.StyleName := 'Windows';
-  lblTimestampCaption.Font.Color := TExplorerTheme.ActiveTheme.InactiveText;
-
-  lblSizeCaption.StyleName := 'Windows';
-  lblSizeCaption.Font.Color := TExplorerTheme.ActiveTheme.InactiveText;
 
   ApplyTreeTheme;
 end;
@@ -237,6 +242,10 @@ end;
 constructor TDumpDocumentFrame.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+
+  Font.Name := TExplorerTheme.FontName;
+  Font.Size := TExplorerTheme.FontSize;
+
   Splitter1.OnPaint := SplitterPaint;
   Splitter2.OnPaint := SplitterPaint;
   FSummaryCard := TCard.Create(cpViews);
@@ -400,15 +409,15 @@ begin
 end;
 
 procedure TDumpDocumentFrame.SplitterPaint(Sender: TObject);
-var
-  LSplitter: TSplitter;
 begin
   if not (Sender is TSplitter) then
     Exit;
 
-  LSplitter := TSplitter(Sender);
+  var LSplitter := TSplitter(Sender);
+  LSplitter.Canvas.Brush.Color := TExplorerTheme.ActiveTheme.BackgroundColor;
+  LSplitter.Canvas.FillRect(LSplitter.ClientRect);
   DrawSplitterLine(LSplitter.Canvas, LSplitter.ClientRect,
-    LSplitter.Align in [alLeft, alRight], TExplorerTheme.ActiveTheme.InactiveText);
+    LSplitter.Align in [alLeft, alRight], TExplorerTheme.ActiveTheme.GhostColor);
 end;
 
 procedure TDumpDocumentFrame.UpdateDocumentHeader;
@@ -430,6 +439,9 @@ begin
   lblDocumentName.Caption := ExtractFileName(LSourceFileName);
   if lblDocumentName.Caption = '' then
     lblDocumentName.Caption := FileKindCaption(FDocument.FileKind);
+  if FDocument.PackageDescription <> '' then
+    lblDocumentName.Caption := lblDocumentName.Caption + ' - ' +
+      FDocument.PackageDescription;
   lblSourcePath.Caption := LSourceFileName;
   lblFormatValue.Caption := HeaderFormatCaption;
   lblArchitectureValue.Caption := HeaderArchitectureCaption;
@@ -2182,6 +2194,44 @@ begin
   if LControl <> nil then
     PTreeItemData(Tree.GetNodeData(FActiveDetailNode))^.DetailItemIndex :=
       LControl.ControlList1.ItemIndex;
+end;
+
+type
+  TControlClass =  class(TControl);
+
+procedure TDumpDocumentFrame.SetParent(AParent: TWinControl);
+
+ procedure FixFontForHighDPI(AControl: TControl);
+ begin
+   TControlClass(AControl).Font.Name := TExplorerTheme.FontName;
+   TControlClass(AControl).Font.Size := TExplorerTheme.FontSize;
+   TControlClass(AControl).Font.Height := MulDiv(TControlClass(AControl).Font.Height, CurrentPPI, TControlClass(AControl).Font.PixelsPerInch);
+ end;
+
+begin
+  inherited;
+  if Parent <> nil then
+  begin
+    Font.Name := TExplorerTheme.FontName;
+    Font.Size := TExplorerTheme.FontSize;
+    Font.Height := MulDiv(Font.Height, CurrentPPI, Font.PixelsPerInch);
+    FixFontForHighDPI(Tree);
+    FixFontForHighDPI(lblFormatCaption);
+    FixFontForHighDPI(lblArchitectureCaption);
+    FixFontForHighDPI(lblTimestampCaption);
+    FixFontForHighDPI(lblSizeCaption);
+    FixFontForHighDPI(lblDocumentName);
+    FixFontForHighDPI(lblSourcePath);
+
+                             {
+    lblArchitectureCaption: TLabel;
+    lblArchitectureValue: TLabel;
+    lblTimestampCaption: TLabel;
+    lblTimestampValue: TLabel;
+    lblSizeCaption: TLabel;
+    lblSizeValue: TLabel;
+    }
+  end;
 end;
 
 procedure TDumpDocumentFrame.RestoreDetailItemIndex(ANode: PVirtualNode);
