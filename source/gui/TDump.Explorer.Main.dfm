@@ -68,13 +68,16 @@ object FrmMain: TFrmMain
     end
     inherited pnToolbar: TPanel
       Width = 1064
+      StyleElements = [seFont, seClient, seBorder]
       ExplicitWidth = 1064
       inherited Label1: TLabel
         Height = 32
+        StyleElements = [seFont, seClient, seBorder]
       end
       inherited SearchFilterBox: TSearchBox
         Left = 891
         Height = 24
+        StyleElements = [seFont, seClient, seBorder]
         ExplicitLeft = 891
       end
     end
@@ -105,5 +108,10 @@ object FrmMain: TFrmMain
     Align = alBottom
     TabOrder = 3
     Visible = False
+  end
+  object ApplicationEvents1: TApplicationEvents
+    OnIdle = ApplicationEvents1Idle
+    Left = 528
+    Top = 344
   end
 end

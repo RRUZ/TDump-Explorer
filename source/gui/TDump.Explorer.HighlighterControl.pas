@@ -7,7 +7,7 @@ uses
   System.Types, System.UITypes, System.Math, System.Generics.Collections, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.StdCtrls, Vcl.ControlList, Vcl.Clipbrd,
   TDump.Explorer.Highlighter, TDump.Explorer.TinyParser, Vcl.ExtCtrls, TDump.Explorer.UI,
-  Vcl.WinXCtrls, Vcl.ComCtrls;
+  Vcl.WinXCtrls, Vcl.ComCtrls, Vcl.ImgList;
 
 type
   THighlighterControl = class(TFrame)
@@ -19,6 +19,7 @@ type
    private
       FHighlighter: TTinyHighlighter;
       FItems: TStringList;
+      FItemImageNames: TStringList;
       FItemParserModes: TList<Integer>;
       FColumnHeaders: TStringList;
       FColumnDataTypes: array of TTinyHighlightDataType;
@@ -40,7 +41,11 @@ type
       FUpdatePending: Boolean;
       FRestoreItemIndex: Integer;
       FRestoreItemIndexPending: Boolean;
+      FImages: TCustomImageList;
+      FOnItemClick: TNotifyEvent;
+    procedure AddItem(const AText, AImageName: string; AParserMode: Integer);
     procedure SetMatchColor(const AValue: TColor);
+    procedure SetImages(const AValue: TCustomImageList);
     function ColumnCount(const AText: string): Integer;
     function ColumnText(AItemIndex, AColumnIndex: Integer): string;
     function ColumnDataType(AColumnIndex: Integer): TTinyHighlightDataType;
@@ -53,6 +58,7 @@ type
       ARect: TRect; AState: TOwnerDrawState);
     procedure ControlList1KeyDown(Sender: TObject; var Key: Word;
       Shift: TShiftState);
+    procedure ControlList1Click(Sender: TObject);
     procedure CopySelectedItemsToClipboard;
     procedure ItemsChanged(Sender: TObject);
     procedure SetAutoSizeColumns(const AValue: Boolean);
@@ -65,12 +71,17 @@ type
     procedure UpdateHeaderControl;
     procedure UpdateColumnWidths;
     procedure UpdateControlList;
+    procedure CMStyleChanged(var AMessage: TMessage); message CM_STYLECHANGED;
+    procedure ApplyTheme;
   protected
+    procedure Notification(AComponent: TComponent;
+      Operation: TOperation); override;
     procedure Resize; override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure Add(const AText: string); overload;
+    procedure Add(const AText, AImageName: string); overload;
     procedure Add(const AText: string; AParserMode: TTinyParserMode); overload;
     procedure AddColumns(const AColumns: array of string); overload;
     procedure AddColumns(const AColumns: array of string;
@@ -84,6 +95,8 @@ type
       const ADataTypes: array of TTinyHighlightDataType);
     procedure SetItemParserMode(AItemIndex: Integer;
       AParserMode: TTinyParserMode);
+    procedure SetItemImageName(AItemIndex: Integer; const AImageName: string);
+    function ItemImageName(AItemIndex: Integer): string;
     procedure SetLineNumber(AItemIndex, ALineNumber: Integer);
     procedure SetFilterText(const AValue: string);
     procedure SetText(const AText: string);
@@ -92,6 +105,8 @@ type
     procedure SelectItem(AItemIndex: Integer);
     procedure ScrollItemToTop(AItemIndex: Integer);
     property Items: TStringList read FItems;
+    property Images: TCustomImageList read FImages write SetImages;
+    property OnItemClick: TNotifyEvent read FOnItemClick write FOnItemClick;
     property AutoSizeColumns: Boolean read FAutoSizeColumns
       write SetAutoSizeColumns default True;
     property UseColumnMode: Boolean read FUseColumnMode
@@ -121,6 +136,7 @@ begin
   FHighlighter := TTinyHighlighter.Create;
   FItems := TStringList.Create;
   FItems.OnChange := ItemsChanged;
+  FItemImageNames := TStringList.Create;
   FItemParserModes := TList<Integer>.Create;
   FColumnHeaders := TStringList.Create;
   FMeasureBitmap := TBitmap.Create;
@@ -134,19 +150,21 @@ begin
   FThemeKind := thtDark;
   FUseEndEllipsis := True;
 
-  FHighlightColor := ColorBlendRGB(clWhite, TExplorerTheme.ActiveTheme.BackgroundColor, 0.95);
-  FMatchColor := TExplorerTheme.ActiveTheme.TypeColor;
+  ApplyTheme;
+
   HeaderControl1.Align := alTop;
   HeaderControl1.Visible := False;
   ControlList1.MultiSelect := True;
   ControlList1.OnBeforeDrawItem := ControlList1BeforeDrawItem;
   ControlList1.OnKeyDown := ControlList1KeyDown;
+  ControlList1.OnClick := ControlList1Click;
   UpdateControlList;
 end;
 
 destructor THighlighterControl.Destroy;
 begin
   FMeasureBitmap.Free;
+  FItemImageNames.Free;
   FItemParserModes.Free;
   FLineNumbers.Free;
   FHighlightedItems.Free;
@@ -305,13 +323,15 @@ begin
   Result := FMeasureBitmap.Canvas.TextWidth('00000000:') + (CTextPadding * 2);
 end;
 
-procedure THighlighterControl.Add(const AText: string);
+procedure THighlighterControl.AddItem(const AText, AImageName: string;
+  AParserMode: Integer);
 begin
   FItems.BeginUpdate;
   try
     FItems.Add(StringReplace(StringReplace(AText, #13, ' ', [rfReplaceAll]),
       #10, ' ', [rfReplaceAll]));
-    FItemParserModes.Add(-1);
+    FItemImageNames.Add(AImageName);
+    FItemParserModes.Add(AParserMode);
     FLineNumbers.Add(-1);
   finally
     FItems.EndUpdate;
@@ -320,26 +340,33 @@ begin
     ControlList1.ItemIndex := 0;
 end;
 
+procedure THighlighterControl.ApplyTheme;
+begin
+  FHighlightColor := ColorBlendRGB(clWhite, TExplorerTheme.ActiveTheme.BackgroundColor, 0.95);
+  FMatchColor := TExplorerTheme.ActiveTheme.TypeColor;
+end;
+
+procedure THighlighterControl.Add(const AText: string);
+begin
+  AddItem(AText, '', -1);
+end;
+
+procedure THighlighterControl.Add(const AText, AImageName: string);
+begin
+  AddItem(AText, AImageName, -1);
+end;
+
 procedure THighlighterControl.Add(const AText: string;
   AParserMode: TTinyParserMode);
 begin
-  FItems.BeginUpdate;
-  try
-    FItems.Add(StringReplace(StringReplace(AText, #13, ' ', [rfReplaceAll]),
-      #10, ' ', [rfReplaceAll]));
-    FItemParserModes.Add(Ord(AParserMode));
-    FLineNumbers.Add(-1);
-  finally
-    FItems.EndUpdate;
-  end;
-  if FItems.Count = 1 then
-    ControlList1.ItemIndex := 0;
+  AddItem(AText, '', Ord(AParserMode));
 end;
 
 procedure THighlighterControl.Clear;
 begin
   ControlList1.ItemIndex := -1;
   FItems.Clear;
+  FItemImageNames.Clear;
   FItemParserModes.Clear;
   FLineNumbers.Clear;
   FColumnHeaders.Clear;
@@ -415,11 +442,13 @@ begin
   FItems.BeginUpdate;
   try
     FItems.Text := AText;
+    FItemImageNames.Clear;
     FItemParserModes.Clear;
     FLineNumbers.Clear;
     for var LItemIndex := 0 to FItems.Count - 1 do
     begin
       FItemParserModes.Add(-1);
+      FItemImageNames.Add('');
       FLineNumbers.Add(-1);
     end;
   finally
@@ -432,6 +461,23 @@ begin
     else
       ControlList1.ItemIndex := 0;
   end;
+end;
+
+function THighlighterControl.ItemImageName(AItemIndex: Integer): string;
+begin
+  Result := '';
+  if (AItemIndex >= 0) and (AItemIndex < FItemImageNames.Count) then
+    Result := FItemImageNames[AItemIndex];
+end;
+
+procedure THighlighterControl.SetItemImageName(AItemIndex: Integer;
+  const AImageName: string);
+begin
+  if (AItemIndex < 0) or (AItemIndex >= FItemImageNames.Count) or
+    SameText(FItemImageNames[AItemIndex], AImageName) then
+    Exit;
+  FItemImageNames[AItemIndex] := AImageName;
+  ControlList1.Invalidate;
 end;
 
 procedure THighlighterControl.SetItemParserMode(AItemIndex: Integer;
@@ -480,6 +526,12 @@ begin
     Exit;
   FHighlightedItems.Clear;
   ControlList1.Invalidate;
+end;
+
+procedure THighlighterControl.CMStyleChanged(var AMessage: TMessage);
+begin
+  inherited;
+  ApplyTheme;
 end;
 
 procedure THighlighterControl.SetHighlightedItems(
@@ -592,6 +644,22 @@ begin
       FThemeKind, [tfRight, tfVerticalCenter, tfSingleLine, tfNoPrefix], tpmTDumpValues, thdtHexadecimal);
     LTextRect.Left := Min(LTextRect.Right, LTextRect.Left + LGutterWidth);
   end;
+  if FImages <> nil then
+  begin
+    var LImageName := ItemImageName(AIndex);
+    if LImageName <> '' then
+    begin
+      var LImageIndex := FImages.GetIndexByName(LImageName);
+      if LImageIndex >= 0 then
+      begin
+        var LImageY := LTextRect.Top +
+          Max(0, (LTextRect.Height - FImages.Height) div 2);
+        FImages.Draw(ACanvas, LTextRect.Left, LImageY, LImageIndex, True);
+        LTextRect.Left := Min(LTextRect.Right, LTextRect.Left +
+          FImages.Width + CTextPadding);
+      end;
+    end;
+  end;
   var LLeft := LTextRect.Left;
   for var LColumnIndex := 0 to FColumnCount - 1 do
   begin
@@ -634,6 +702,12 @@ begin
     end;
 end;
 
+procedure THighlighterControl.ControlList1Click(Sender: TObject);
+begin
+  if (ControlList1.ItemIndex >= 0) and Assigned(FOnItemClick) then
+    FOnItemClick(Self);
+end;
+
 procedure THighlighterControl.CopySelectedItemsToClipboard;
 begin
   var LText := TStringBuilder.Create;
@@ -654,6 +728,14 @@ begin
   end;
 end;
 
+procedure THighlighterControl.Notification(AComponent: TComponent;
+  Operation: TOperation);
+begin
+  inherited;
+  if (Operation = opRemove) and (AComponent = FImages) then
+    FImages := nil;
+end;
+
 procedure THighlighterControl.ItemsChanged(Sender: TObject);
 begin
   UpdateControlList;
@@ -664,6 +746,18 @@ begin
   inherited;
   if FItems <> nil then
     UpdateControlList;
+end;
+
+procedure THighlighterControl.SetImages(const AValue: TCustomImageList);
+begin
+  if FImages = AValue then
+    Exit;
+  if FImages <> nil then
+    FImages.RemoveFreeNotification(Self);
+  FImages := AValue;
+  if FImages <> nil then
+    FImages.FreeNotification(Self);
+  UpdateControlList;
 end;
 
 procedure THighlighterControl.SetAutoSizeColumns(const AValue: Boolean);
@@ -733,17 +827,29 @@ begin
   if not FAutoSizeColumns then
     Exit;
 
-  FMeasureBitmap.Canvas.Font.Name := Font.Name;//TExplorerTheme.FontName;
-  FMeasureBitmap.Canvas.Font.Size := Font.Size;//TExplorerTheme.FontSize;
+  var LCaptionWidths: TArray<Integer>;
+  SetLength(LCaptionWidths, FColumnCount);
+  FMeasureBitmap.Canvas.Font.Assign(HeaderControl1.Font);
+  for var LColumnIndex := 0 to FColumnHeaders.Count - 1 do
+    LCaptionWidths[LColumnIndex] := FMeasureBitmap.Canvas.TextWidth(
+      CHeaderCaptionMargin + FColumnHeaders[LColumnIndex]) +
+      (CTextPadding * 2);
+
+  FMeasureBitmap.Canvas.Font.Assign(Font);
   for var LColumnIndex := 0 to FColumnCount - 1 do
   begin
     var LWidth := CTextPadding * 2;
-    if LColumnIndex < FColumnHeaders.Count then
-      LWidth := Max(LWidth, FMeasureBitmap.Canvas.TextWidth(
-        FColumnHeaders[LColumnIndex]) + (CTextPadding * 2));
+    if LColumnIndex < Length(LCaptionWidths) then
+      LWidth := Max(LWidth, LCaptionWidths[LColumnIndex]);
     for var LItemIndex := 0 to FItems.Count - 1 do
-      LWidth := Max(LWidth, FMeasureBitmap.Canvas.TextWidth(
-        ColumnText(LItemIndex, LColumnIndex)) + (CTextPadding * 2));
+    begin
+      var LItemWidth := FMeasureBitmap.Canvas.TextWidth(
+        ColumnText(LItemIndex, LColumnIndex)) + (CTextPadding * 2);
+      if (LColumnIndex = 0) and (FImages <> nil) and
+        (FImages.GetIndexByName(ItemImageName(LItemIndex)) >= 0) then
+        Inc(LItemWidth, FImages.Width + CTextPadding);
+      LWidth := Max(LWidth, LItemWidth);
+    end;
     FColumnWidths[LColumnIndex] := LWidth;
   end;
 end;
@@ -813,6 +919,10 @@ begin
     FItemParserModes.Add(-1);
   while FItemParserModes.Count > FItems.Count do
     FItemParserModes.Delete(FItemParserModes.Count - 1);
+  while FItemImageNames.Count < FItems.Count do
+    FItemImageNames.Add('');
+  while FItemImageNames.Count > FItems.Count do
+    FItemImageNames.Delete(FItemImageNames.Count - 1);
   while FLineNumbers.Count < FItems.Count do
     FLineNumbers.Add(-1);
   while FLineNumbers.Count > FItems.Count do

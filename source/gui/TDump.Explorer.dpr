@@ -2,6 +2,8 @@ program TDump.Explorer;
 
 uses
   System.Classes,
+  Vcl.Themes,
+  Vcl.Styles,
   Vcl.Forms,
   TDump.Explorer.Phosphor.Font in '..\common\TDump.Explorer.Phosphor.Font.pas',
   TDump.Explorer.Finder in '..\common\TDump.Explorer.Finder.pas',
@@ -16,12 +18,16 @@ uses
   TDump.Explorer.Highlighter in '..\common\TDump.Explorer.Highlighter.pas',
   TDump.Explorer.UI in '..\common\TDump.Explorer.UI.pas',
   TDump.Explorer.GlassTabs in '..\common\TDump.Explorer.GlassTabs.pas',
-  Vcl.Themes,
-  Vcl.Styles,
   TDump.Explorer.LogControl in 'TDump.Explorer.LogControl.pas' {LogControl: TFrame},
   TDump.Explorer.Relations in '..\common\TDump.Explorer.Relations.pas',
   TDump.Explorer.Resources in 'TDump.Explorer.Resources.pas' {DataModule1: TDataModule},
-  TDump.Explorer.Utils in '..\common\TDump.Explorer.Utils.pas';
+  TDump.Explorer.Utils in '..\common\TDump.Explorer.Utils.pas',
+  TDump.Explorer.View.ELF in 'TDump.Explorer.View.ELF.pas',
+  TDump.Explorer.View.Mach in 'TDump.Explorer.View.Mach.pas',
+  TDump.Explorer.View.OMF in 'TDump.Explorer.View.OMF.pas',
+  TDump.Explorer.View.PE in 'TDump.Explorer.View.PE.pas',
+  TDump.Explorer.View.Shared in 'TDump.Explorer.View.Shared.pas',
+  TDump.Explorer.PopupMenu in 'TDump.Explorer.PopupMenu.pas';
 
 {$R *.res}
 
@@ -29,7 +35,6 @@ begin
   ReportMemoryLeaksOnShutdown := True;
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
-  TStyleManager.TrySetStyle('Glow');
   Application.CreateForm(TFrmMain, FrmMain);
   Application.CreateForm(TDataModule1, DataModule1);
   FrmMain.InitializeTabImages;

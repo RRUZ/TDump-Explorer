@@ -10,6 +10,7 @@ object HighlighterControl: THighlighterControl
     Width = 640
     Height = 456
     Align = alClient
+    BorderStyle = bsNone
     ItemHeight = 20
     ItemMargins.Left = 0
     ItemMargins.Top = 0

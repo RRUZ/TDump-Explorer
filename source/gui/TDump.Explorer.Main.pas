@@ -12,7 +12,7 @@ uses
   TDump.Explorer.Parser, TDump.Explorer.Phosphor.Font, TDump.Explorer.Runner,
   TDump.Explorer.Frame, Vcl.ComCtrls, TDump.Explorer.LogControl, Vcl.ExtCtrls,
   Vcl.TitleBarCtrls, Vcl.WinXPanels, Vcl.VirtualImageList,
-  TDump.Explorer.GlassTabs;
+  TDump.Explorer.GlassTabs, TDump.Explorer.PopupMenu, Vcl.AppEvnts;
 
 type
   TAnalysisKind = (akBinary, akReport);
@@ -48,7 +48,9 @@ type
     TitleBarPanel1: TTitleBarPanel;
     CardPanel1: TCardPanel;
     ProgressBar1: TProgressBar;
+    ApplicationEvents1: TApplicationEvents;
     procedure FormShow(Sender: TObject);
+    procedure ApplicationEvents1Idle(Sender: TObject; var Done: Boolean);
   private
     FAnalysisId: Integer;
     FAnalysisTask: ITask;
@@ -66,6 +68,8 @@ type
     FEmptyStateHint: TLabel;
     FTabs: TGlassTabStrip;
     FTabImages: TVirtualImageList;
+    FExplorerPopupMenu: TExplorerPopupMenuForm;
+    FExplorerPopupImages: TVirtualImageList;
     FDocumentStagingPanel: TCardPanel;
     FDeferredTabActivationTimer: TTimer;
     FPendingDocumentCards: TList<TCard>;
@@ -73,7 +77,9 @@ type
     FProgressTotalFiles: Integer;
     FProgressCompletedFiles: Integer;
     FCurrentFileProgress: Integer;
-    procedure ApplyTabsTheme;
+    FRestoreAlphaBlend: Boolean;
+    procedure ApplyTheme;
+    procedure ApplyExplorerPopupMenuTheme;
     procedure ApplyEmptyStateTheme;
     procedure AddAnalysisProgressItem;
     procedure AdvanceAnalysisProgress;
@@ -108,7 +114,12 @@ type
     procedure SchedulePendingDocumentActivation;
     procedure SplitterPaint(Sender: TObject);
     procedure StartNextAnalysis;
-    procedure TabMenuItemClick(Sender: TObject);
+    procedure PopupMenuAboutClick(Sender: TObject);
+    procedure PopupMenuChangeThemeClick(Sender: TObject);
+    procedure ExplorerPopupMenuItemClick(Sender: TObject; AItemIndex: Integer);
+    procedure InitializeExplorerPopupMenuImages;
+    procedure PopulateExplorerPopupMenu;
+    procedure PopupMenuSettingsClick(Sender: TObject);
     procedure TabsAddButtonClick(Sender: TObject);
     procedure TabsAfterPaintBackground(ACanvas: TCanvas;
       const ARect: TRect);
@@ -146,7 +157,7 @@ implementation
 
 uses
   TDump.Explorer.UI, TDump.Explorer.Utils, TDump.Explorer.Resources,
-  Vcl.GraphUtil, Vcl.Menus;
+  Vcl.GraphUtil, Vcl.Menus, Vcl.Themes;
 
 {$R *.dfm}
 
@@ -496,7 +507,7 @@ begin
   end;
 end;
 
-procedure TFrmMain.ApplyTabsTheme;
+procedure TFrmMain.ApplyTheme;
 begin
   var LTheme := TExplorerTheme.ActiveTheme;
   var LPalette := ExplorerTabPalette(LTheme);
@@ -533,6 +544,31 @@ begin
   TitleBarPanel1.AlphaValue := 255;
   TitleBarPanel1.Invalidate;
   ApplyEmptyStateTheme;
+  ApplyExplorerPopupMenuTheme;
+end;
+
+procedure TFrmMain.ApplyExplorerPopupMenuTheme;
+begin
+  if not Assigned(FExplorerPopupMenu) then
+    Exit;
+
+  var LTheme := TExplorerTheme.ActiveTheme;
+  FExplorerPopupMenu.Color := LTheme.BackgroundColor;
+  //FExplorerPopupMenu.CustomTitleBar.BackgroundColor := LTheme.BackgroundColor;
+  //FExplorerPopupMenu.CustomTitleBar.InactiveBackgroundColor := LTheme.BackgroundColor;
+  FExplorerPopupMenu.MenuItems.ControlList1.BorderStyle := bsNone;
+  FExplorerPopupMenu.MenuItems.Color := LTheme.BackgroundColor;
+  FExplorerPopupMenu.MenuItems.HighlightColor := ColorBlendRGB(
+    LTheme.SelectionColor, LTheme.BackgroundColor, 0.95);
+end;
+
+procedure TFrmMain.ApplicationEvents1Idle(Sender: TObject; var Done: Boolean);
+begin
+  if FRestoreAlphaBlend then
+  begin
+    FRestoreAlphaBlend := False;
+    AlphaBlend := False;
+  end;
 end;
 
 procedure TFrmMain.ApplyEmptyStateTheme;
@@ -543,17 +579,14 @@ begin
   var LTheme := TExplorerTheme.ActiveTheme;
   FEmptyStateHost.Color := LTheme.BackgroundColor;
   FEmptyStateDropZone.Color := LTheme.BackgroundColor;
-  FEmptyStateDropZone.BorderColor := ColorBlendRGB(LTheme.SelectionColor,
-    LTheme.BackgroundColor, 0.65);
+  FEmptyStateDropZone.BorderColor := ColorBlendRGB(LTheme.SelectionColor, LTheme.BackgroundColor, 0.65);
   FEmptyStateLayout.Color := LTheme.BackgroundColor;
   FEmptyStateIconHost.Color := LTheme.BackgroundColor;
   FPhosphorIcon.Color := LTheme.BackgroundColor;
   FPhosphorIcon.IconColor := LTheme.SelectionColor;
   FEmptyStateTitle.Font.Color := LTheme.TextColor;
-  FEmptyStateMessage.Font.Color := ColorBlendRGB(LTheme.TextColor,
-    LTheme.BackgroundColor, 0.32);
-  FEmptyStateHint.Font.Color := ColorBlendRGB(LTheme.TextColor,
-    LTheme.BackgroundColor, 0.65);
+  FEmptyStateMessage.Font.Color := LTheme.InactiveText;
+  FEmptyStateHint.Font.Color := LTheme.InactiveText;
 end;
 
 procedure TFrmMain.CardsChanged(Sender: TObject; PrevCard, NextCard: TCard);
@@ -572,7 +605,7 @@ procedure TFrmMain.CMStyleChanged(var AMessage: TMessage);
 begin
   inherited;
   if Assigned(FTabs) then
-    ApplyTabsTheme;
+    ApplyTheme;
 end;
 
 procedure TFrmMain.CreateTabs;
@@ -606,7 +639,7 @@ begin
   TitleBarPanel1.Height := ScaleValue(CTitleBarHeight);
   CardPanel1.Caption := '';
   CardPanel1.OnCardChange := CardsChanged;
-  ApplyTabsTheme;
+  ApplyTheme;
 end;
 
 procedure TFrmMain.CreateEmptyState;
@@ -789,13 +822,84 @@ begin
   UpdateEmptyState;
 end;
 
-procedure TFrmMain.TabMenuItemClick(Sender: TObject);
+procedure TFrmMain.PopupMenuSettingsClick(Sender: TObject);
 begin
-  if not (Sender is TMenuItem) then
+  // Settings action stub.
+end;
+
+procedure TFrmMain.PopupMenuChangeThemeClick(Sender: TObject);
+begin
+  AlphaBlendValue := 0;
+  AlphaBlend := True;
+  try
+    if IsLightThemeActive then
+      TStyleManager.SetStyle('Glow')
+    else
+      TStyleManager.SetStyle('Windows');
+  finally
+    FRestoreAlphaBlend := True;
+    UnlockDrawing;
+  end;
+end;
+
+procedure TFrmMain.ExplorerPopupMenuItemClick(Sender: TObject;
+  AItemIndex: Integer);
+begin
+  case AItemIndex of
+    0: PopupMenuSettingsClick(Self);
+    1: PopupMenuChangeThemeClick(Self);
+    2: PopupMenuAboutClick(Self);
+  end;
+end;
+
+procedure TFrmMain.InitializeExplorerPopupMenuImages;
+begin
+  if not Assigned(DataModule1) or not Assigned(FExplorerPopupImages) then
     Exit;
-  var LIndex := TMenuItem(Sender).Tag;
-  if (LIndex >= 0) and (LIndex < FTabs.Items.Count) then
-    FTabs.ActiveIndex := LIndex;
+
+  FExplorerPopupImages.Clear;
+  FExplorerPopupImages.ImageCollection := DataModule1.ImageCollection1;
+  FExplorerPopupImages.Add('gear_dark', 'gear_dark');
+  FExplorerPopupImages.Add('gear_light', 'gear_light');
+
+  FExplorerPopupImages.Add('moon_dark', 'moon_dark');
+  FExplorerPopupImages.Add('moon_light', 'moon_light');
+  FExplorerPopupImages.Add('sun_dark', 'sun_dark');
+  FExplorerPopupImages.Add('sun_light', 'sun_light');
+
+  FExplorerPopupImages.Add('file-dashed_dark', 'file-dashed_dark');
+  FExplorerPopupImages.Add('file-dashed_light', 'file-dashed_light');
+end;
+
+procedure TFrmMain.PopulateExplorerPopupMenu;
+begin
+  if not Assigned(FExplorerPopupMenu) then
+    Exit;
+
+  var LIconSuffix := '_dark';
+  if IsLightThemeActive then
+    LIconSuffix := '_light';
+
+  var LMenuItems := FExplorerPopupMenu.MenuItems;
+  LMenuItems.BeginUpdate;
+  try
+    LMenuItems.Clear;
+    LMenuItems.Add('Settings', 'gear' + LIconSuffix);
+
+    if IsLightThemeActive  then
+      LMenuItems.Add('Dark Theme', 'moon_light')
+    else
+      LMenuItems.Add('Light Theme', 'sun_dark');
+
+    LMenuItems.Add('About', 'file-dashed' + LIconSuffix);
+  finally
+    LMenuItems.EndUpdate;
+  end;
+end;
+
+procedure TFrmMain.PopupMenuAboutClick(Sender: TObject);
+begin
+  // About action stub.
 end;
 
 procedure TFrmMain.TabsAddButtonClick(Sender: TObject);
@@ -883,30 +987,17 @@ end;
 
 procedure TFrmMain.TabsChevronButtonClick(Sender: TObject);
 begin
-  var LMenu := TPopupMenu.Create(Self);
-  try
-    if CardPanel1.CardCount = 0 then
-    begin
-      var LEmptyItem := TMenuItem.Create(LMenu);
-      LEmptyItem.Caption := '(No open documents)';
-      LEmptyItem.Enabled := False;
-      LMenu.Items.Add(LEmptyItem);
-    end
-    else
-      for var LIndex := 0 to CardPanel1.CardCount - 1 do
-      begin
-        var LItem := TMenuItem.Create(LMenu);
-        LItem.Caption := CardPanel1.Cards[LIndex].Caption;
-        LItem.Checked := LIndex = CardPanel1.ActiveCardIndex;
-        LItem.Tag := LIndex;
-        LItem.OnClick := TabMenuItemClick;
-        LMenu.Items.Add(LItem);
-      end;
-    var LPoint := Mouse.CursorPos;
-    LMenu.Popup(LPoint.X, LPoint.Y);
-  finally
-    LMenu.Free;
+  if FExplorerPopupMenu = nil then
+  begin
+    FExplorerPopupMenu := TExplorerPopupMenuForm.Create(Self);
+    FExplorerPopupImages := TVirtualImageList.Create(Self);
+    InitializeExplorerPopupMenuImages;
+    FExplorerPopupMenu.MenuItems.Images := FExplorerPopupImages;
+    FExplorerPopupMenu.OnItemClick := ExplorerPopupMenuItemClick;
   end;
+  ApplyExplorerPopupMenuTheme;
+  PopulateExplorerPopupMenu;
+  FExplorerPopupMenu.ShowAt(Mouse.CursorPos);
 end;
 
 procedure TFrmMain.TabsClosing(Sender: TObject; AIndex: Integer;
@@ -937,15 +1028,6 @@ begin
   FDeferredTabActivationTimer.OnTimer := DeferredTabActivationTimer;
   CompleteAnalysisProgress;
   CheckTDumpAvailability;
-  {
-  FPhosphorIcon := TPhosphorIcon.Create(Self);
-  FPhosphorIcon.Parent := Self;
-  FPhosphorIcon.Align := alClient;
-  FPhosphorIcon.IconCode := ph_tree_structure;
-  FPhosphorIcon.IconColor := clHighlight;
-  FPhosphorIcon.Weight := pfwRegular;
-  FPhosphorIcon.OnClick := PhosphorIconClick;
-  }
 end;
 
 procedure TFrmMain.SplitterPaint(Sender: TObject);
@@ -1080,6 +1162,7 @@ begin
     CompleteAnalysisProgress;
     Exit;
   end;
+
   if FActiveRequest.Discarded then
   begin
     ADocument.Free;
@@ -1090,6 +1173,7 @@ begin
     StartNextAnalysis;
     Exit;
   end;
+
   if FActiveRequest.ReloadRequested then
   begin
     ADocument.Free;
@@ -1102,6 +1186,7 @@ begin
     ProcessDroppedFile(LFileName);
     Exit;
   end;
+
   if FActiveRequest.Kind = akBinary then
   begin
     var LTDumpParameters := ATDumpParameters;

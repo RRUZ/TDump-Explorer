@@ -24,6 +24,8 @@ type
   TGlassGradientDirection = (ggdVertical, ggdHorizontal,
     ggdForwardDiagonal, ggdBackwardDiagonal);
 
+  TGlassChevronButtonPosition = (gcpLeft, gcpRight);
+
   TGlassTabItem = class(TCollectionItem)
   private
     FCaption: string;
@@ -86,6 +88,7 @@ type
       CButtonHoverHalfHeight = 12;
       CButtonHoverRadius = 6;
       CBaselineOffset = 1;
+      CDefaultTrailingReservedSpace = 150;
   private
     FItems: TGlassTabItems;
     FImages: TCustomImageList;
@@ -96,6 +99,8 @@ type
     FHotAddButton: Boolean;
     FPressedAddButton: Boolean;
     FShowChevronButton: Boolean;
+    FChevronButtonPosition: TGlassChevronButtonPosition;
+    FTrailingReservedSpace: Integer;
     FHotChevronButton: Boolean;
     FPressedChevronButton: Boolean;
     FButtonHoverGlow: Boolean;
@@ -142,6 +147,9 @@ type
     procedure SetActiveIndex(const AValue: Integer);
     procedure SetShowAddButton(const AValue: Boolean);
     procedure SetShowChevronButton(const AValue: Boolean);
+    procedure SetChevronButtonPosition(
+      const AValue: TGlassChevronButtonPosition);
+    procedure SetTrailingReservedSpace(const AValue: Integer);
     procedure SetButtonHoverGlow(const AValue: Boolean);
     procedure SetButtonHoverBackground(const AValue: Boolean);
     procedure SetLeftInset(const AValue: Integer);
@@ -150,10 +158,14 @@ type
     function GetCloseRect(AIndex: Integer): TRect;
     function GetAddButtonRect: TRect;
     function GetChevronButtonRect: TRect;
+    function GetActionButtonsWidth: Integer;
+    function GetActionButtonsLeft: Integer;
+    function GetActionAreaRect: TRect;
     function GetTabsViewport: TRect;
     function GetAvailableBackgroundRect: TRect;
     function GetLeftNavigationRect: TRect;
     function GetRightNavigationRect: TRect;
+    function GetVisibleTabsRight: Integer;
     function IsOverflowing: Boolean;
     function IsAddButtonVisible: Boolean;
     function IsChevronButtonVisible: Boolean;
@@ -233,6 +245,11 @@ type
     property ShowAddButton: Boolean read FShowAddButton write SetShowAddButton default True;
     property ShowChevronButton: Boolean read FShowChevronButton
       write SetShowChevronButton default True;
+    property ChevronButtonPosition: TGlassChevronButtonPosition
+      read FChevronButtonPosition write SetChevronButtonPosition
+      default gcpRight;
+    property TrailingReservedSpace: Integer read FTrailingReservedSpace
+      write SetTrailingReservedSpace default CDefaultTrailingReservedSpace;
     property ButtonHoverGlow: Boolean read FButtonHoverGlow
       write SetButtonHoverGlow default False;
     property ButtonHoverBackground: Boolean read FButtonHoverBackground
@@ -467,6 +484,8 @@ begin
   FHotAddButton := False;
   FPressedAddButton := False;
   FShowChevronButton := True;
+  FChevronButtonPosition := gcpRight;
+  FTrailingReservedSpace := CDefaultTrailingReservedSpace;
   FHotChevronButton := False;
   FPressedChevronButton := False;
   FButtonHoverGlow := False;
@@ -713,6 +732,26 @@ begin
   Invalidate;
 end;
 
+procedure TGlassTabStrip.SetChevronButtonPosition(
+  const AValue: TGlassChevronButtonPosition);
+begin
+  if FChevronButtonPosition = AValue then
+    Exit;
+  FChevronButtonPosition := AValue;
+  EnsureActiveTabVisible;
+  Invalidate;
+end;
+
+procedure TGlassTabStrip.SetTrailingReservedSpace(const AValue: Integer);
+begin
+  var LValue := Max(0, AValue);
+  if FTrailingReservedSpace = LValue then
+    Exit;
+  FTrailingReservedSpace := LValue;
+  EnsureActiveTabVisible;
+  Invalidate;
+end;
+
 procedure TGlassTabStrip.SetButtonHoverGlow(const AValue: Boolean);
 begin
   if FButtonHoverGlow <> AValue then
@@ -808,11 +847,45 @@ begin
   end;
   if FShowAddButton then
   begin
-    Inc(LRequiredWidth, ScaleValue(FAddButtonSpacing + CAddButtonWidth));
-    if FShowChevronButton then
-      Inc(LRequiredWidth, ScaleValue(CChevronButtonWidth));
+    Inc(LRequiredWidth, ScaleValue(FAddButtonSpacing));
+    Inc(LRequiredWidth, GetActionButtonsWidth);
+    Inc(LRequiredWidth, ScaleValue(FTrailingReservedSpace));
   end;
   Result := LRequiredWidth > Width;
+end;
+
+function TGlassTabStrip.GetActionButtonsWidth: Integer;
+begin
+  if not FShowAddButton then
+    Exit(0);
+  Result := ScaleValue(CAddButtonWidth);
+  if FShowChevronButton then
+    Inc(Result, ScaleValue(CChevronButtonWidth));
+end;
+
+function TGlassTabStrip.GetActionAreaRect: TRect;
+begin
+  if not FShowAddButton then
+    Exit(TRect.Empty);
+  var LWidth := GetActionButtonsWidth +
+    ScaleValue(FTrailingReservedSpace);
+  Result := Rect(Max(0, Width - LWidth), 0, Width, Height);
+end;
+
+function TGlassTabStrip.GetActionButtonsLeft: Integer;
+const
+  CEmptyAddCenterOffset = 14;
+  CAddButtonHalfWidth = 18;
+begin
+  if IsOverflowing then
+    Exit(GetRightNavigationRect.Right);
+  if FItems.Count = 0 then
+  begin
+    var LCenterX := ScaleValue(FLeftInset + CEmptyAddCenterOffset);
+    Exit(Max(0, LCenterX - ScaleValue(CAddButtonHalfWidth)));
+  end;
+  Result := GetTabRect(FItems.Count - 1).Right +
+    ScaleValue(FAddButtonSpacing);
 end;
 
 function TGlassTabStrip.GetTabsViewport: TRect;
@@ -822,16 +895,26 @@ begin
   Result := ClientRect;
   if not IsOverflowing then
     Exit;
-  var LButtonWidth := Min(Width div 2,
+  var LAvailableRight := Width;
+  if FShowAddButton then
+    LAvailableRight := GetActionAreaRect.Left;
+  var LButtonWidth := Min(LAvailableRight div 2,
     ScaleValue(CNavigationButtonWidth));
   Result.Left := LButtonWidth;
-  Result.Right := Max(Result.Left, Width - LButtonWidth);
+  Result.Right := Max(Result.Left, LAvailableRight - LButtonWidth);
 end;
 
 function TGlassTabStrip.GetAvailableBackgroundRect: TRect;
 begin
   var LViewport := GetTabsViewport;
   Result := LViewport;
+  if IsOverflowing and FShowAddButton then
+  begin
+    var LButtonsRight := GetAddButtonRect.Right;
+    if IsChevronButtonVisible then
+      LButtonsRight := Max(LButtonsRight, GetChevronButtonRect.Right);
+    Exit(Rect(Min(Width, LButtonsRight), 0, Width, Height));
+  end;
   var LContentRight := LViewport.Left;
   var LFirstIndex := 0;
   if IsOverflowing then
@@ -861,15 +944,44 @@ begin
   if not IsOverflowing then
     Exit(TRect.Empty);
   var LViewport := GetTabsViewport;
-  Result := Rect(0, 0, LViewport.Left, Height);
+  Result := Rect(0, ScaleValue(CTabTop), LViewport.Left, Height);
 end;
 
 function TGlassTabStrip.GetRightNavigationRect: TRect;
+const
+  CNavigationButtonWidth = 40;
+  CNavigationControlSpacing = 4;
 begin
   if not IsOverflowing then
     Exit(TRect.Empty);
+  var LMaximumRight := Width;
+  if FShowAddButton then
+    LMaximumRight := GetActionAreaRect.Left;
+  var LButtonWidth := Min(LMaximumRight,
+    ScaleValue(CNavigationButtonWidth));
+  var LLeft := Min(Max(0, LMaximumRight - LButtonWidth),
+    GetVisibleTabsRight + ScaleValue(CNavigationControlSpacing));
+  Result := Rect(LLeft, ScaleValue(CTabTop),
+    LLeft + LButtonWidth, Height);
+end;
+
+function TGlassTabStrip.GetVisibleTabsRight: Integer;
+begin
   var LViewport := GetTabsViewport;
-  Result := Rect(LViewport.Right, 0, Width, Height);
+  Result := LViewport.Left;
+  var LFirstIndex := 0;
+  if IsOverflowing then
+    LFirstIndex := FFirstVisibleIndex;
+  for var LIndex := LFirstIndex to FItems.Count - 1 do
+  begin
+    var LTabRect := GetTabRect(LIndex);
+    if LTabRect.Left >= LViewport.Right then
+      Break;
+    var LTabRight := LTabRect.Right;
+    if LIndex = FActiveIndex then
+      Inc(LTabRight, ScaleValue(CSelectedShoulderWidth));
+    Result := Max(Result, Min(LTabRight, LViewport.Right));
+  end;
 end;
 
 function TGlassTabStrip.GetTabRect(AIndex: Integer): TRect;
@@ -912,42 +1024,26 @@ begin
 end;
 
 function TGlassTabStrip.GetAddButtonRect: TRect;
-const
-  CEmptyAddCenterOffset = 14;
-  CAddButtonHalfWidth = 18;
 begin
-  if FItems.Count = 0 then
-  begin
-    var LCenterX := ScaleValue(FLeftInset + CEmptyAddCenterOffset);
-    Exit(Rect(Max(0, LCenterX - ScaleValue(CAddButtonHalfWidth)),
-      ScaleValue(CTabTop), LCenterX + ScaleValue(CAddButtonHalfWidth),
-      Height));
-  end;
-  var LLast := GetTabRect(FItems.Count - 1);
-  var LLeft := LLast.Right + ScaleValue(FAddButtonSpacing);
-  Result := Rect(LLeft, LLast.Top,
-    LLeft + ScaleValue(CAddButtonWidth), LLast.Bottom);
+  var LLeft := GetActionButtonsLeft;
+  if FShowChevronButton and (FChevronButtonPosition = gcpLeft) then
+    Inc(LLeft, ScaleValue(CChevronButtonWidth));
+  Result := Rect(LLeft, ScaleValue(CTabTop),
+    LLeft + ScaleValue(CAddButtonWidth), Height);
 end;
 
 function TGlassTabStrip.GetChevronButtonRect: TRect;
 begin
-  var LAddRect := GetAddButtonRect;
-  Result := Rect(LAddRect.Right, LAddRect.Top,
-    LAddRect.Right + ScaleValue(CChevronButtonWidth), LAddRect.Bottom);
+  var LLeft := GetActionButtonsLeft;
+  if FChevronButtonPosition = gcpRight then
+    Inc(LLeft, ScaleValue(CAddButtonWidth));
+  Result := Rect(LLeft, ScaleValue(CTabTop),
+    LLeft + ScaleValue(CChevronButtonWidth), Height);
 end;
 
 function TGlassTabStrip.IsAddButtonVisible: Boolean;
 begin
   Result := FShowAddButton;
-  if not Result or not IsOverflowing then
-    Exit;
-  var LAddRect := GetAddButtonRect;
-  var LViewport := GetTabsViewport;
-  var LRequiredRight := LAddRect.Right;
-  if FShowChevronButton then
-    LRequiredRight := GetChevronButtonRect.Right;
-  Result := (LAddRect.Left >= LViewport.Left) and
-    (LRequiredRight <= LViewport.Right);
 end;
 
 function TGlassTabStrip.IsChevronButtonVisible: Boolean;
@@ -988,13 +1084,6 @@ begin
     var LActiveRect := GetTabRect(FActiveIndex);
     var LRequiredRight := LActiveRect.Right +
       ScaleValue(CSelectedShoulderWidth);
-    if FShowAddButton and (FActiveIndex = FItems.Count - 1) then
-    begin
-      if FShowChevronButton then
-        LRequiredRight := Max(LRequiredRight, GetChevronButtonRect.Right)
-      else
-        LRequiredRight := Max(LRequiredRight, GetAddButtonRect.Right);
-    end;
     if LRequiredRight <= LViewport.Right then
       Break;
     Inc(FFirstVisibleIndex);
@@ -1072,10 +1161,8 @@ const
   CTextVerticalOffset = 1;
   CCloseGlyphInset = 7;
   CAccentFadeWidth = 72;
-  CBaselineLeftFadeWidth = 64;
-  CBaselineRightFadeWidth = 128;
-  CBaselineLeftFadeMidAlpha = 48;
-  CBaselineRightFadeMidAlpha = 72;
+  CBaselineFadeWidth = 64;
+  CBaselineFadeMidAlpha = 48;
   CSelectedGlowWidth = 2.0;
   CSelectedOutlineWidth = 1.0;
   CBaselineWidth = 1.0;
@@ -1098,10 +1185,19 @@ begin
   var LBaselineColors: array[0..5] of TGPColor;
   var LBaselinePositions: array[0..5] of Single;
   var LBaselineLeftFadeEnd, LBaselineRightFadeStart: Integer;
+  var LBaselineLeft, LBaselineRight: Integer;
   var LFirstShoulderBlendY: Integer;
   var LBaseY: Single;
   var LTab := GetTabRect(AIndex);
   var LIsFirstSelected := ASelected and (AIndex = 0);
+  var LLeftShoulder := LTab.Left - ScaleValue(CSelectedShoulderWidth);
+  LBaselineLeft := 0;
+  LBaselineRight := Width;
+  if IsOverflowing then
+  begin
+    var LViewport := GetTabsViewport;
+    LBaselineLeft := LViewport.Left;
+  end;
   LBaseY := 0;
   if LTab.Left >= Width then
     Exit;
@@ -1216,15 +1312,15 @@ begin
         LBaseY - ScaleValue(CSelectedShoulderRise),
         LTab.Right + ScaleValue(CSelectedShoulderControlOffset), LBaseY,
         LTab.Right + ScaleValue(CSelectedShoulderWidth), LBaseY);
-      if not LIsFirstSelected then
+      if not LIsFirstSelected and (LLeftShoulder > LBaselineLeft) then
       begin
-        LBaselinePath.AddLine(0, LBaseY,
-          LTab.Left - ScaleValue(CSelectedShoulderWidth), LBaseY);
+        LBaselinePath.AddLine(LBaselineLeft, LBaseY,
+          LLeftShoulder, LBaseY);
         LBaselinePath.StartFigure;
       end;
       LBaselinePath.AddLine(
         LTab.Right + ScaleValue(CSelectedShoulderWidth), LBaseY,
-        Width, LBaseY);
+        LBaselineRight, LBaseY);
     end
     else
     begin
@@ -1284,29 +1380,34 @@ begin
           { Reach full accent precisely where the baseline meets the selected
             tab's lower-left shoulder. This keeps short first-tab segments from
             joining the shoulder while they are still semi-transparent. }
-          LBaselineLeftFadeEnd := Min(ScaleValue(CBaselineLeftFadeWidth),
-            Max(1, LTab.Left - ScaleValue(CSelectedShoulderWidth)));
+          var LBaselineSpan := Max(1, LBaselineRight - LBaselineLeft);
+          LBaselineLeftFadeEnd := Min(
+            LBaselineLeft + ScaleValue(CBaselineFadeWidth),
+            Max(LBaselineLeft + 1, LLeftShoulder));
           LBaselineRightFadeStart := Max(LBaselineLeftFadeEnd,
-            Width - ScaleValue(CBaselineRightFadeWidth));
+            LBaselineRight - ScaleValue(CBaselineFadeWidth));
           LBaselinePositions[0] := 0;
           LBaselinePositions[1] := EnsureRange(
-            (LBaselineLeftFadeEnd div 2) / Max(1, Width), 0.0, 1.0);
+            ((LBaselineLeftFadeEnd - LBaselineLeft) div 2) /
+            LBaselineSpan, 0.0, 1.0);
           LBaselinePositions[2] := EnsureRange(
-            LBaselineLeftFadeEnd / Max(1, Width), 0.0, 1.0);
+            (LBaselineLeftFadeEnd - LBaselineLeft) /
+            LBaselineSpan, 0.0, 1.0);
           LBaselinePositions[3] := EnsureRange(
-            LBaselineRightFadeStart / Max(1, Width), 0.0, 1.0);
+            (LBaselineRightFadeStart - LBaselineLeft) /
+            LBaselineSpan, 0.0, 1.0);
           LBaselinePositions[4] := EnsureRange(
-            (LBaselineRightFadeStart +
-            (Width - LBaselineRightFadeStart) div 2) / Max(1, Width),
-            0.0, 1.0);
+            (LBaselineRightFadeStart - LBaselineLeft +
+            (LBaselineRight - LBaselineRightFadeStart) div 2) /
+            LBaselineSpan, 0.0, 1.0);
           LBaselinePositions[5] := 1;
           LBaselineColors[0] := ToArgb(FPalette.Accent, 0);
           LBaselineColors[1] := ToArgb(FPalette.Accent,
-            CBaselineLeftFadeMidAlpha);
+            CBaselineFadeMidAlpha);
           LBaselineColors[2] := ToArgb(FPalette.Accent);
           LBaselineColors[3] := ToArgb(FPalette.Accent);
           LBaselineColors[4] := ToArgb(FPalette.Accent,
-            CBaselineRightFadeMidAlpha);
+            CBaselineFadeMidAlpha);
           LBaselineColors[5] := ToArgb(FPalette.Accent, 0);
 
           var LGlowPen := TGPPen.Create(LGlowGradient,
@@ -1316,7 +1417,7 @@ begin
               ScaleValue(CSelectedOutlineWidth));
             try
               var LBaselineGradient := TGPLinearGradientBrush.Create(
-                MakeRect(0, 0, Max(1, Width), Height),
+                MakeRect(LBaselineLeft, 0, LBaselineSpan, Height),
                 ToArgb(FPalette.Accent, 0), ToArgb(FPalette.Accent, 0),
                 LinearGradientModeHorizontal);
               try
@@ -1697,23 +1798,43 @@ begin
   var LFirstIndex := 0;
   if IsOverflowing then
     LFirstIndex := FFirstVisibleIndex;
-  for var LIndex := LFirstIndex to FItems.Count - 1 do
-  begin
-    var LTabRect := GetTabRect(LIndex);
-    if LTabRect.Left >= LViewport.Right then
-      Break;
-    if LIndex <> FActiveIndex then
-    begin
-      DrawTab(Canvas, LIndex, False);
-      DoAfterPaintTab(Canvas, LTabRect, LIndex, False,
-        LIndex = FHotIndex);
+  var LSavedDC := SaveDC(Canvas.Handle);
+  try
+    var LTabClipRegion := CreateRectRgn(LViewport.Left, LViewport.Top,
+      LViewport.Right, LViewport.Bottom);
+    try
+      var LBaselineClipRegion := CreateRectRgn(LViewport.Left,
+        Max(0, Height - ScaleValue(2)), Width, Height);
+      try
+        CombineRgn(LTabClipRegion, LTabClipRegion, LBaselineClipRegion,
+          RGN_OR);
+        ExtSelectClipRgn(Canvas.Handle, LTabClipRegion, RGN_AND);
+      finally
+        DeleteObject(LBaselineClipRegion);
+      end;
+      for var LIndex := LFirstIndex to FItems.Count - 1 do
+      begin
+        var LTabRect := GetTabRect(LIndex);
+        if LTabRect.Left >= LViewport.Right then
+          Break;
+        if LIndex <> FActiveIndex then
+        begin
+          DrawTab(Canvas, LIndex, False);
+          DoAfterPaintTab(Canvas, LTabRect, LIndex, False,
+            LIndex = FHotIndex);
+        end;
+      end;
+      if FActiveIndex >= 0 then
+      begin
+        DrawTab(Canvas, FActiveIndex, True);
+        DoAfterPaintTab(Canvas, GetTabRect(FActiveIndex), FActiveIndex, True,
+          FActiveIndex = FHotIndex);
+      end;
+    finally
+      DeleteObject(LTabClipRegion);
     end;
-  end;
-  if FActiveIndex >= 0 then
-  begin
-    DrawTab(Canvas, FActiveIndex, True);
-    DoAfterPaintTab(Canvas, GetTabRect(FActiveIndex), FActiveIndex, True,
-      FActiveIndex = FHotIndex);
+  finally
+    RestoreDC(Canvas.Handle, LSavedDC);
   end;
 
   if IsAddButtonVisible then

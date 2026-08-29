@@ -161,6 +161,7 @@ begin
   pnToolbar.ParentBackground := False;
   pnToolbar.StyleElements := pnToolbar.StyleElements - [seClient];
   pnToolbar.Color := TExplorerTheme.ActiveTheme.BackgroundColor;
+  FHighlighterControl.Invalidate;
 end;
 
 procedure TRawViewFrame.cbFollowSelectionClick(Sender: TObject);

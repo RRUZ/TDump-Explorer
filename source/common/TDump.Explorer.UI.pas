@@ -57,11 +57,17 @@ procedure DrawDashedRoundedRectangle(const ACanvas: TCanvas;
 procedure DrawSelectionBar(const Canvas: TCanvas; const ARect: TRect; FillColor, BorderColor: TColor);
 procedure DrawSplitterLine(const ACanvas: TCanvas; const ARect: TRect; AIsVertical: Boolean; AColor: TColor);
 function IsWindows11: Boolean;
+function IsLightThemeActive: Boolean;
 
 implementation
 
 uses
   Winapi.Windows, Vcl.GraphUtil, Winapi.GDIPAPI, Winapi.GDIPOBJ, System.SysUtils, Vcl.Themes;
+
+function IsLightThemeActive: Boolean;
+begin
+  Result := ColorIsBright(StyleServices.GetSystemColor(clWindow));
+end;
 
 class function TExplorerTheme.DarkTheme: TExplorerTheme;
 begin
