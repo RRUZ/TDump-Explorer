@@ -48,6 +48,8 @@ type
     FActiveDetailNode: PVirtualNode;
     FTreeSelectionFillColor: TColor;
     FTreeSelectionBorderColor: TColor;
+    FTreeHighlighter: TTinyHighlighter;
+    function TreeTextColor(ADetailKind: TTreeDetailKind): TColor;
     function HeaderFormatCaption: string;
     function HeaderArchitectureCaption: string;
     procedure UpdateDocumentHeader;
@@ -84,6 +86,12 @@ type
     procedure ShowBorlandSourceFileDetails(ASourceFile: TDumpSourceFile);
     procedure ShowBorlandSymbolRecordDetails(ADetailKind: TTreeDetailKind;
       ARecord: TDumpBorlandSymbolRecord);
+    procedure ShowLazyAlignSymbolRecordDetails(
+      ASection: TDumpLazyAlignSymbolSection; ARecordIndex: Integer);
+    procedure ShowLazyGlobalSymbolRecordDetails(
+      ASection: TDumpLazyGlobalSymbolSection; ARecordIndex: Integer);
+    procedure ShowLazyGlobalTypeRecordDetails(
+      ASection: TDumpLazyGlobalTypeSection; ARecordIndex: Integer);
     procedure ShowBorlandGlobalTypeRecordDetails(
       ARecord: TDumpGlobalTypeRecord);
     procedure ShowMachArchitecturesDetails;
@@ -115,6 +123,12 @@ type
       TargetCanvas: TCanvas; Node: PVirtualNode; Column: TColumnIndex;
       CellPaintMode: TVTCellPaintMode; CellRect: TRect;
       var ContentRect: TRect);
+    procedure TreePaintText(Sender: TBaseVirtualTree;
+      const TargetCanvas: TCanvas; Node: PVirtualNode; Column: TColumnIndex;
+      TextType: TVSTTextType);
+    procedure TreeDrawText(Sender: TBaseVirtualTree;
+      TargetCanvas: TCanvas; Node: PVirtualNode; Column: TColumnIndex;
+      const Text: string; const CellRect: TRect; var DefaultDraw: Boolean);
     procedure TreeMouseUp(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
     procedure pnTopResize(Sender: TObject);
@@ -186,15 +200,32 @@ begin
   Tree.Colors.FocusedSelectionBorderColor := FTreeSelectionBorderColor;
   Tree.Colors.UnfocusedSelectionColor := FTreeSelectionFillColor;
   Tree.Colors.UnfocusedSelectionBorderColor := FTreeSelectionBorderColor;
-  Tree.Colors.SelectionTextColor := LTheme.TextColor;
+  Tree.Colors.SelectionTextColor := LTheme.SelectionColor;
   Tree.Colors.UnfocusedColor := LTheme.TextColor;
   Tree.Invalidate;
+end;
+
+function TDumpDocumentFrame.TreeTextColor(
+  ADetailKind: TTreeDetailKind): TColor;
+begin
+  var LTheme := TExplorerTheme.ActiveTheme;
+  case cTreeDetailKindInfos[ADetailKind].TextColorKind of
+    ttckHighlighted:
+      Result := LTheme.TextColor;
+    ttckMethod:
+      Result := LTheme.MethodColor;
+    ttckType:
+      Result := LTheme.TypeColor;
+  else
+    Result := LTheme.TextColor;
+  end;
 end;
 
 constructor TDumpDocumentFrame.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
 
+  FTreeHighlighter := TTinyHighlighter.Create;
   Font.Name := TExplorerTheme.FontName;
   Font.Size := TExplorerTheme.FontSize;
 
@@ -213,6 +244,8 @@ begin
   Tree.OnFreeNode := TreeFreeNode;
   Tree.OnFocusChanged := TreeFocusChanged;
   Tree.OnBeforeCellPaint := TreeBeforeCellPaint;
+  Tree.OnPaintText := TreePaintText;
+  Tree.OnDrawText := TreeDrawText;
   Tree.OnMouseUp := TreeMouseUp;
   var LPaintOptions := Tree.TreeOptions.PaintOptions +
     [toAlwaysHideSelection, toHideFocusRect];
@@ -235,6 +268,7 @@ end;
 
 destructor TDumpDocumentFrame.Destroy;
 begin
+  FTreeHighlighter.Free;
   FDocument.Free;
   inherited;
 end;
@@ -353,6 +387,14 @@ begin
     FDetailCard.Caption := cTreeDetailKindInfos[ADetailKind].Caption;
     FHighlighterCards[ADetailKind] := FDetailCard;
     FHighlighterControls[ADetailKind] := FDetailControl;
+  end;
+  FDetailControl.PrepareGridPresentation;
+  // sstModule overrides this in TBorlandView.  Every other reused detail view
+  // starts from the normal UI font so its presentation cannot leak across nodes.
+  if ADetailKind <> tdkBorlandSubsection then
+  begin
+    FDetailControl.Font.Name := TExplorerTheme.FontName;
+    FDetailControl.Font.Size := TExplorerTheme.FontSize;
   end;
   Result := FDetailControl;
 end;
@@ -721,6 +763,42 @@ begin
   cpViews.ActiveCard := FHighlighterCards[ADetailKind];
 end;
 
+procedure TDumpDocumentFrame.ShowLazyAlignSymbolRecordDetails(
+  ASection: TDumpLazyAlignSymbolSection; ARecordIndex: Integer);
+begin
+  if (FDocument = nil) or (ASection = nil) then
+    Exit;
+  TBorlandView.PopulateLazyAlignSymbolRecord(
+    EnsureHighlighterDetailControl(tdkBorlandAlignSymbolRecord), FDocument,
+    ASection, ARecordIndex);
+  FHighlighterCards[tdkBorlandAlignSymbolRecord].Caption := 'Symbol record';
+  cpViews.ActiveCard := FHighlighterCards[tdkBorlandAlignSymbolRecord];
+end;
+
+procedure TDumpDocumentFrame.ShowLazyGlobalSymbolRecordDetails(
+  ASection: TDumpLazyGlobalSymbolSection; ARecordIndex: Integer);
+begin
+  if (FDocument = nil) or (ASection = nil) then
+    Exit;
+  TBorlandView.PopulateLazyAlignSymbolRecord(
+    EnsureHighlighterDetailControl(tdkBorlandGlobalSymbolRecord), FDocument,
+    ASection, ARecordIndex);
+  FHighlighterCards[tdkBorlandGlobalSymbolRecord].Caption := 'Symbol record';
+  cpViews.ActiveCard := FHighlighterCards[tdkBorlandGlobalSymbolRecord];
+end;
+
+procedure TDumpDocumentFrame.ShowLazyGlobalTypeRecordDetails(
+  ASection: TDumpLazyGlobalTypeSection; ARecordIndex: Integer);
+begin
+  if (FDocument = nil) or (ASection = nil) then
+    Exit;
+  TBorlandView.PopulateLazyAlignSymbolRecord(
+    EnsureHighlighterDetailControl(tdkBorlandGlobalTypeRecord), FDocument,
+    ASection, ARecordIndex);
+  FHighlighterCards[tdkBorlandGlobalTypeRecord].Caption := 'Type record';
+  cpViews.ActiveCard := FHighlighterCards[tdkBorlandGlobalTypeRecord];
+end;
+
 procedure TDumpDocumentFrame.ShowBorlandGlobalTypeRecordDetails(
   ARecord: TDumpGlobalTypeRecord);
 begin
@@ -958,13 +1036,25 @@ begin
     tdkBorlandSourceFile:
       ShowBorlandSourceFileDetails(LNodeData.SourceFile);
     tdkBorlandAlignSymbolRecord:
-      ShowBorlandSymbolRecordDetails(tdkBorlandAlignSymbolRecord,
-        LNodeData.AlignSymbolRecord);
+      if LNodeData.LazyAlignSymbolSection <> nil then
+        ShowLazyAlignSymbolRecordDetails(LNodeData.LazyAlignSymbolSection,
+          LNodeData.LazyAlignSymbolRecordIndex)
+      else
+        ShowBorlandSymbolRecordDetails(tdkBorlandAlignSymbolRecord,
+          LNodeData.AlignSymbolRecord);
     tdkBorlandGlobalSymbolRecord:
-      ShowBorlandSymbolRecordDetails(tdkBorlandGlobalSymbolRecord,
-        LNodeData.GlobalSymbolRecord);
+      if LNodeData.LazyGlobalSymbolSection <> nil then
+        ShowLazyGlobalSymbolRecordDetails(LNodeData.LazyGlobalSymbolSection,
+          LNodeData.LazyGlobalSymbolRecordIndex)
+      else
+        ShowBorlandSymbolRecordDetails(tdkBorlandGlobalSymbolRecord,
+          LNodeData.GlobalSymbolRecord);
     tdkBorlandGlobalTypeRecord:
-      ShowBorlandGlobalTypeRecordDetails(LNodeData.GlobalTypeRecord);
+      if LNodeData.LazyGlobalTypeSection <> nil then
+        ShowLazyGlobalTypeRecordDetails(LNodeData.LazyGlobalTypeSection,
+          LNodeData.LazyGlobalTypeRecordIndex)
+      else
+        ShowBorlandGlobalTypeRecordDetails(LNodeData.GlobalTypeRecord);
     tdkMachArchitectures:
       ShowMachArchitecturesDetails;
     tdkMachArchitecture:
@@ -1032,13 +1122,45 @@ procedure TDumpDocumentFrame.TreeBeforeCellPaint(Sender: TBaseVirtualTree;
 begin
   if CellPaintMode <> cpmPaint then
     Exit;
-  if not Sender.Selected[Node] then
-    Exit;
-  if (CellRect.Width <= 0) or (CellRect.Height <= 0) then
+  if Node = nil then
     Exit;
 
-  DrawSelectionBar(TargetCanvas, CellRect, FTreeSelectionFillColor,
-    FTreeSelectionBorderColor);
+  if Sender.Selected[Node] and (CellRect.Width > 0) and
+    (CellRect.Height > 0) then
+    DrawSelectionBar(TargetCanvas, CellRect, FTreeSelectionFillColor,
+      FTreeSelectionBorderColor);
+end;
+
+procedure TDumpDocumentFrame.TreePaintText(Sender: TBaseVirtualTree;
+  const TargetCanvas: TCanvas; Node: PVirtualNode; Column: TColumnIndex;
+  TextType: TVSTTextType);
+begin
+  if Node = nil then
+    Exit;
+
+  if Sender.Selected[Node] then
+    TargetCanvas.Font.Color := TExplorerTheme.ActiveTheme.SelectionColor
+  else
+    TargetCanvas.Font.Color := TreeTextColor(
+      PTreeItemData(Sender.GetNodeData(Node))^.DetailKind);
+end;
+
+procedure TDumpDocumentFrame.TreeDrawText(Sender: TBaseVirtualTree;
+  TargetCanvas: TCanvas; Node: PVirtualNode; Column: TColumnIndex;
+  const Text: string; const CellRect: TRect; var DefaultDraw: Boolean);
+begin
+  if (Node = nil) or Sender.Selected[Node] then
+    Exit;
+
+  var LNodeData := PTreeItemData(Sender.GetNodeData(Node));
+  if (LNodeData = nil) or
+    not (cTreeDetailKindInfos[LNodeData.DetailKind].TextColorKind in
+      [ttckMethod, ttckType]) then
+    Exit;
+
+  DefaultDraw := False;
+  FTreeHighlighter.TextRect(TargetCanvas, CellRect, Text,
+    TExplorerTheme.ActiveTheme, [tfVerticalCenter]);
 end;
 
 procedure TDumpDocumentFrame.TreeFocusChanged(Sender: TBaseVirtualTree;

@@ -1008,6 +1008,33 @@ type
     StartLine: Integer;
   end;
 
+  // Compact, source-backed sstAlignSym record metadata. Decoded properties
+  // remain in the mapped text source until a node needs them.
+  TDumpLazyBorlandRecord = record
+    Kind: TDumpBorlandSymbolRecordKind;
+    StartLine: Integer;
+    EndLine: Integer;
+    ParentIndex: Integer;
+    FirstChildIndex: Integer;
+    LastChildIndex: Integer;
+    NextSiblingIndex: Integer;
+  end;
+
+  // Common compact index for a Borland record subsection.  It deliberately
+  // retains only line spans and tree relationships; values remain mapped.
+  TDumpLazyBorlandRecordSection = class
+  public
+    ModIndex: Integer;
+    FileOffset: UInt64;
+    Records: TList<TDumpLazyBorlandRecord>;
+    constructor Create;
+    destructor Destroy; override;
+  end;
+
+  TDumpLazyAlignSymbolSection = class(TDumpLazyBorlandRecordSection);
+  TDumpLazyGlobalSymbolSection = class(TDumpLazyBorlandRecordSection);
+  TDumpLazyGlobalTypeSection = class(TDumpLazyBorlandRecordSection);
+
   // Owns the complete parsed TDUMP result and its lossless original text.
   // Specialized collections project supported data while diagnostics report tolerance issues.
   TDumpDocument = class
@@ -1062,6 +1089,9 @@ type
     SourceModules: TObjectList<TDumpSourceModule>;
     DebugInformation: TDumpDebugInformation;
     AlignSymbolSections: TObjectList<TDumpAlignSymbolSection>;
+    LazyAlignSymbolSections: TObjectList<TDumpLazyAlignSymbolSection>;
+    LazyGlobalSymbolSections: TObjectList<TDumpLazyGlobalSymbolSection>;
+    LazyGlobalTypeSections: TObjectList<TDumpLazyGlobalTypeSection>;
     SymbolSearches: TObjectList<TDumpSymbolSearch>;
     GlobalSymbolSections: TObjectList<TDumpGlobalSymbolSection>;
     GlobalTypeSections: TObjectList<TDumpGlobalTypeSection>;
@@ -1071,7 +1101,7 @@ type
     Nodes: TObjectList<TDumpNode>;
     Diagnostics: TList<TDumpDiagnostic>;
     UnsupportedStructures: TObjectList<TDumpUnsupportedStructure>;
-    BorlandIndexOnly: Boolean;
+    BorlandLazyRecords: Boolean;
     property RawText: string read GetRawText write SetRawText;
     constructor Create;
     destructor Destroy; override;
@@ -1113,6 +1143,8 @@ type
     procedure ParseResourceSection;
     procedure ParseRelocationSection;
     procedure ParseBorlandSymbolTable;
+    // Retained for potential targeted/lazy parsing; normal document parsing no
+    // longer selects this compact projection.
     procedure ParseBorlandSymbolIndex;
     procedure BuildDebugInformation;
     procedure ParseStrings;
@@ -1196,7 +1228,7 @@ function BorlandTypeCaption(const ARecord: TDumpGlobalTypeRecord): string;
 implementation
 
 const
-  CBorlandIndexedLineThreshold = 250000;
+  CBorlandLazyRecordLineThreshold = 250000;
   SOldExecutableHeader = 'Old Executable Header';
   SPortableExecutableHeader = 'Portable Executable (PE) File';
   SGlobalSymbolHeaderLabels: array[0..8] of string = ('cbSymbols:',
@@ -1736,6 +1768,20 @@ begin
   inherited;
 end;
 
+{ TDumpLazyBorlandRecordSection }
+
+constructor TDumpLazyBorlandRecordSection.Create;
+begin
+  inherited Create;
+  Records := TList<TDumpLazyBorlandRecord>.Create;
+end;
+
+destructor TDumpLazyBorlandRecordSection.Destroy;
+begin
+  Records.Free;
+  inherited;
+end;
+
 { TDumpBorlandSymbolRecord }
 
 constructor TDumpBorlandSymbolRecord.Create;
@@ -1961,6 +2007,9 @@ begin
   SourceModules := TObjectList<TDumpSourceModule>.Create(True);
   DebugInformation := nil;
   AlignSymbolSections := TObjectList<TDumpAlignSymbolSection>.Create(True);
+  LazyAlignSymbolSections := TObjectList<TDumpLazyAlignSymbolSection>.Create(True);
+  LazyGlobalSymbolSections := TObjectList<TDumpLazyGlobalSymbolSection>.Create(True);
+  LazyGlobalTypeSections := TObjectList<TDumpLazyGlobalTypeSection>.Create(True);
   SymbolSearches := TObjectList<TDumpSymbolSearch>.Create(True);
   GlobalSymbolSections := TObjectList<TDumpGlobalSymbolSection>.Create(True);
   GlobalTypeSections := TObjectList<TDumpGlobalTypeSection>.Create(True);
@@ -1986,6 +2035,9 @@ begin
   GlobalSymbolSections.Free;
   SymbolSearches.Free;
   AlignSymbolSections.Free;
+  LazyAlignSymbolSections.Free;
+  LazyGlobalTypeSections.Free;
+  LazyGlobalSymbolSections.Free;
   DebugInformation.Free;
   SourceModules.Free;
   SymbolModules.Free;
@@ -2291,8 +2343,9 @@ begin
     ParseExportSection;
     ParseResourceSection;
     ParseRelocationSection;
-    FDocument.BorlandIndexOnly := FLines.Count > CBorlandIndexedLineThreshold;
-    if FDocument.BorlandIndexOnly then
+    FDocument.BorlandLazyRecords :=
+      FLines.Count > CBorlandLazyRecordLineThreshold;
+    if FDocument.BorlandLazyRecords then
       ParseBorlandSymbolIndex
     else
       ParseBorlandSymbolTable;
@@ -3635,8 +3688,20 @@ begin
     FLines.Count);
   var LInDirectory := False;
   var LCurrentSubsection: TDumpBorlandSubsection := nil;
-  for var LIndex := LTableStart + 1 to FLines.Count - 1 do
-  begin
+  // The indexed path deliberately skips the expensive symbol-record model, but
+  // source files are cheap to collect and are needed to build sstSrcModule
+  // children in the document tree.
+  var LCurrentSourceModule: TDumpSourceModule := nil;
+  var LCurrentSourceFile: TDumpSourceFile := nil;
+  var LCurrentSourceRange: TDumpSourceRange := nil;
+  var LReadingSourceLines := False;
+  var LLazyAlignSection: TDumpLazyAlignSymbolSection := nil;
+  var LLazyGlobalSymbolSection: TDumpLazyGlobalSymbolSection := nil;
+  var LLazyGlobalTypeSection: TDumpLazyGlobalTypeSection := nil;
+  var LAlignScopeStack := TList<Integer>.Create;
+  try
+    for var LIndex := LTableStart + 1 to FLines.Count - 1 do
+    begin
     var LLine := FLines[LIndex];
     var LTrimmed := Trim(LLine);
     if Assigned(FOnProgress) then
@@ -3673,6 +3738,29 @@ begin
         Continue;
       if LCurrentSubsection <> nil then
         LCurrentSubsection.EndLine := LIndex;
+      if (LLazyAlignSection <> nil) and (LLazyAlignSection.Records.Count > 0) then
+      begin
+        var LLastRecord := LLazyAlignSection.Records.Last;
+        LLastRecord.EndLine := LIndex;
+        LLazyAlignSection.Records[LLazyAlignSection.Records.Count - 1] :=
+          LLastRecord;
+      end;
+      if (LLazyGlobalSymbolSection <> nil) and
+        (LLazyGlobalSymbolSection.Records.Count > 0) then
+      begin
+        var LLastRecord := LLazyGlobalSymbolSection.Records.Last;
+        LLastRecord.EndLine := LIndex;
+        LLazyGlobalSymbolSection.Records[
+          LLazyGlobalSymbolSection.Records.Count - 1] := LLastRecord;
+      end;
+      if (LLazyGlobalTypeSection <> nil) and
+        (LLazyGlobalTypeSection.Records.Count > 0) then
+      begin
+        var LLastRecord := LLazyGlobalTypeSection.Records.Last;
+        LLastRecord.EndLine := LIndex;
+        LLazyGlobalTypeSection.Records[
+          LLazyGlobalTypeSection.Records.Count - 1] := LLastRecord;
+      end;
       LCurrentSubsection := TDumpBorlandSubsection.Create;
       LCurrentSubsection.ModIndex := LModIndex;
       LCurrentSubsection.FileOffset := LFileOffset;
@@ -3680,10 +3768,232 @@ begin
       LCurrentSubsection.StartLine := LIndex + 1;
       LCurrentSubsection.EndLine := LIndex + 1;
       FDocument.BorlandSubsections.Add(LCurrentSubsection);
+
+      LCurrentSourceModule := nil;
+      LCurrentSourceFile := nil;
+      LCurrentSourceRange := nil;
+      LReadingSourceLines := False;
+      LLazyAlignSection := nil;
+      LLazyGlobalSymbolSection := nil;
+      LLazyGlobalTypeSection := nil;
+      LAlignScopeStack.Clear;
+      if SameText(LSubsectionType, 'sstSrcModule') then
+      begin
+        LCurrentSourceModule := TDumpSourceModule.Create;
+        LCurrentSourceModule.ModIndex := LModIndex;
+        LCurrentSourceModule.FileOffset := LFileOffset;
+        LCurrentSourceModule.StartLine := LIndex + 1;
+        LCurrentSourceModule.EndLine := LIndex + 1;
+        FDocument.SourceModules.Add(LCurrentSourceModule);
+      end;
+      if SameText(LSubsectionType, 'sstAlignSym') then
+      begin
+        LLazyAlignSection := TDumpLazyAlignSymbolSection.Create;
+        LLazyAlignSection.ModIndex := LModIndex;
+        LLazyAlignSection.FileOffset := LFileOffset;
+        FDocument.LazyAlignSymbolSections.Add(LLazyAlignSection);
+      end;
+      if SameText(LSubsectionType, 'sstGlobalSym') then
+      begin
+        LLazyGlobalSymbolSection := TDumpLazyGlobalSymbolSection.Create;
+        LLazyGlobalSymbolSection.ModIndex := LModIndex;
+        LLazyGlobalSymbolSection.FileOffset := LFileOffset;
+        FDocument.LazyGlobalSymbolSections.Add(LLazyGlobalSymbolSection);
+      end;
+      if SameText(LSubsectionType, 'sstGlobalTypes') then
+      begin
+        LLazyGlobalTypeSection := TDumpLazyGlobalTypeSection.Create;
+        LLazyGlobalTypeSection.ModIndex := LModIndex;
+        LLazyGlobalTypeSection.FileOffset := LFileOffset;
+        FDocument.LazyGlobalTypeSections.Add(LLazyGlobalTypeSection);
+      end;
+      Continue;
     end;
+
+    if (LLazyAlignSection <> nil) and (not LInDirectory) then
+    begin
+      var LRecordPos := Pos('S_', LTrimmed);
+      var LIsRecord := False;
+      if LRecordPos > 1 then
+      begin
+        var LRecordOffset: UInt64;
+        LIsRecord := TryParseHexUIntToken(
+          Trim(Copy(LTrimmed, 1, LRecordPos - 1)), LRecordOffset);
+      end;
+      if LIsRecord then
+      begin
+        if LLazyAlignSection.Records.Count > 0 then
+        begin
+          var LPrevious := LLazyAlignSection.Records.Last;
+          LPrevious.EndLine := LIndex;
+          LLazyAlignSection.Records[LLazyAlignSection.Records.Count - 1] :=
+            LPrevious;
+        end;
+        var LRecord := Default(TDumpLazyBorlandRecord);
+        var LRecordText := Copy(LTrimmed, LRecordPos, MaxInt);
+        LRecord.Kind := BorlandSymbolRecordKind(FirstToken(LRecordText));
+        LRecord.StartLine := LIndex + 1;
+        LRecord.EndLine := LIndex + 1;
+        LRecord.ParentIndex := -1;
+        LRecord.FirstChildIndex := -1;
+        LRecord.LastChildIndex := -1;
+        LRecord.NextSiblingIndex := -1;
+        if LAlignScopeStack.Count > 0 then
+          LRecord.ParentIndex := LAlignScopeStack.Last;
+        var LRecordIndex := LLazyAlignSection.Records.Count;
+        LLazyAlignSection.Records.Add(LRecord);
+        if LRecord.ParentIndex >= 0 then
+        begin
+          var LParent := LLazyAlignSection.Records[LRecord.ParentIndex];
+          if LParent.FirstChildIndex < 0 then
+            LParent.FirstChildIndex := LRecordIndex
+          else
+          begin
+            var LPreviousSibling := LLazyAlignSection.Records[LParent.LastChildIndex];
+            LPreviousSibling.NextSiblingIndex := LRecordIndex;
+            LLazyAlignSection.Records[LParent.LastChildIndex] := LPreviousSibling;
+          end;
+          LParent.LastChildIndex := LRecordIndex;
+          LLazyAlignSection.Records[LRecord.ParentIndex] := LParent;
+        end;
+        if LRecord.Kind = bsrkProcedure then
+          LAlignScopeStack.Add(LRecordIndex)
+        else if (LRecord.Kind = bsrkEnd) and (LAlignScopeStack.Count > 0) then
+          LAlignScopeStack.Delete(LAlignScopeStack.Count - 1);
+        Continue;
+      end;
+    end;
+
+    if (LLazyGlobalSymbolSection <> nil) and (not LInDirectory) then
+    begin
+      var LRecordPos := Pos('S_', LTrimmed);
+      var LIsRecord := False;
+      if LRecordPos > 1 then
+      begin
+        var LRecordOffset: UInt64;
+        LIsRecord := TryParseHexUIntToken(
+          Trim(Copy(LTrimmed, 1, LRecordPos - 1)), LRecordOffset);
+      end;
+      if LIsRecord then
+      begin
+        if LLazyGlobalSymbolSection.Records.Count > 0 then
+        begin
+          var LPrevious := LLazyGlobalSymbolSection.Records.Last;
+          LPrevious.EndLine := LIndex;
+          LLazyGlobalSymbolSection.Records[
+            LLazyGlobalSymbolSection.Records.Count - 1] := LPrevious;
+        end;
+        var LRecord := Default(TDumpLazyBorlandRecord);
+        var LRecordText := Copy(LTrimmed, LRecordPos, MaxInt);
+        LRecord.Kind := BorlandSymbolRecordKind(FirstToken(LRecordText));
+        LRecord.StartLine := LIndex + 1;
+        LRecord.EndLine := LIndex + 1;
+        LRecord.ParentIndex := -1;
+        LRecord.FirstChildIndex := -1;
+        LRecord.LastChildIndex := -1;
+        LRecord.NextSiblingIndex := -1;
+        LLazyGlobalSymbolSection.Records.Add(LRecord);
+        Continue;
+      end;
+    end;
+
+    if (LLazyGlobalTypeSection <> nil) and (not LInDirectory) then
+    begin
+      var LTypePos := Pos(' Type:', LTrimmed);
+      var LIsTypeRecord := False;
+      if LTypePos > 1 then
+      begin
+        var LRecordOffset: UInt64;
+        LIsTypeRecord := TryParseHexUIntToken(
+          Trim(Copy(LTrimmed, 1, LTypePos - 1)), LRecordOffset);
+      end;
+      if LIsTypeRecord then
+      begin
+        if LLazyGlobalTypeSection.Records.Count > 0 then
+        begin
+          var LPrevious := LLazyGlobalTypeSection.Records.Last;
+          LPrevious.EndLine := LIndex;
+          LLazyGlobalTypeSection.Records[
+            LLazyGlobalTypeSection.Records.Count - 1] := LPrevious;
+        end;
+        var LRecord := Default(TDumpLazyBorlandRecord);
+        LRecord.StartLine := LIndex + 1;
+        LRecord.EndLine := LIndex + 1;
+        LRecord.ParentIndex := -1;
+        LRecord.FirstChildIndex := -1;
+        LRecord.LastChildIndex := -1;
+        LRecord.NextSiblingIndex := -1;
+        LLazyGlobalTypeSection.Records.Add(LRecord);
+        Continue;
+      end;
+    end;
+
+    if LCurrentSourceModule <> nil then
+    begin
+      LCurrentSourceModule.EndLine := LIndex + 1;
+      if StartsWithText(LTrimmed, 'File:') then
+      begin
+        var LSourceFile: TDumpSourceFile;
+        if TryParseBorlandSourceFileLine(LLine, LIndex + 1, LSourceFile) then
+        begin
+          LCurrentSourceModule.SourceFiles.Add(LSourceFile);
+          LCurrentSourceFile := LSourceFile;
+          LCurrentSourceRange := nil;
+        end;
+        LReadingSourceLines := False;
+      end
+      else if StartsWithText(LTrimmed, 'Range:') and
+        (LCurrentSourceFile <> nil) then
+      begin
+        var LSourceRange: TDumpSourceRange;
+        if TryParseBorlandSourceRangeLine(LLine, LIndex + 1, LSourceRange) then
+        begin
+          LCurrentSourceFile.Ranges.Add(LSourceRange);
+          LCurrentSourceRange := LSourceRange;
+        end;
+        LReadingSourceLines := False;
+      end
+      else if SameText(LTrimmed, 'Line numbers:') then
+        LReadingSourceLines := True
+      else if (LCurrentSourceFile = nil) then
+      begin
+        var LSourceRange: TDumpSourceRange;
+        if TryParseBorlandSourceRangeLine(LLine, LIndex + 1, LSourceRange) then
+          LCurrentSourceModule.SegmentRanges.Add(LSourceRange)
+        else if LReadingSourceLines and (LCurrentSourceRange <> nil) then
+          AddBorlandSourceLinePairs(LLine, LIndex + 1, LCurrentSourceRange);
+      end
+      else if LReadingSourceLines and (LCurrentSourceRange <> nil) then
+        AddBorlandSourceLinePairs(LLine, LIndex + 1, LCurrentSourceRange);
+    end;
+    end;
+    if LCurrentSubsection <> nil then
+      LCurrentSubsection.EndLine := FLines.Count;
+    if (LLazyAlignSection <> nil) and (LLazyAlignSection.Records.Count > 0) then
+    begin
+      var LLastRecord := LLazyAlignSection.Records.Last;
+      LLastRecord.EndLine := FLines.Count;
+      LLazyAlignSection.Records[LLazyAlignSection.Records.Count - 1] := LLastRecord;
+    end;
+    if (LLazyGlobalSymbolSection <> nil) and
+      (LLazyGlobalSymbolSection.Records.Count > 0) then
+    begin
+      var LLastRecord := LLazyGlobalSymbolSection.Records.Last;
+      LLastRecord.EndLine := FLines.Count;
+      LLazyGlobalSymbolSection.Records[
+        LLazyGlobalSymbolSection.Records.Count - 1] := LLastRecord;
+    end;
+    if (LLazyGlobalTypeSection <> nil) and
+      (LLazyGlobalTypeSection.Records.Count > 0) then
+    begin
+      var LLastRecord := LLazyGlobalTypeSection.Records.Last;
+      LLastRecord.EndLine := FLines.Count;
+      LLazyGlobalTypeSection.Records[
+        LLazyGlobalTypeSection.Records.Count - 1] := LLastRecord;
+    end;
+  finally
+    LAlignScopeStack.Free;
   end;
-  if LCurrentSubsection <> nil then
-    LCurrentSubsection.EndLine := FLines.Count;
 end;
 
 procedure TDumpParser.ParseBorlandSymbolTable;
@@ -4422,6 +4732,7 @@ begin
     LRecord.RawOffset := LRawOffset;
     LRecord.RecordKind := LRecordKind;
     LRecord.Name := LRemainder;
+    LRecord.RawText := FLines[LIndex];
     LRecord.StartLine := LIndex + 1;
     LRecord.EndLine := FLines.Count;
     FDocument.ObjectRecords.Add(LRecord);

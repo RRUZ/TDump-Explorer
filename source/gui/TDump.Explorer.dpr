@@ -29,7 +29,8 @@ uses
   TDump.Explorer.View.OMF in 'TDump.Explorer.View.OMF.pas',
   TDump.Explorer.View.PE in 'TDump.Explorer.View.PE.pas',
   TDump.Explorer.View.Shared in 'TDump.Explorer.View.Shared.pas',
-  TDump.Explorer.PopupMenu in 'TDump.Explorer.PopupMenu.pas';
+  TDump.Explorer.PopupMenu in 'TDump.Explorer.PopupMenu.pas',
+  TDump.Explorer.View.Borland in 'TDump.Explorer.View.Borland.pas';
 
 {$R *.res}
 

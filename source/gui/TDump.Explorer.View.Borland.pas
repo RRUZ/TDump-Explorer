@@ -26,6 +26,9 @@ type
       ADocument: TDumpDocument; ASubsectionIndex: Integer); static;
     class procedure PopulateSymbolRecord(AControl: THighlighterControl;
       ARecord: TDumpBorlandSymbolRecord); static;
+    class procedure PopulateLazyAlignSymbolRecord(AControl: THighlighterControl;
+      ADocument: TDumpDocument; ASection: TDumpLazyBorlandRecordSection;
+      ARecordIndex: Integer); static;
     class procedure PopulateGlobalTypeRecord(AControl: THighlighterControl;
       ARecord: TDumpGlobalTypeRecord); static;
     class procedure PopulateSourceFile(AControl: THighlighterControl;
@@ -44,8 +47,234 @@ uses
   System.SysUtils,
   System.StrUtils,
   TDump.Explorer.Highlighter,
-  TDump.Explorer.HighlighterProviders,
-  TDump.Explorer.TinyParser;
+  TDump.Explorer.TinyParser,
+  TDump.Explorer.UI;
+
+function BorlandSourceLine(ADocument: TDumpDocument;
+  ALineNumber: Integer): string;
+begin
+  Result := '';
+  if (ADocument = nil) or (ADocument.TextSource = nil) or
+    (ALineNumber < 1) or (ALineNumber > ADocument.TextSource.LineCount) then
+    Exit;
+  Result := ADocument.TextSource[ALineNumber - 1];
+end;
+
+function BorlandValueForLabel(const ALine, ALabel: string): string;
+const
+  CLabels: array[0..15] of string = ('OvlNum:', 'LibIndex:', 'SegCount:',
+    'Time:', 'Name:', 'cbSymbols:', 'cNamespaces:', 'cUDTs:', 'cOthers:',
+    'Total:', 'SymHash:', 'cbSymHash:', 'AddrHash:', 'cbAddrHash:',
+    'Number of types:', 'Flags:');
+var
+  LStart: Integer;
+  LEnd: Integer;
+  LCandidate: Integer;
+  LKnownLabel: string;
+begin
+  Result := '';
+  LStart := Pos(ALabel, ALine);
+  if LStart = 0 then
+    Exit;
+  Inc(LStart, Length(ALabel));
+  LEnd := Length(ALine) + 1;
+  for LKnownLabel in CLabels do
+  begin
+    LCandidate := PosEx(LKnownLabel, ALine, LStart);
+    if (LCandidate > 0) and (LCandidate < LEnd) then
+      LEnd := LCandidate;
+  end;
+  Result := Trim(Copy(ALine, LStart, LEnd - LStart));
+end;
+
+function BorlandNameWithoutIndex(const AValue: string): string;
+var
+  LOpenBracket: Integer;
+  LCloseBracket: Integer;
+begin
+  Result := Trim(AValue);
+  LOpenBracket := LastDelimiter('[', Result);
+  LCloseBracket := LastDelimiter(']', Result);
+  if (LOpenBracket > 0) and (LCloseBracket > LOpenBracket) then
+    Result := Trim(Copy(Result, 1, LOpenBracket - 1));
+end;
+
+procedure AddSourceBackedModuleDetails(AControl: THighlighterControl;
+  ADocument: TDumpDocument; ASubsection: TDumpBorlandSubsection);
+var
+  LLineNumber: Integer;
+  LLine: string;
+  LName: string;
+  LOverlay: string;
+  LLibraryIndex: string;
+  LTime: string;
+  LHasHeader: Boolean;
+  LSegmentCount: Integer;
+  LSegments: TArray<string>;
+begin
+  if (AControl = nil) or (ASubsection = nil) then
+    Exit;
+  LName := '';
+  LOverlay := '';
+  LLibraryIndex := '';
+  LTime := '';
+  LHasHeader := False;
+  LSegmentCount := 0;
+  for LLineNumber := ASubsection.StartLine + 1 to ASubsection.EndLine do
+  begin
+    LLine := Trim(BorlandSourceLine(ADocument, LLineNumber));
+    if StartsText('OvlNum:', LLine) then
+    begin
+      LHasHeader := True;
+      LName := BorlandNameWithoutIndex(BorlandValueForLabel(LLine, 'Name:'));
+      LOverlay := BorlandValueForLabel(LLine, 'OvlNum:');
+      LLibraryIndex := BorlandValueForLabel(LLine, 'LibIndex:');
+      LTime := BorlandValueForLabel(LLine, 'Time:');
+    end
+    else if (Pos(':', LLine) > 0) and (Pos('-', LLine) > 0) and
+      (Pos('Flags:', LLine) > 0) then
+    begin
+      Inc(LSegmentCount);
+      SetLength(LSegments, Length(LSegments) + 1);
+      LSegments[High(LSegments)] := LLine;
+    end;
+  end;
+  if LHasHeader then
+  begin
+    if LName <> '' then
+      AControl.AddColumns(['Name', LName]);
+    AControl.AddColumns(['Overlay', LOverlay]);
+    AControl.AddColumns(['Library index', LLibraryIndex]);
+    AControl.AddColumns(['Segments', LSegmentCount.ToString]);
+    AControl.AddColumns(['Time', LTime]);
+    for var LSegment in LSegments do
+      AControl.AddColumns(['Segment', LSegment]);
+  end;
+end;
+
+procedure AddSourceBackedGlobalSymbolDetails(AControl: THighlighterControl;
+  ADocument: TDumpDocument; ASubsection: TDumpBorlandSubsection);
+var
+  LLineNumber: Integer;
+  LLine: string;
+  LRecordCount: Integer;
+begin
+  LRecordCount := 0;
+  for var LSection in ADocument.LazyGlobalSymbolSections do
+    if (LSection.ModIndex = ASubsection.ModIndex) and
+      (LSection.FileOffset = ASubsection.FileOffset) then
+    begin
+      LRecordCount := LSection.Records.Count;
+      Break;
+    end;
+  for LLineNumber := ASubsection.StartLine + 1 to ASubsection.EndLine do
+  begin
+    if LLineNumber > ASubsection.StartLine + 3 then
+      Break;
+    LLine := Trim(BorlandSourceLine(ADocument, LLineNumber));
+    if StartsText('cbSymbols:', LLine) then
+    begin
+      AControl.AddColumns(['Symbol bytes', BorlandValueForLabel(LLine,
+        'cbSymbols:')]);
+      AControl.AddColumns(['Namespaces', BorlandValueForLabel(LLine,
+        'cNamespaces:')]);
+      AControl.AddColumns(['UDTs', BorlandValueForLabel(LLine, 'cUDTs:')]);
+      AControl.AddColumns(['Others', BorlandValueForLabel(LLine, 'cOthers:')]);
+      AControl.AddColumns(['Total', BorlandValueForLabel(LLine, 'Total:')]);
+    end
+    else if StartsText('SymHash:', LLine) then
+      AControl.AddColumns(['Symbol hash', BorlandValueForLabel(LLine,
+        'SymHash:')]);
+  end;
+  AControl.AddColumns(['Records', LRecordCount.ToString]);
+end;
+
+procedure AddSourceBackedGlobalTypeDetails(AControl: THighlighterControl;
+  ADocument: TDumpDocument; ASubsection: TDumpBorlandSubsection);
+var
+  LLineNumber: Integer;
+  LLine: string;
+  LRecordCount: Integer;
+begin
+  LRecordCount := 0;
+  for var LSection in ADocument.LazyGlobalTypeSections do
+    if (LSection.ModIndex = ASubsection.ModIndex) and
+      (LSection.FileOffset = ASubsection.FileOffset) then
+    begin
+      LRecordCount := LSection.Records.Count;
+      Break;
+    end;
+  for LLineNumber := ASubsection.StartLine + 1 to ASubsection.EndLine do
+  begin
+    if LLineNumber > ASubsection.StartLine + 2 then
+      Break;
+    LLine := Trim(BorlandSourceLine(ADocument, LLineNumber));
+    if StartsText('Number of types:', LLine) then
+      AControl.AddColumns(['Declared types', BorlandValueForLabel(LLine,
+        'Number of types:')]);
+  end;
+  AControl.AddColumns(['Parsed records', LRecordCount.ToString]);
+end;
+
+procedure AddSourceBackedNames(AControl: THighlighterControl;
+  ADocument: TDumpDocument; ASubsection: TDumpBorlandSubsection);
+var
+  LLineNumber: Integer;
+  LLine: string;
+  LColon: Integer;
+  LIndexText: string;
+  LIndex: Integer;
+begin
+  for LLineNumber := ASubsection.StartLine + 1 to ASubsection.EndLine do
+  begin
+    LLine := Trim(BorlandSourceLine(ADocument, LLineNumber));
+    LColon := Pos(':', LLine);
+    if LColon <= 1 then
+      Continue;
+    LIndexText := Trim(Copy(LLine, 1, LColon - 1));
+    if not TryStrToInt('$' + LIndexText, LIndex) then
+      Continue;
+    var LName := Trim(Copy(LLine, LColon + 1, MaxInt));
+    if IsBorlandMethodName(LName) then
+      AControl.AddColumns([LIndexText, LName], tpmCppBuilderMethod)
+    else
+      AControl.AddColumns([LIndexText, LName]);
+  end;
+end;
+
+procedure AddLazyAlignSymbolSummary(AControl: THighlighterControl;
+  ADocument: TDumpDocument; ASubsection: TDumpBorlandSubsection);
+begin
+  for var LSection in ADocument.LazyAlignSymbolSections do
+    if (LSection.ModIndex = ASubsection.ModIndex) and
+      (LSection.FileOffset = ASubsection.FileOffset) then
+    begin
+      var LSearchCount := 0;
+      for var LRecord in LSection.Records do
+        if LRecord.Kind = bsrkSearch then
+          Inc(LSearchCount);
+      AControl.AddColumns(['Records', LSection.Records.Count.ToString]);
+      AControl.AddColumns(['Search records', LSearchCount.ToString]);
+      Exit;
+    end;
+end;
+
+procedure AddSourceBackedProperties(AControl: THighlighterControl;
+  ADocument: TDumpDocument; ASubsection: TDumpBorlandSubsection);
+var
+  LLineNumber: Integer;
+  LLine: string;
+  LColon: Integer;
+begin
+  for LLineNumber := ASubsection.StartLine + 1 to ASubsection.EndLine do
+  begin
+    LLine := Trim(BorlandSourceLine(ADocument, LLineNumber));
+    LColon := Pos(':', LLine);
+    if (LColon > 1) and (Pos(' S_', LLine) = 0) then
+      AControl.AddColumns([Trim(Copy(LLine, 1, LColon - 1)),
+        Trim(Copy(LLine, LColon + 1, MaxInt))]);
+  end;
+end;
 
 class procedure TBorlandView.PopulateSymbolTable(AControl: THighlighterControl;
   ADocument: TDumpDocument);
@@ -126,18 +355,17 @@ begin
   var LSubsection := ADocument.BorlandSubsections[ASubsectionIndex];
   AControl.ParserMode := tpmTDumpValues;
   AControl.BeginUpdate;
-  try
-    AControl.Clear;
-    if ADocument.BorlandIndexOnly then
+  try     {
+    if SameText(LSubsection.SubsectionType, 'sstModule') then
     begin
-      AControl.UseColumnMode := False;
-      AControl.AutoSizeColumns := False;
-      AControl.ShowLineNumbers := True;
-      AControl.SetItemProvider(TDocumentLineRowProvider.CreateRange(ADocument,
-        LSubsection.StartLine - 1,
-        LSubsection.EndLine - LSubsection.StartLine + 1));
-      Exit;
-    end;
+      AControl.Font.Name := TExplorerTheme.FixedWidthFontName;
+    end
+    else
+    begin
+      AControl.Font.Name := TExplorerTheme.FontName;
+      AControl.Font.Size := TExplorerTheme.FontSize;
+    end; }
+    AControl.Clear;
     AControl.UseColumnMode := True;
     AControl.AutoSizeColumns := True;
     AControl.ShowLineNumbers := False;
@@ -145,11 +373,14 @@ begin
     begin
       AControl.SetColumnHeaders(['Index', 'Name']);
       AControl.SetColumnDataTypes([thdtHexadecimal, thdtAuto]);
-      for var LName in ADocument.BorlandNames do
-        if IsBorlandMethodName(LName.Value) then
-          AControl.AddColumns([LName.RawIndex, LName.Value], tpmCppBuilderMethod)
-        else
-          AControl.AddColumns([LName.RawIndex, LName.Value]);
+      if ADocument.BorlandLazyRecords then
+        AddSourceBackedNames(AControl, ADocument, LSubsection)
+      else
+        for var LName in ADocument.BorlandNames do
+          if IsBorlandMethodName(LName.Value) then
+            AControl.AddColumns([LName.RawIndex, LName.Value], tpmCppBuilderMethod)
+          else
+            AControl.AddColumns([LName.RawIndex, LName.Value]);
       Exit;
     end;
     AControl.SetColumnHeaders(['Name', 'Value']);
@@ -167,6 +398,10 @@ begin
           AControl.AddColumns(['Library index', IntToHex(LModule.LibIndex, 4)]);
           AControl.AddColumns(['Segments', LModule.Segments.Count.ToString]);
           AControl.AddColumns(['Time', IntToHex(LModule.Time, 4)]);
+          for var LSegment in LModule.Segments do
+            AControl.AddColumns(['Segment', Format('%s:%s-%s  Flags: %s',
+              [LSegment.RawSegment, LSegment.RawStartOffset,
+               LSegment.RawEndOffset, LSegment.RawFlags])]);
           Break;
         end
     else if SameText(LSubsection.SubsectionType, 'sstSrcModule') then
@@ -208,6 +443,19 @@ begin
           AControl.AddColumns(['Parsed records', LGlobalTypeSection.Records.Count.ToString]);
           Break;
         end;
+    if ADocument.BorlandLazyRecords then
+    begin
+      if SameText(LSubsection.SubsectionType, 'sstModule') then
+        AddSourceBackedModuleDetails(AControl, ADocument, LSubsection)
+      else if SameText(LSubsection.SubsectionType, 'sstAlignSym') then
+        AddLazyAlignSymbolSummary(AControl, ADocument, LSubsection)
+      else if SameText(LSubsection.SubsectionType, 'sstGlobalSym') then
+        AddSourceBackedGlobalSymbolDetails(AControl, ADocument, LSubsection)
+      else if SameText(LSubsection.SubsectionType, 'sstGlobalTypes') then
+        AddSourceBackedGlobalTypeDetails(AControl, ADocument, LSubsection)
+      else if not SameText(LSubsection.SubsectionType, 'sstSrcModule') then
+        AddSourceBackedProperties(AControl, ADocument, LSubsection);
+    end;
     if not SameText(LSubsection.SubsectionType, 'sstSrcModule') and
       (LSubsection.Node <> nil) then
       for var LProperty in LSubsection.Node.Properties do
@@ -243,6 +491,86 @@ begin
     if ARecord.Value <> '' then AControl.AddColumns(['Value', ARecord.Value]);
     for var LProperty in ARecord.Properties do AControl.AddColumns([LProperty.Name, LProperty.RawValue]);
   finally AControl.EndUpdate; end;
+end;
+
+class procedure TBorlandView.PopulateLazyAlignSymbolRecord(
+  AControl: THighlighterControl; ADocument: TDumpDocument;
+  ASection: TDumpLazyBorlandRecordSection; ARecordIndex: Integer);
+  function TakeToken(var AText: string): string;
+  begin
+    AText := Trim(AText);
+    var LSeparator := Pos(' ', AText);
+    if LSeparator = 0 then
+    begin
+      Result := AText;
+      AText := '';
+    end
+    else
+    begin
+      Result := Copy(AText, 1, LSeparator - 1);
+      Delete(AText, 1, LSeparator);
+      AText := Trim(AText);
+    end;
+  end;
+  procedure AddLine(const ALine: string);
+  begin
+    var LText := Trim(ALine);
+    if LText = '' then
+      Exit;
+    var LTypePos := Pos(' Type:', LText);
+    if LTypePos > 1 then
+    begin
+      AControl.AddColumns(['Record offset', Trim(Copy(LText, 1,
+        LTypePos - 1))]);
+      var LTypeText := Trim(Copy(LText, LTypePos + Length(' Type:'), MaxInt));
+      AControl.AddColumns(['Type index', TakeToken(LTypeText)]);
+      if StartsText('Len:', LTypeText) then
+      begin
+        Delete(LTypeText, 1, Length('Len:'));
+        LTypeText := Trim(LTypeText);
+        AControl.AddColumns(['Length', TakeToken(LTypeText)]);
+      end;
+      if LTypeText <> '' then
+        AControl.AddColumns(['Kind', TakeToken(LTypeText)]);
+      Exit;
+    end;
+    var LRecordPos := Pos('S_', LText);
+    if LRecordPos > 1 then
+    begin
+      AControl.AddColumns(['Record offset', Trim(Copy(LText, 1, LRecordPos - 1))]);
+      AControl.AddColumns(['Record kind', Trim(Copy(LText, LRecordPos, MaxInt))]);
+      Exit;
+    end;
+    var LNamePos := Pos('@', LText);
+    if LNamePos > 0 then
+    begin
+      AControl.AddColumns(['Name', Trim(Copy(LText, LNamePos, MaxInt))],
+        tpmCppBuilderMethod);
+      Exit;
+    end;
+    var LColonPos := Pos(':', LText);
+    if LColonPos > 1 then
+      AControl.AddColumns([Trim(Copy(LText, 1, LColonPos - 1)),
+        Trim(Copy(LText, LColonPos + 1, MaxInt))])
+    else
+      AControl.AddColumns(['Data', LText]);
+  end;
+begin
+  if (AControl = nil) or (ADocument = nil) or (ADocument.TextSource = nil) or
+    (ASection = nil) or (ARecordIndex < 0) or
+    (ARecordIndex >= ASection.Records.Count) then
+    Exit;
+  var LRecord := ASection.Records[ARecordIndex];
+  AControl.ParserMode := tpmTDumpValues;
+  AControl.BeginUpdate;
+  try
+    AControl.Clear;
+    AControl.SetColumnHeaders(['Name', 'Value']);
+    for var LLineNumber := LRecord.StartLine to LRecord.EndLine do
+      AddLine(ADocument.TextSource[LLineNumber - 1]);
+  finally
+    AControl.EndUpdate;
+  end;
 end;
 
 class procedure TBorlandView.PopulateGlobalTypeRecord(AControl: THighlighterControl;

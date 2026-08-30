@@ -42,58 +42,61 @@ type
     tdkMachIndirectSymbols, tdkMachDynamicSymbolMetadata,
     tdkArchiveMembers, tdkArchiveSymbols, tdkDiagnostics);
 
+  TTreeTextColorKind = (ttckDefault, ttckHighlighted, ttckMethod, ttckType);
+
   TTreeDetailKindInfo = record
     Caption: string;
     ImageName: string;
+    TextColorKind: TTreeTextColorKind;
   end;
 
 const
   cTreeDetailKindInfos: array[TTreeDetailKind] of TTreeDetailKindInfo = (
-    (Caption: ''; ImageName: ''),
-    (Caption: ''; ImageName: ''),
-    (Caption: 'Old Executable Header'; ImageName: 'stack-simple'),
-    (Caption: 'Portable Executable Header'; ImageName: 'stack'),
-    (Caption: 'ELF Header'; ImageName: 'rectangle'),
-    (Caption: 'Data Directories'; ImageName: 'cards'),
-    (Caption: 'Object Table'; ImageName: 'rectangle'),
-    (Caption: 'Import Directory'; ImageName: 'arrow-square-right'),
-    (Caption: 'Import Module'; ImageName: ''),
-    (Caption: 'Delayed Load Import Table'; ImageName: ''),
-    (Caption: 'Delayed Import Module'; ImageName: ''),
-    (Caption: 'Export Directory'; ImageName: 'arrow-square-left'),
-    (Caption: 'Resources'; ImageName: 'archive'),
-    (Caption: 'Resource'; ImageName: ''),
-    (Caption: 'Borland 32-bit Symbol Table'; ImageName: 'package'),
-    (Caption: 'Borland Subsection'; ImageName: 'package'),
-    (Caption: 'Source File'; ImageName: 'file-code'),
-    (Caption: 'Alignment Symbol'; ImageName: ''),
-    (Caption: 'Global Symbol'; ImageName: ''),
-    (Caption: 'Global Type'; ImageName: ''),
-    (Caption: 'Mach Header'; ImageName: ''),
-    (Caption: 'FAT Architectures'; ImageName: 'scan'),
-    (Caption: 'FAT Architecture'; ImageName: ''),
-    (Caption: 'Load Commands'; ImageName: ''),
-    (Caption: 'Load Command'; ImageName: ''),
-    (Caption: 'Mach Section'; ImageName: ''),
-    (Caption: 'Symbol Table'; ImageName: ''),
-    (Caption: 'ELF Section Headers'; ImageName: ''),
-    (Caption: 'ELF Program Headers'; ImageName: ''),
-    (Caption: 'ELF Symbol Table'; ImageName: ''),
-    (Caption: 'ELF Dynamic Section'; ImageName: ''),
-    (Caption: 'ELF Relocations'; ImageName: ''),
-    (Caption: 'OMF Records'; ImageName: ''),
-    (Caption: 'OMF Record'; ImageName: ''),
-    (Caption: 'OMF Library Members'; ImageName: ''),
-    (Caption: 'OMF Library Index'; ImageName: ''),
-    (Caption: 'Relocations'; ImageName: ''),
-    (Caption: 'Relocation Block'; ImageName: ''),
-    (Caption: 'Strings'; ImageName: ''),
-    (Caption: 'Mach Dynamic Imports'; ImageName: ''),
-    (Caption: 'Mach Indirect Symbols'; ImageName: ''),
-    (Caption: 'Mach Dynamic Symbol Table'; ImageName: ''),
-    (Caption: 'AR Archive Members'; ImageName: ''),
-    (Caption: 'AR Archive Symbols'; ImageName: ''),
-    (Caption: 'Diagnostics'; ImageName: 'warning'));
+    (Caption: ''; ImageName: ''; TextColorKind: ttckDefault),
+    (Caption: ''; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'Old Executable Header'; ImageName: 'stack-simple'; TextColorKind: ttckHighlighted),
+    (Caption: 'Portable Executable Header'; ImageName: 'stack'; TextColorKind: ttckHighlighted),
+    (Caption: 'ELF Header'; ImageName: 'rectangle'; TextColorKind: ttckHighlighted),
+    (Caption: 'Data Directories'; ImageName: 'cards'; TextColorKind: ttckHighlighted),
+    (Caption: 'Object Table'; ImageName: 'rectangle'; TextColorKind: ttckHighlighted),
+    (Caption: 'Import Directory'; ImageName: 'arrow-square-right'; TextColorKind: ttckHighlighted),
+    (Caption: 'Import Module'; ImageName: ''; TextColorKind: ttckDefault),
+    (Caption: 'Delayed Load Import Table'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'Delayed Import Module'; ImageName: ''; TextColorKind: ttckDefault),
+    (Caption: 'Export Directory'; ImageName: 'arrow-square-left'; TextColorKind: ttckHighlighted),
+    (Caption: 'Resources'; ImageName: 'archive'; TextColorKind: ttckHighlighted),
+    (Caption: 'Resource'; ImageName: ''; TextColorKind: ttckDefault),
+    (Caption: 'Borland 32-bit Symbol Table'; ImageName: 'package'; TextColorKind: ttckHighlighted),
+    (Caption: 'Borland Subsection'; ImageName: 'package'; TextColorKind: ttckHighlighted),
+    (Caption: 'Source File'; ImageName: 'file-code'; TextColorKind: ttckDefault),
+    (Caption: 'Alignment Symbol'; ImageName: ''; TextColorKind: ttckMethod),
+    (Caption: 'Global Symbol'; ImageName: ''; TextColorKind: ttckMethod),
+    (Caption: 'Global Type'; ImageName: ''; TextColorKind: ttckType),
+    (Caption: 'Mach Header'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'FAT Architectures'; ImageName: 'scan'; TextColorKind: ttckHighlighted),
+    (Caption: 'FAT Architecture'; ImageName: ''; TextColorKind: ttckDefault),
+    (Caption: 'Load Commands'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'Load Command'; ImageName: ''; TextColorKind: ttckDefault),
+    (Caption: 'Mach Section'; ImageName: ''; TextColorKind: ttckDefault),
+    (Caption: 'Symbol Table'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'ELF Section Headers'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'ELF Program Headers'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'ELF Symbol Table'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'ELF Dynamic Section'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'ELF Relocations'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'OMF Records'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'OMF Record'; ImageName: ''; TextColorKind: ttckDefault),
+    (Caption: 'OMF Library Members'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'OMF Library Index'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'Relocations'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'Relocation Block'; ImageName: ''; TextColorKind: ttckDefault),
+    (Caption: 'Strings'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'Mach Dynamic Imports'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'Mach Indirect Symbols'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'Mach Dynamic Symbol Table'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'AR Archive Members'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'AR Archive Symbols'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'Diagnostics'; ImageName: 'warning'; TextColorKind: ttckHighlighted));
 
 type
   PTreeItemData = ^TTreeItemData;
@@ -106,6 +109,12 @@ type
     BorlandSubsectionIndex: Integer;
     SourceFile: TDumpSourceFile;
     AlignSymbolRecord: TDumpAlignSymbolRecord;
+    LazyAlignSymbolSection: TDumpLazyAlignSymbolSection;
+    LazyAlignSymbolRecordIndex: Integer;
+    LazyGlobalSymbolSection: TDumpLazyGlobalSymbolSection;
+    LazyGlobalSymbolRecordIndex: Integer;
+    LazyGlobalTypeSection: TDumpLazyGlobalTypeSection;
+    LazyGlobalTypeRecordIndex: Integer;
     GlobalSymbolRecord: TDumpGlobalSymbolRecord;
     GlobalTypeRecord: TDumpGlobalTypeRecord;
     MachArchitecture: TDumpMachArchitecture;
@@ -131,6 +140,19 @@ type
       ADetailKind: TTreeDetailKind = tdkNone): PVirtualNode;
     procedure AddAlignSymbolRecordNode(AParent: PVirtualNode;
       ARecord: TDumpAlignSymbolRecord);
+    procedure AddLazyAlignSymbolRecordNode(AParent: PVirtualNode;
+      ADocument: TDumpDocument; ASection: TDumpLazyAlignSymbolSection;
+      ARecordIndex: Integer);
+    procedure AddLazyGlobalSymbolRecordNode(AParent: PVirtualNode;
+      ADocument: TDumpDocument; ASection: TDumpLazyGlobalSymbolSection;
+      ARecordIndex: Integer);
+    procedure AddLazyGlobalTypeRecordNode(AParent: PVirtualNode;
+      ADocument: TDumpDocument; ASection: TDumpLazyGlobalTypeSection;
+      ARecordIndex: Integer);
+    function LazyAlignSymbolCaption(ADocument: TDumpDocument;
+      ASection: TDumpLazyBorlandRecordSection; ARecordIndex: Integer): string;
+    function LazyGlobalTypeCaption(ADocument: TDumpDocument;
+      ASection: TDumpLazyGlobalTypeSection; ARecordIndex: Integer): string;
     procedure AddResourceNodes(AParent: PVirtualNode;
       const AResources: TObjectList<TDumpResource>);
     function HeaderDetailKind(const AHeader: TDumpHeader): TTreeDetailKind;
@@ -193,6 +215,124 @@ begin
   PTreeItemData(FTree.GetNodeData(LRecordNode))^.AlignSymbolRecord := ARecord;
   for var LChild in ARecord.ScopeChildren do
     AddAlignSymbolRecordNode(LRecordNode, TDumpAlignSymbolRecord(LChild));
+end;
+
+function TDocumentTreeBuilder.LazyAlignSymbolCaption(ADocument: TDumpDocument;
+  ASection: TDumpLazyBorlandRecordSection; ARecordIndex: Integer): string;
+  function LeadingToken(const AText: string): string;
+  begin
+    Result := Trim(AText);
+    var LSeparator := Pos(' ', Result);
+    if LSeparator > 0 then
+      SetLength(Result, LSeparator - 1);
+  end;
+begin
+  Result := 'Symbol record';
+  if (ADocument = nil) or (ADocument.TextSource = nil) or (ASection = nil) or
+    (ARecordIndex < 0) or (ARecordIndex >= ASection.Records.Count) then
+    Exit;
+  var LRecord := ASection.Records[ARecordIndex];
+  var LLine := ADocument.TextSource[LRecord.StartLine - 1];
+  var LRecordPos := Pos('S_', LLine);
+  if LRecordPos > 0 then
+    Result := LeadingToken(Copy(LLine, LRecordPos, MaxInt));
+  for var LLineIndex := LRecord.StartLine to LRecord.EndLine do
+  begin
+    LLine := ADocument.TextSource[LLineIndex - 1];
+    var LNamePos := Pos('@', LLine);
+    if LNamePos > 0 then
+      Exit(Result + '  ' + LeadingToken(Copy(LLine, LNamePos, MaxInt)));
+  end;
+end;
+
+procedure TDocumentTreeBuilder.AddLazyAlignSymbolRecordNode(
+  AParent: PVirtualNode; ADocument: TDumpDocument;
+  ASection: TDumpLazyAlignSymbolSection; ARecordIndex: Integer);
+begin
+  if (ASection = nil) or (ARecordIndex < 0) or
+    (ARecordIndex >= ASection.Records.Count) then
+    Exit;
+  var LRecord := ASection.Records[ARecordIndex];
+  var LRecordNode := AddNode(AParent,
+    LazyAlignSymbolCaption(ADocument, ASection, ARecordIndex),
+    tdkBorlandAlignSymbolRecord);
+  var LNodeData := PTreeItemData(FTree.GetNodeData(LRecordNode));
+  LNodeData.LazyAlignSymbolSection := ASection;
+  LNodeData.LazyAlignSymbolRecordIndex := ARecordIndex;
+  LNodeData.SourceStartLine := LRecord.StartLine;
+  LNodeData.SourceEndLine := LRecord.EndLine;
+  var LChildIndex := LRecord.FirstChildIndex;
+  while LChildIndex >= 0 do
+  begin
+    AddLazyAlignSymbolRecordNode(LRecordNode, ADocument, ASection, LChildIndex);
+    LChildIndex := ASection.Records[LChildIndex].NextSiblingIndex;
+  end;
+end;
+
+procedure TDocumentTreeBuilder.AddLazyGlobalSymbolRecordNode(
+  AParent: PVirtualNode; ADocument: TDumpDocument;
+  ASection: TDumpLazyGlobalSymbolSection; ARecordIndex: Integer);
+begin
+  if (ASection = nil) or (ARecordIndex < 0) or
+    (ARecordIndex >= ASection.Records.Count) then
+    Exit;
+  var LRecord := ASection.Records[ARecordIndex];
+  var LRecordNode := AddNode(AParent,
+    LazyAlignSymbolCaption(ADocument, ASection, ARecordIndex),
+    tdkBorlandGlobalSymbolRecord);
+  var LNodeData := PTreeItemData(FTree.GetNodeData(LRecordNode));
+  LNodeData.LazyGlobalSymbolSection := ASection;
+  LNodeData.LazyGlobalSymbolRecordIndex := ARecordIndex;
+  LNodeData.SourceStartLine := LRecord.StartLine;
+  LNodeData.SourceEndLine := LRecord.EndLine;
+end;
+
+function TDocumentTreeBuilder.LazyGlobalTypeCaption(ADocument: TDumpDocument;
+  ASection: TDumpLazyGlobalTypeSection; ARecordIndex: Integer): string;
+begin
+  Result := 'Type record';
+  if (ADocument = nil) or (ADocument.TextSource = nil) or (ASection = nil) or
+    (ARecordIndex < 0) or (ARecordIndex >= ASection.Records.Count) then
+    Exit;
+  var LLine := Trim(ADocument.TextSource[
+    ASection.Records[ARecordIndex].StartLine - 1]);
+  var LTypePos := Pos(' Type:', LLine);
+  if LTypePos > 0 then
+  begin
+    var LText := Trim(Copy(LLine, LTypePos + Length(' Type:'), MaxInt));
+    var LTypeIndex := Copy(LText, 1, Pos(' ', LText + ' ') - 1);
+    Delete(LText, 1, Length(LTypeIndex));
+    LText := Trim(LText);
+    if StartsText('Len:', LText) then
+    begin
+      Delete(LText, 1, Length('Len:'));
+      LText := Trim(LText);
+      var LLength := Copy(LText, 1, Pos(' ', LText + ' ') - 1);
+      Delete(LText, 1, Length(LLength));
+      LText := Trim(LText);
+    end;
+    Result := 'Type ' + LTypeIndex;
+    if LText <> '' then
+      Result := Result + '  ' + Copy(LText, 1, Pos(' ', LText + ' ') - 1);
+  end;
+end;
+
+procedure TDocumentTreeBuilder.AddLazyGlobalTypeRecordNode(
+  AParent: PVirtualNode; ADocument: TDumpDocument;
+  ASection: TDumpLazyGlobalTypeSection; ARecordIndex: Integer);
+begin
+  if (ASection = nil) or (ARecordIndex < 0) or
+    (ARecordIndex >= ASection.Records.Count) then
+    Exit;
+  var LRecord := ASection.Records[ARecordIndex];
+  var LRecordNode := AddNode(AParent,
+    LazyGlobalTypeCaption(ADocument, ASection, ARecordIndex),
+    tdkBorlandGlobalTypeRecord);
+  var LNodeData := PTreeItemData(FTree.GetNodeData(LRecordNode));
+  LNodeData.LazyGlobalTypeSection := ASection;
+  LNodeData.LazyGlobalTypeRecordIndex := ARecordIndex;
+  LNodeData.SourceStartLine := LRecord.StartLine;
+  LNodeData.SourceEndLine := LRecord.EndLine;
 end;
 
 procedure TDocumentTreeBuilder.AddResourceNodes(AParent: PVirtualNode;
@@ -292,8 +432,14 @@ begin
   while LNode <> nil do
   begin
     var LData := PTreeItemData(FTree.GetNodeData(LNode));
-    TDocumentSourceNavigation.Resolve(ADocument, LData,
-      LData.SourceStartLine, LData.SourceEndLine);
+    // Lazy Borland nodes already carry compact source spans.  Do not pass
+    // those fields directly as out parameters: Delphi clears out arguments
+    // before Resolve can use them as the lazy fallback.
+    var LStartLine := LData.SourceStartLine;
+    var LEndLine := LData.SourceEndLine;
+    TDocumentSourceNavigation.Resolve(ADocument, LData, LStartLine, LEndLine);
+    LData.SourceStartLine := LStartLine;
+    LData.SourceEndLine := LEndLine;
     LNode := FTree.GetNext(LNode);
   end;
 end;
@@ -581,6 +727,15 @@ begin
           if LRecord.ScopeParent = nil then
             AddAlignSymbolRecordNode(AParent, LRecord);
 
+  if SameText(ASubsection.SubsectionType, 'sstAlignSym') then
+    for var LSection in ADocument.LazyAlignSymbolSections do
+      if (LSection.ModIndex = ASubsection.ModIndex) and
+        (LSection.FileOffset = ASubsection.FileOffset) then
+        for var LRecordIndex := 0 to LSection.Records.Count - 1 do
+          if LSection.Records[LRecordIndex].ParentIndex < 0 then
+            AddLazyAlignSymbolRecordNode(AParent, ADocument, LSection,
+              LRecordIndex);
+
   if SameText(ASubsection.SubsectionType, 'sstGlobalSym') then
     for var LSection in ADocument.GlobalSymbolSections do
       if (LSection.ModIndex = ASubsection.ModIndex) and
@@ -593,6 +748,14 @@ begin
             LRecord;
         end;
 
+  if SameText(ASubsection.SubsectionType, 'sstGlobalSym') then
+    for var LSection in ADocument.LazyGlobalSymbolSections do
+      if (LSection.ModIndex = ASubsection.ModIndex) and
+        (LSection.FileOffset = ASubsection.FileOffset) then
+        for var LRecordIndex := 0 to LSection.Records.Count - 1 do
+          AddLazyGlobalSymbolRecordNode(AParent, ADocument, LSection,
+            LRecordIndex);
+
   if SameText(ASubsection.SubsectionType, 'sstGlobalTypes') then
     for var LSection in ADocument.GlobalTypeSections do
       if (LSection.ModIndex = ASubsection.ModIndex) and
@@ -604,6 +767,14 @@ begin
           PTreeItemData(FTree.GetNodeData(LRecordNode))^.GlobalTypeRecord :=
             LRecord;
         end;
+
+  if SameText(ASubsection.SubsectionType, 'sstGlobalTypes') then
+    for var LSection in ADocument.LazyGlobalTypeSections do
+      if (LSection.ModIndex = ASubsection.ModIndex) and
+        (LSection.FileOffset = ASubsection.FileOffset) then
+        for var LRecordIndex := 0 to LSection.Records.Count - 1 do
+          AddLazyGlobalTypeRecordNode(AParent, ADocument, LSection,
+            LRecordIndex);
 end;
 
 class procedure TDocumentSourceNavigation.Resolve(ADocument: TDumpDocument;
@@ -892,13 +1063,21 @@ begin
         UseSpan(AData.SourceFile.StartLine, AData.SourceFile.StartLine);
     tdkBorlandAlignSymbolRecord:
       if AData.AlignSymbolRecord <> nil then
-        UseSpan(AData.AlignSymbolRecord.StartLine, AData.AlignSymbolRecord.EndLine);
-    tdkBorlandGlobalSymbolRecord:
-      if AData.GlobalSymbolRecord <> nil then
-        UseSpan(AData.GlobalSymbolRecord.StartLine, AData.GlobalSymbolRecord.EndLine);
-    tdkBorlandGlobalTypeRecord:
-      if AData.GlobalTypeRecord <> nil then
-        UseSpan(AData.GlobalTypeRecord.StartLine, AData.GlobalTypeRecord.EndLine);
+        UseSpan(AData.AlignSymbolRecord.StartLine, AData.AlignSymbolRecord.EndLine)
+      else if (AData.SourceStartLine > 0) and (AData.SourceEndLine >= AData.SourceStartLine) then
+        UseSpan(AData.SourceStartLine, AData.SourceEndLine);
+      tdkBorlandGlobalSymbolRecord:
+        if AData.GlobalSymbolRecord <> nil then
+          UseSpan(AData.GlobalSymbolRecord.StartLine, AData.GlobalSymbolRecord.EndLine)
+        else if (AData.SourceStartLine > 0) and
+          (AData.SourceEndLine >= AData.SourceStartLine) then
+          UseSpan(AData.SourceStartLine, AData.SourceEndLine);
+      tdkBorlandGlobalTypeRecord:
+        if AData.GlobalTypeRecord <> nil then
+          UseSpan(AData.GlobalTypeRecord.StartLine, AData.GlobalTypeRecord.EndLine)
+        else if (AData.SourceStartLine > 0) and
+          (AData.SourceEndLine >= AData.SourceStartLine) then
+          UseSpan(AData.SourceStartLine, AData.SourceEndLine);
   else
     ResolveRemainingKinds;
   end;

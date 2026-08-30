@@ -108,6 +108,9 @@ type
     procedure Clear;
     procedure ClearHighlightedItems;
     procedure EndUpdate;
+    // Resets the shared detail control for a tabular view.  The next update
+    // transaction applies the pending layout, avoiding intermediate redraws.
+    procedure PrepareGridPresentation;
     procedure SetColumnHeaders(const AColumns: array of string);
     procedure SetColumnDataTypes(
       const ADataTypes: array of TTinyHighlightDataType);
@@ -456,6 +459,17 @@ begin
   end;
 end;
 
+procedure THighlighterControl.PrepareGridPresentation;
+begin
+  if FUseColumnMode and FAutoSizeColumns and not FShowLineNumbers then
+    Exit;
+
+  FUseColumnMode := True;
+  FAutoSizeColumns := True;
+  FShowLineNumbers := False;
+  FUpdatePending := True;
+end;
+
 procedure THighlighterControl.SetColumnHeaders(const AColumns: array of string);
 begin
   FColumnHeaders.Clear;
@@ -464,7 +478,8 @@ begin
       [rfReplaceAll]), #10, ' ', [rfReplaceAll]));
   SetLength(FColumnDataTypes, FColumnHeaders.Count);
   for var LColumnIndex := 0 to High(FColumnDataTypes) do
-    FColumnDataTypes[LColumnIndex] := thdtAuto;
+    FColumnDataTypes[LColumnIndex] := if LColumnIndex = 0 then thdtText
+      else thdtAuto;
   UpdateControlList;
 end;
 

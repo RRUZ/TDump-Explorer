@@ -22,6 +22,7 @@ uses
 type
   THighlighterTextGetter = reference to function(AIndex: Integer): string;
   THighlighterIntegerGetter = reference to function(AIndex: Integer): Integer;
+  THighlighterLineFilter = reference to function(const ALine: string): Boolean;
 
   // General virtual provider used by semantic tables. It retains the model and
   // row access callbacks, never a second set of display strings.
@@ -54,12 +55,16 @@ type
     FFirstIndex: Integer;
     FCount: Integer;
     FIndexes: TList<Integer>;
+    FOwnsIndexes: Boolean;
     function SourceIndex(AIndex: Integer): Integer;
   public
     constructor CreateRange(ADocument: TDumpDocument; AFirstIndex,
       ACount: Integer);
+    constructor CreateFilteredRange(ADocument: TDumpDocument; AFirstIndex,
+      ACount: Integer; const ALineFilter: THighlighterLineFilter);
     constructor CreateIndexes(ADocument: TDumpDocument;
       AIndexes: TList<Integer>);
+    destructor Destroy; override;
     function GetCount: Integer;
     function GetText(AIndex: Integer): string;
     function GetImageName(AIndex: Integer): string;
@@ -139,6 +144,32 @@ begin
   inherited Create;
   FDocument := ADocument;
   FIndexes := AIndexes;
+end;
+
+constructor TDocumentLineRowProvider.CreateFilteredRange(
+  ADocument: TDumpDocument; AFirstIndex, ACount: Integer;
+  const ALineFilter: THighlighterLineFilter);
+begin
+  inherited Create;
+  FDocument := ADocument;
+  FIndexes := TList<Integer>.Create;
+  FOwnsIndexes := True;
+  if (FDocument = nil) or (FDocument.TextSource = nil) then
+    Exit;
+
+  var LFirstIndex := Max(0, AFirstIndex);
+  var LLastIndex := Min(FDocument.TextSource.LineCount,
+    LFirstIndex + Max(0, ACount));
+  for var LSourceIndex := LFirstIndex to LLastIndex - 1 do
+    if not Assigned(ALineFilter) or ALineFilter(FDocument.TextSource[LSourceIndex]) then
+      FIndexes.Add(LSourceIndex);
+end;
+
+destructor TDocumentLineRowProvider.Destroy;
+begin
+  if FOwnsIndexes then
+    FIndexes.Free;
+  inherited;
 end;
 
 function TDocumentLineRowProvider.SourceIndex(AIndex: Integer): Integer;

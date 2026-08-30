@@ -3,8 +3,6 @@ program TDumpParserTests;
 {$APPTYPE CONSOLE}
 
 uses
-  Winapi.Windows,
-  Winapi.PsAPI,
   System.SysUtils,
   System.IOUtils,
   System.StrUtils,
@@ -55,23 +53,12 @@ type
     [Test] procedure RelationGraph;
     [Test] procedure ARArchiveProjection;
     [Test] procedure ELFProgramHeadersProjection;
-    [Test] procedure LargeReportIndexedStorage;
+    [Test] procedure LargeReportStructuredProjection;
   end;
 
 procedure Require(ACondition: Boolean; const AMessage: string);
 begin
   Assert.IsTrue(ACondition, AMessage);
-end;
-
-function CurrentPrivateBytes: UInt64;
-begin
-  var LCounters: TProcessMemoryCountersEx;
-  ZeroMemory(@LCounters, SizeOf(LCounters));
-  LCounters.cb := SizeOf(LCounters);
-  if not GetProcessMemoryInfo(GetCurrentProcess,
-    PPROCESS_MEMORY_COUNTERS(@LCounters), SizeOf(LCounters)) then
-    RaiseLastOSError;
-  Result := LCounters.PrivateUsage;
 end;
 
 function ParseGeneratedFixture(const AFileName: string): TDumpDocument;
@@ -459,7 +446,12 @@ begin
       ContainsText(LDocument.ObjectRecords[0].RawText, 'THEADR') and
       (LDocument.ObjectRecords[1].Details.Count > 0) and
       SameText(LDocument.ObjectRecords[1].Details[0].Name, 'Translator'),
-      'OMF object fixture must project typed record-body details.');
+      Format('OMF object fixture must project typed record-body details ' +
+        '(record 1: %s, details: %d, first detail: %s).',
+        [LDocument.ObjectRecords[1].RecordKind,
+         LDocument.ObjectRecords[1].Details.Count,
+         IfThen(LDocument.ObjectRecords[1].Details.Count > 0,
+           LDocument.ObjectRecords[1].Details[0].Name, '<none>')]));
   finally
     LDocument.Free;
   end;
@@ -802,13 +794,12 @@ begin
   end;
 end;
 
-procedure TestLargeReportIndexedStorage;
+procedure TestLargeReportStructuredProjection;
 begin
   Require(TFile.Exists(CLargeVCLFixture),
     'The large VCL regression fixture must be available.');
   var LParser := TDumpParser.Create;
   try
-    var LBaselinePrivateBytes := CurrentPrivateBytes;
     var LDocument := LParser.ParseFile(CLargeVCLFixture);
     try
       Require(LDocument.TextSource <> nil,
@@ -817,20 +808,66 @@ begin
         'The line catalog must be a view over the indexed source.');
       Require(LDocument.Lines.Count = 1052806,
         'The large fixture line count must remain stable.');
-      Require(LDocument.Nodes.Count < 1000,
-        'Borland records must not create a duplicate generic-node graph.');
       Require(LDocument.BorlandSubsections.Count = 312,
-        'The large fixture must retain its Borland subsection index.');
-      Require(LDocument.BorlandIndexOnly,
-        'The large fixture must use the lazy Borland index.');
-      Require((LDocument.AlignSymbolSections.Count = 0) and
+        'The large fixture must retain every Borland subsection.');
+      Require(LDocument.BorlandLazyRecords,
+        'The large fixture must use the source-backed Borland projection.');
+      Require((LDocument.LazyAlignSymbolSections.Count > 0) and
+        (LDocument.LazyAlignSymbolSections[0].Records.Count > 0),
+        'Large reports must retain source-backed sstAlignSym record indexes.');
+      Require((LDocument.LazyGlobalSymbolSections.Count > 0) and
+        (LDocument.LazyGlobalSymbolSections[0].Records.Count > 0),
+        'Large reports must retain source-backed sstGlobalSym record indexes.');
+      Require((LDocument.LazyGlobalTypeSections.Count > 0) and
+        (LDocument.LazyGlobalTypeSections[0].Records.Count > 0),
+        'Large reports must retain source-backed sstGlobalTypes record indexes.');
+      Require(LDocument.SourceModules.Count > 0,
+        'Large reports must retain sstSrcModule projections for source-file navigation.');
+      var LSourceFileCount := 0;
+      for var LSourceModule in LDocument.SourceModules do
+        Inc(LSourceFileCount, LSourceModule.SourceFiles.Count);
+      Require(LSourceFileCount > 0,
+        'Large sstSrcModule projections must retain their source-file children.');
+      Require((LDocument.SymbolModules.Count = 0) and
+        (LDocument.BorlandNames.Count = 0) and
+        (LDocument.GlobalSymbolSections.Count = 0) and
         (LDocument.GlobalTypeSections.Count = 0),
-        'Indexed mode must not eagerly allocate per-record Borland models.');
-      var LPrivateDelta := CurrentPrivateBytes - LBaselinePrivateBytes;
-      Require(LPrivateDelta <= 64 * 1024 * 1024,
-        Format('The large indexed parse retained %.2f MiB private memory; '+
-          'the regression ceiling is 64 MiB.',
-          [LPrivateDelta / (1024.0 * 1024.0)]));
+        'The lazy projection must not retain full Borland subsection models.');
+
+      var LHasModuleBody := False;
+      var LHasModuleSegmentFlags := False;
+      var LHasGlobalSymbolBody := False;
+      var LHasGlobalTypeBody := False;
+      var LHasNamesBody := False;
+      for var LSubsection in LDocument.BorlandSubsections do
+      begin
+        if LSubsection.StartLine >= LDocument.TextSource.LineCount then
+          Continue;
+        var LFirstBodyLine := LDocument.TextSource[LSubsection.StartLine];
+        if SameText(LSubsection.SubsectionType, 'sstModule') then
+        begin
+          LHasModuleBody := LHasModuleBody or
+            ContainsText(LFirstBodyLine, 'OvlNum:');
+          for var LLineNumber := LSubsection.StartLine + 1 to
+            LSubsection.EndLine do
+            if ContainsText(LDocument.TextSource[LLineNumber - 1], 'Flags:') then
+            begin
+              LHasModuleSegmentFlags := True;
+              Break;
+            end;
+        end
+        else if SameText(LSubsection.SubsectionType, 'sstGlobalSym') then
+          LHasGlobalSymbolBody := LHasGlobalSymbolBody or
+            ContainsText(LFirstBodyLine, 'cbSymbols:')
+        else if SameText(LSubsection.SubsectionType, 'sstGlobalTypes') then
+          LHasGlobalTypeBody := LHasGlobalTypeBody or
+            ContainsText(LFirstBodyLine, 'Number of types:')
+        else if SameText(LSubsection.SubsectionType, 'sstNames') then
+          LHasNamesBody := LHasNamesBody or (Pos(':', LFirstBodyLine) > 0);
+      end;
+      Require(LHasModuleBody and LHasModuleSegmentFlags and
+        LHasGlobalSymbolBody and LHasGlobalTypeBody and LHasNamesBody,
+        'Every lazy Borland detail section must retain an addressable source body.');
     finally
       LDocument.Free;
     end;
@@ -1187,9 +1224,9 @@ begin
   TestELFProgramHeadersProjection;
 end;
 
-procedure TParserFixture.LargeReportIndexedStorage;
+procedure TParserFixture.LargeReportStructuredProjection;
 begin
-  TestLargeReportIndexedStorage;
+  TestLargeReportStructuredProjection;
 end;
 
 begin

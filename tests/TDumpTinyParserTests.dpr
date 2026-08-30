@@ -151,6 +151,180 @@ begin
       finally
         LBorlandSlashMethodTokens.Free;
       end;
+      var LMultiNamespaceBorlandTokens := LParser.Tokenize(
+        '@Winapi\@Windows\@RegCloseKey$qqsp6HKEY__', tpmCppBuilderMethod);
+      try
+        Require(HasToken(LMultiNamespaceBorlandTokens, ttkMethodName,
+          'RegCloseKey'),
+          'The final Borland namespace separator must identify the method name.');
+        Require(not HasToken(LMultiNamespaceBorlandTokens, ttkMethodName,
+          'Windows'),
+          'Intermediate Borland namespace segments must not be classified as methods.');
+      finally
+        LMultiNamespaceBorlandTokens.Free;
+      end;
+      var LNestedBorlandMethodTokens := LParser.Tokenize(
+        '@System@TExtended80Rec@internalGetWords', tpmCppBuilderMethod);
+      try
+        Require(HasToken(LNestedBorlandMethodTokens, ttkTypeName,
+          'TExtended80Rec'),
+          'Nested Borland owner types must be classified independently.');
+        Require(HasToken(LNestedBorlandMethodTokens, ttkMethodName,
+          'internalGetWords'),
+          'The final component of nested Borland names must be a method.');
+      finally
+        LNestedBorlandMethodTokens.Free;
+      end;
+      var LGenericBorlandMethodTokens := LParser.Tokenize(
+        '@System\@Generics\@Collections@%TDictionary__2$ynpqqrxp14System\@TObjectxp29System\@Messaging\@TMessageBase$vp46System\@Messaging\@TMessageManager\@TListenerData%@TKeyEnumerator\@MoveNext',
+        tpmCppBuilderMethod);
+      try
+        Require(HasToken(LGenericBorlandMethodTokens, ttkTypeName,
+          'TDictionary__2') and HasToken(LGenericBorlandMethodTokens,
+          ttkTypeName, 'TKeyEnumerator'),
+          'Borland generic linker names must preserve embedded type components.');
+        Require(HasToken(LGenericBorlandMethodTokens, ttkMethodName,
+          'MoveNext'),
+          'Borland generic linker names must identify the final method after generic mangling.');
+      finally
+        LGenericBorlandMethodTokens.Free;
+      end;
+      var LItaniumMethodTokens := LParser.Tokenize(
+        'S_LPROC32  _ZN6System11CloseHandleEy [013]', tpmCppBuilderMethod);
+      try
+        Require(HasToken(LItaniumMethodTokens, ttkMethodName, 'CloseHandle'),
+          'Itanium nested names must classify the final component as a method.');
+        Require(HasToken(LItaniumMethodTokens, ttkMangledSignature, 'Ey'),
+          'Itanium method parameter and return encodings must be a signature token.');
+      finally
+        LItaniumMethodTokens.Free;
+      end;
+      var LItaniumTypeTokens := LParser.Tokenize(
+        'S_UDT  _ZTRN6Winapi7Windows9PWideCharE [995]', tpmCppBuilderMethod);
+      try
+        Require(HasToken(LItaniumTypeTokens, ttkTypeName, 'PWideChar'),
+          'Delphi _ZTRN nested names must classify the final component as a type.');
+        Require(not HasToken(LItaniumTypeTokens, ttkMethodName, 'PWideChar'),
+          'Delphi _ZTRN nested names must not classify the final component as a method.');
+      finally
+        LItaniumTypeTokens.Free;
+      end;
+      var LItaniumGenericTypeTokens := LParser.Tokenize(
+        'S_UDT  _ZTRN6System12DynamicArrayIhEE [4BA]', tpmCppBuilderMethod);
+      try
+        Require(HasToken(LItaniumGenericTypeTokens, ttkTypeName,
+          'DynamicArray'),
+          'Generic Delphi _ZTRN names must preserve the outer type token.');
+      finally
+        LItaniumGenericTypeTokens.Free;
+      end;
+      var LItaniumNestedTypeTokens := LParser.Tokenize(
+        'S_UDT  _ZTRN6System12DynamicArrayINS_11TPtrWrapperEEE [4BA]',
+        tpmCppBuilderMethod);
+      try
+        Require(HasToken(LItaniumNestedTypeTokens, ttkTypeName,
+          'DynamicArray'),
+          'Nested Itanium template arguments and S_ substitutions must preserve the outer type token.');
+      finally
+        LItaniumNestedTypeTokens.Free;
+      end;
+      var LItaniumPointerTemplateTokens := LParser.Tokenize(
+        'S_UDT  _ZTRN6System12DynamicArrayIPPEE [4BA]',
+        tpmCppBuilderMethod);
+      try
+        Require(HasToken(LItaniumPointerTemplateTokens, ttkTypeName,
+          'DynamicArray'),
+          'Itanium template arguments containing pointer type encodings must be balanced.');
+      finally
+        LItaniumPointerTemplateTokens.Free;
+      end;
+      var LItaniumMethodSubstitutionTokens := LParser.Tokenize(
+        'S_LPROC32  _ZN6System8ReadFileEyPvjRjS0_ [013]',
+        tpmCppBuilderMethod);
+      try
+        Require(HasToken(LItaniumMethodSubstitutionTokens, ttkMethodName,
+          'ReadFile'),
+          'Itanium function names must remain identified when the signature uses substitutions.');
+        Require(HasToken(LItaniumMethodSubstitutionTokens, ttkMangledSignature,
+          'EyPvjRjS0_'),
+          'Itanium substituted function arguments must remain a signature token.');
+      finally
+        LItaniumMethodSubstitutionTokens.Free;
+      end;
+      var LItaniumTypedParametersTokens := LParser.Tokenize(
+        'S_LPROC32  _ZN6System23_WriteUnicodeStringProcERNS_8TTextRecENS_13UnicodeStringEi [15F]',
+        tpmCppBuilderMethod);
+      try
+        Require(HasToken(LItaniumTypedParametersTokens, ttkMethodName,
+          '_WriteUnicodeStringProc'),
+          'The final Itanium nested-name component must remain the method token.');
+        Require(HasToken(LItaniumTypedParametersTokens, ttkNamespace,
+          'System'),
+          'The outer Itanium owner must be emitted as a separate namespace token.');
+        Require(not HasToken(LItaniumTypedParametersTokens, ttkNamespace,
+          '_ZN6System23'),
+          'The Itanium prefix, source-name lengths, and owner must not be merged into one namespace token.');
+        Require(HasToken(LItaniumTypedParametersTokens, ttkTypeName,
+          'TTextRec'),
+          'A referenced nested Itanium parameter type must receive a separate type token.');
+        Require(HasToken(LItaniumTypedParametersTokens, ttkTypeName,
+          'UnicodeString'),
+          'Each nested Itanium parameter type must receive its own type token.');
+      finally
+        LItaniumTypedParametersTokens.Free;
+      end;
+      var LItaniumConstructorTokens := LParser.Tokenize(
+        'S_GPROC32  _ZN6System7TObjectC3Ev [196]', tpmCppBuilderMethod);
+      try
+        Require(HasToken(LItaniumConstructorTokens, ttkNamespace, 'System'),
+          'An Itanium constructor must retain its owner namespace token.');
+        Require(HasToken(LItaniumConstructorTokens, ttkTypeName, 'TObject'),
+          'An Itanium constructor must classify its owning class as a type.');
+        Require(not HasToken(LItaniumConstructorTokens, ttkMethodName,
+          'TObject'),
+          'An Itanium constructor class name must not be emitted as an ordinary method.');
+      finally
+        LItaniumConstructorTokens.Free;
+      end;
+      var LItaniumConstructorParameterTokens := LParser.Tokenize(
+        'S_GPROC32  _ZN6System8Sysutils9ExceptionC3ENS_13UnicodeStringE [196]',
+        tpmCppBuilderMethod);
+      try
+        Require(HasToken(LItaniumConstructorParameterTokens, ttkTypeName,
+          'Exception'),
+          'A nested Itanium constructor must classify its class as a type.');
+        Require(HasToken(LItaniumConstructorParameterTokens, ttkTypeName,
+          'UnicodeString'),
+          'Itanium constructor parameter type names must be tokenized separately.');
+      finally
+        LItaniumConstructorParameterTokens.Free;
+      end;
+      var LItaniumDestructorTokens := LParser.Tokenize(
+        'S_GPROC32  _ZN6System7TObjectD0Ev [196]', tpmCppBuilderMethod);
+      try
+        Require(HasToken(LItaniumDestructorTokens, ttkTypeName, 'TObject'),
+          'An Itanium destructor must classify its owning class as a type.');
+      finally
+        LItaniumDestructorTokens.Free;
+      end;
+      var LMachOItaniumTokens := LParser.Tokenize(
+        'S_LPROC32  __ZN6System11CloseHandleEy [013]',
+        tpmCppBuilderMethod);
+      try
+        Require(HasToken(LMachOItaniumTokens, ttkMethodName, 'CloseHandle'),
+          'The double-underscore Itanium spelling must classify the final method name.');
+      finally
+        LMachOItaniumTokens.Free;
+      end;
+      var LMalformedItaniumTokens := LParser.Tokenize(
+        'S_UDT  _ZTRN6System12DynamicArrayIhE [4BA]', tpmCppBuilderMethod);
+      try
+        Require(not HasToken(LMalformedItaniumTokens, ttkTypeName,
+          'DynamicArray'),
+          'An unterminated Itanium template must not be accepted as a valid nested type name.');
+      finally
+        LMalformedItaniumTokens.Free;
+      end;
       for var LMode in [tpmTDumpValues, tpmCppBuilderMethod] do
       begin
         var LInitProcessTokens := LParser.Tokenize(

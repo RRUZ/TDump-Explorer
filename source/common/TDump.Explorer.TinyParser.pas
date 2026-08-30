@@ -57,6 +57,8 @@ type
     class function IsHexadecimalCharacter(ACharacter: Char): Boolean; static;
     class function IsIdentifierCharacter(ACharacter: Char): Boolean; static;
     class function IsIdentifierStart(ACharacter: Char): Boolean; static;
+    class function IsItaniumSpecialMember(const AText: string;
+      AStartIndex: Integer): Boolean; static;
     class function IsTextInRange(const AText: string; AStartIndex,
       ACount: Integer): Boolean; static;
     class function TryReadDate(const AText: string; AStartIndex: Integer;
@@ -66,6 +68,21 @@ type
     class function TryReadBorlandMethod(const AText: string;
       AStartIndex: Integer; out AMethodStartIndex, AMethodEndIndex,
       AEndIndex: Integer): Boolean; static;
+    class function TryReadItaniumNestedName(const AText: string;
+      AStartIndex: Integer; const APrefix: string; out ANameStartIndex,
+      ANameEndIndex, AEndIndex: Integer): Boolean; static;
+    class function TryReadItaniumMethod(const AText: string;
+      AStartIndex: Integer; out AMethodStartIndex, AMethodEndIndex,
+      AEndIndex: Integer): Boolean; static;
+    class function TryReadItaniumType(const AText: string;
+      AStartIndex: Integer; out ATypeStartIndex, ATypeEndIndex,
+      AEndIndex: Integer): Boolean; static;
+    procedure AddBorlandOwnerTokens(AResult: TTinyTokenList;
+      const AText: string; AStartIndex, AEndIndex: Integer);
+    procedure AddItaniumNestedNameTokens(AResult: TTinyTokenList;
+      const AText: string; AStartIndex, ANameStartIndex: Integer);
+    procedure AddItaniumSignatureTokens(AResult: TTinyTokenList;
+      const AText: string; AStartIndex, AEndIndex: Integer);
     class function TryReadHexadecimal(const AText: string; AStartIndex: Integer;
       out AEndIndex: Integer): Boolean; static;
     class function TryReadNumber(const AText: string; AStartIndex: Integer;
@@ -95,6 +112,36 @@ begin
   LToken.Length := AEndIndex - AStartIndex;
   LToken.Text := Copy(AText, AStartIndex, LToken.Length);
   AResult.Add(LToken);
+end;
+
+procedure TTinyParser.AddBorlandOwnerTokens(AResult: TTinyTokenList;
+  const AText: string; AStartIndex, AEndIndex: Integer);
+begin
+  // Generic Borland linker names embed type arguments and mangling between
+  // their @-qualified components.  Tokenize the owner chain component by
+  // component so T-prefixed types do not collapse into a single namespace.
+  var LIndex := AStartIndex;
+  while LIndex < AEndIndex do
+  begin
+    var LTokenStart := LIndex;
+    if IsIdentifierStart(AText[LIndex]) then
+    begin
+      repeat
+        Inc(LIndex);
+      until (LIndex >= AEndIndex) or not IsIdentifierCharacter(AText[LIndex]);
+      if IsCppBuilderTypeName(Copy(AText, LTokenStart, LIndex - LTokenStart)) then
+        AddToken(AResult, ttkTypeName, AText, LTokenStart, LIndex)
+      else
+        AddToken(AResult, ttkNamespace, AText, LTokenStart, LIndex);
+      Continue;
+    end;
+
+    Inc(LIndex);
+    if CharInSet(AText[LTokenStart], ['@', '\', '%']) then
+      AddToken(AResult, ttkNamespace, AText, LTokenStart, LIndex)
+    else
+      AddToken(AResult, ttkMangledSignature, AText, LTokenStart, LIndex);
+  end;
 end;
 
 procedure TTinyParser.ApplyCppBuilderMethodMode(AResult: TTinyTokenList);
@@ -179,6 +226,17 @@ begin
   Result := CharInSet(ACharacter, ['a'..'z', 'A'..'Z', '_']);
 end;
 
+class function TTinyParser.IsItaniumSpecialMember(const AText: string;
+  AStartIndex: Integer): Boolean;
+begin
+  Result := IsTextInRange(AText, AStartIndex, 3) and
+    (AText[AStartIndex + 2] = 'E') and
+    (((AText[AStartIndex] = 'C') and
+      CharInSet(AText[AStartIndex + 1], ['1'..'3'])) or
+     ((AText[AStartIndex] = 'D') and
+      CharInSet(AText[AStartIndex + 1], ['0'..'2'])));
+end;
+
 class function TTinyParser.IsTextInRange(const AText: string; AStartIndex,
   ACount: Integer): Boolean;
 begin
@@ -224,12 +282,40 @@ begin
       LMethodEndIndex, LEndIndex) then
     begin
       if LStartIndex < LMethodStartIndex then
-        AddToken(AResult, ttkNamespace, AText, LStartIndex, LMethodStartIndex);
+        AddBorlandOwnerTokens(AResult, AText, LStartIndex, LMethodStartIndex);
       AddToken(AResult, ttkMethodName, AText, LMethodStartIndex,
         LMethodEndIndex);
       if LMethodEndIndex < LEndIndex then
         AddToken(AResult, ttkMangledSignature, AText, LMethodEndIndex,
           LEndIndex);
+      LIndex := LEndIndex;
+      Continue;
+    end;
+    if TryReadItaniumMethod(AText, LIndex, LMethodStartIndex,
+      LMethodEndIndex, LEndIndex) then
+    begin
+      AddItaniumNestedNameTokens(AResult, AText, LStartIndex,
+        LMethodStartIndex);
+      if IsItaniumSpecialMember(AText, LMethodEndIndex) then
+        AddToken(AResult, ttkTypeName, AText, LMethodStartIndex,
+          LMethodEndIndex)
+      else
+        AddToken(AResult, ttkMethodName, AText, LMethodStartIndex,
+          LMethodEndIndex);
+      if LMethodEndIndex < LEndIndex then
+        AddItaniumSignatureTokens(AResult, AText, LMethodEndIndex, LEndIndex);
+      LIndex := LEndIndex;
+      Continue;
+    end;
+    if TryReadItaniumType(AText, LIndex, LMethodStartIndex,
+      LMethodEndIndex, LEndIndex) then
+    begin
+      AddItaniumNestedNameTokens(AResult, AText, LStartIndex,
+        LMethodStartIndex);
+      AddToken(AResult, ttkTypeName, AText, LMethodStartIndex,
+        LMethodEndIndex);
+      if LMethodEndIndex < LEndIndex then
+        AddItaniumSignatureTokens(AResult, AText, LMethodEndIndex, LEndIndex);
       LIndex := LEndIndex;
       Continue;
     end;
@@ -289,6 +375,87 @@ begin
   end;
   if AMode = tpmCppBuilderMethod then
     ApplyCppBuilderMethodMode(AResult);
+end;
+
+procedure TTinyParser.AddItaniumNestedNameTokens(AResult: TTinyTokenList;
+  const AText: string; AStartIndex, ANameStartIndex: Integer);
+begin
+  var LIndex := AStartIndex;
+  while (LIndex < ANameStartIndex) and (AText[LIndex] = '_') do
+    Inc(LIndex);
+  if (LIndex < ANameStartIndex) and (AText[LIndex] = 'Z') then
+  begin
+    Inc(LIndex);
+    if (LIndex + 2 < ANameStartIndex) and
+      (Copy(AText, LIndex, 3) = 'TRN') then
+      Inc(LIndex, 3)
+    else if (LIndex < ANameStartIndex) and (AText[LIndex] = 'N') then
+      Inc(LIndex);
+  end;
+
+  var LCursor := AStartIndex;
+  while LIndex < ANameStartIndex do
+  begin
+    if not CharInSet(AText[LIndex], ['0'..'9']) then
+    begin
+      Inc(LIndex);
+      Continue;
+    end;
+
+    var LLengthStart := LIndex;
+    repeat
+      Inc(LIndex);
+    until (LIndex >= ANameStartIndex) or
+      not CharInSet(AText[LIndex], ['0'..'9']);
+    var LComponentLength: Integer;
+    if not TryStrToInt(Copy(AText, LLengthStart, LIndex - LLengthStart),
+      LComponentLength) or (LComponentLength <= 0) or
+      (LIndex + LComponentLength > ANameStartIndex) then
+      Continue;
+
+    if LCursor < LIndex then
+      AddToken(AResult, ttkMangledSignature, AText, LCursor, LIndex);
+    AddToken(AResult, ttkNamespace, AText, LIndex,
+      LIndex + LComponentLength);
+    Inc(LIndex, LComponentLength);
+    LCursor := LIndex;
+  end;
+  if LCursor < ANameStartIndex then
+    AddToken(AResult, ttkMangledSignature, AText, LCursor, ANameStartIndex);
+end;
+
+procedure TTinyParser.AddItaniumSignatureTokens(AResult: TTinyTokenList;
+  const AText: string; AStartIndex, AEndIndex: Integer);
+begin
+  var LCursor := AStartIndex;
+  var LIndex := AStartIndex;
+  while LIndex < AEndIndex do
+  begin
+    if not CharInSet(AText[LIndex], ['0'..'9']) then
+    begin
+      Inc(LIndex);
+      Continue;
+    end;
+
+    var LLengthStart := LIndex;
+    repeat
+      Inc(LIndex);
+    until (LIndex >= AEndIndex) or not CharInSet(AText[LIndex], ['0'..'9']);
+    var LComponentLength: Integer;
+    if not TryStrToInt(Copy(AText, LLengthStart, LIndex - LLengthStart),
+      LComponentLength) or (LComponentLength <= 0) or
+      (LIndex + LComponentLength > AEndIndex) then
+      Continue;
+
+    if LCursor < LIndex then
+      AddToken(AResult, ttkMangledSignature, AText, LCursor, LIndex);
+    AddToken(AResult, ttkTypeName, AText, LIndex,
+      LIndex + LComponentLength);
+    Inc(LIndex, LComponentLength);
+    LCursor := LIndex;
+  end;
+  if LCursor < AEndIndex then
+    AddToken(AResult, ttkMangledSignature, AText, LCursor, AEndIndex);
 end;
 
 class function TTinyParser.TryReadDate(const AText: string;
@@ -352,24 +519,33 @@ begin
     Exit;
 
   var LIndex := AStartIndex + 1;
-  var LMethodStart := 0;
+  var LMethodStart := LIndex;
   while LIndex <= Length(AText) do
   begin
-    if (AText[LIndex] = '@') and (LIndex > AStartIndex + 1) then
-    begin
-      LMethodStart := LIndex + 1;
-      Break;
-    end;
     if (AText[LIndex] = '\') and (LIndex < Length(AText)) and
       (AText[LIndex + 1] = '@') then
     begin
-      LMethodStart := LIndex + 2;
-      Break;
+      if (LIndex + 2 <= Length(AText)) and
+        IsIdentifierStart(AText[LIndex + 2]) then
+        LMethodStart := LIndex + 2;
+      Inc(LIndex, 2);
+      Continue;
     end;
-    if not (IsIdentifierCharacter(AText[LIndex]) or (AText[LIndex] = '.')) then
-      Exit;
+    if (AText[LIndex] = '@') and (LIndex > AStartIndex + 1) then
+    begin
+      if (LIndex + 1 <= Length(AText)) and
+        IsIdentifierStart(AText[LIndex + 1]) then
+        LMethodStart := LIndex + 1;
+      Inc(LIndex);
+      Continue;
+    end;
+    if not (IsIdentifierCharacter(AText[LIndex]) or
+      CharInSet(AText[LIndex], ['.', '@', '\', '%', '$'])) then
+      Break;
     Inc(LIndex);
   end;
+
+  var LNameEnd := LIndex;
 
   if LMethodStart = 0 then
     Exit;
@@ -384,16 +560,130 @@ begin
     Inc(LIndex);
   AMethodStartIndex := LMethodStart;
   AMethodEndIndex := LIndex;
-  if (LIndex <= Length(AText)) and (AText[LIndex] = '$') then
-    repeat
-      Inc(LIndex)
-    until (LIndex > Length(AText)) or
-      not (IsIdentifierCharacter(AText[LIndex]) or
-        CharInSet(AText[LIndex], ['$', '@']));
   if AMethodEndIndex > AMethodStartIndex then
   begin
-    AEndIndex := LIndex;
+    // The first scan already consumed the whole linker name, including any
+    // generic instantiation and mangled suffix.
+    AEndIndex := LNameEnd;
     Result := True;
+  end;
+end;
+
+class function TTinyParser.TryReadItaniumMethod(const AText: string;
+  AStartIndex: Integer; out AMethodStartIndex, AMethodEndIndex,
+  AEndIndex: Integer): Boolean;
+begin
+  Result := TryReadItaniumNestedName(AText, AStartIndex, 'ZN',
+    AMethodStartIndex, AMethodEndIndex, AEndIndex);
+  if not Result then
+    Exit;
+
+  var LIndex := AEndIndex;
+  while (LIndex <= Length(AText)) and
+    (IsIdentifierCharacter(AText[LIndex]) or (AText[LIndex] = '$')) do
+    Inc(LIndex);
+  AEndIndex := LIndex;
+  Result := True;
+end;
+
+class function TTinyParser.TryReadItaniumType(const AText: string;
+  AStartIndex: Integer; out ATypeStartIndex, ATypeEndIndex,
+  AEndIndex: Integer): Boolean;
+begin
+  Result := TryReadItaniumNestedName(AText, AStartIndex, 'ZTRN',
+    ATypeStartIndex, ATypeEndIndex, AEndIndex);
+end;
+
+class function TTinyParser.TryReadItaniumNestedName(const AText: string;
+  AStartIndex: Integer; const APrefix: string; out ANameStartIndex,
+  ANameEndIndex, AEndIndex: Integer): Boolean;
+begin
+  Result := False;
+  ANameStartIndex := AStartIndex;
+  ANameEndIndex := AStartIndex;
+  AEndIndex := AStartIndex;
+
+  var LPrefixIndex := AStartIndex;
+  while (LPrefixIndex <= Length(AText)) and (AText[LPrefixIndex] = '_') do
+    Inc(LPrefixIndex);
+  if not IsTextInRange(AText, LPrefixIndex, Length(APrefix)) or
+    (Copy(AText, LPrefixIndex, Length(APrefix)) <> APrefix) then
+    Exit;
+
+  var LIndex := LPrefixIndex + Length(APrefix);
+  var LLastComponentStart := 0;
+  var LLastComponentEnd := 0;
+  var LScopes := TList<Char>.Create;
+  try
+    while LIndex <= Length(AText) do
+    begin
+      if (LScopes.Count = 0) and IsItaniumSpecialMember(AText, LIndex) then
+      begin
+        Inc(LIndex, 2);
+        Continue;
+      end;
+      if CharInSet(AText[LIndex], ['0'..'9']) then
+      begin
+        var LLengthStart := LIndex;
+        repeat
+          Inc(LIndex);
+        until (LIndex > Length(AText)) or
+          not CharInSet(AText[LIndex], ['0'..'9']);
+        var LComponentLength: Integer;
+        if not TryStrToInt(Copy(AText, LLengthStart, LIndex - LLengthStart),
+          LComponentLength) or (LComponentLength <= 0) or
+          (LIndex + LComponentLength - 1 > Length(AText)) then
+          Exit;
+        if LScopes.Count = 0 then
+          LLastComponentStart := LIndex;
+        Inc(LIndex, LComponentLength);
+        if LScopes.Count = 0 then
+          LLastComponentEnd := LIndex;
+        Continue;
+      end;
+
+      case AText[LIndex] of
+        'E':
+          begin
+            if LScopes.Count = 0 then
+            begin
+              if LLastComponentStart = 0 then
+                Exit;
+              ANameStartIndex := LLastComponentStart;
+              ANameEndIndex := LLastComponentEnd;
+              AEndIndex := LIndex + 1;
+              Result := True;
+              Exit;
+            end;
+            LScopes.Delete(LScopes.Count - 1);
+            Inc(LIndex);
+          end;
+        'I', 'N', 'F', 'L', 'X', 'Z':
+          begin
+            LScopes.Add(AText[LIndex]);
+            Inc(LIndex);
+          end;
+        'S':
+          begin
+            Inc(LIndex);
+            if (LIndex <= Length(AText)) and
+              CharInSet(AText[LIndex], ['a'..'z']) then
+              Inc(LIndex)
+            else
+            begin
+              while (LIndex <= Length(AText)) and
+                CharInSet(AText[LIndex], ['0'..'9', 'A'..'Z']) do
+                Inc(LIndex);
+              if (LIndex <= Length(AText)) and (AText[LIndex] = '_') then
+                Inc(LIndex);
+            end;
+          end;
+      else
+        Inc(LIndex);
+      end;
+    end;
+  finally
+    LScopes.Free;
   end;
 end;
 

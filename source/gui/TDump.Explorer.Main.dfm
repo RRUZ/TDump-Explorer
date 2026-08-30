@@ -37,7 +37,7 @@ object FrmMain: TFrmMain
   TextHeight = 15
   object Splitter1: TSplitter
     Left = 0
-    Top = 576
+    Top = 572
     Width = 1072
     Height = 4
     Cursor = crVSplit
@@ -47,13 +47,13 @@ object FrmMain: TFrmMain
   inline LogControl1: TLogControl
     AlignWithMargins = True
     Left = 4
-    Top = 580
+    Top = 576
     Width = 1064
     Height = 127
     Margins.Left = 4
     Margins.Top = 0
     Margins.Right = 4
-    Margins.Bottom = 0
+    Margins.Bottom = 4
     Align = alBottom
     TabOrder = 0
     ExplicitLeft = 4
@@ -93,12 +93,13 @@ object FrmMain: TFrmMain
     Left = 0
     Top = 39
     Width = 1072
-    Height = 537
+    Height = 533
     Align = alClient
     BevelOuter = bvNone
     Caption = 'CardPanel1'
     ParentBackground = False
     TabOrder = 2
+    ExplicitHeight = 537
   end
   object ProgressBar1: TProgressBar
     Left = 0
