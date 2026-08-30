@@ -15,6 +15,9 @@ const
   WM_RAW_FILTER_READY = WM_USER + $541;
 
 type
+  TRawViewSourceLineSelectedEvent = procedure(Sender: TObject;
+    ASourceLine: Integer) of object;
+
   TRawViewFrame = class(TFrame)
     pnToolbar: TPanel;
     SearchFilterBox: TSearchBox;
@@ -31,6 +34,7 @@ type
     FFilterGeneration: Integer;
     FSyncWithSelectedNode: Boolean;
     FOnSyncWithSelectedNodeChanged: TNotifyEvent;
+    FOnSourceLineSelected: TRawViewSourceLineSelectedEvent;
     FLastSourceStartLine: Integer;
     FLastSourceEndLine: Integer;
     procedure ApplyFilter;
@@ -43,6 +47,7 @@ type
     function FindFirstVisibleIndexAtOrAfter(ASourceIndex: Integer): Integer;
     function FindLastVisibleIndexAtOrBefore(ASourceIndex: Integer): Integer;
     procedure cbFollowSelectionClick(Sender: TObject);
+    procedure HighlighterControlItemClick(Sender: TObject);
     procedure SearchFilterBoxChange(Sender: TObject);
     procedure FilterTimerTimer(Sender: TObject);
     procedure SearchFilterBoxKeyDown(Sender: TObject; var Key: Word;
@@ -63,6 +68,8 @@ type
       write SetSyncWithSelectedNode default True;
     property OnSyncWithSelectedNodeChanged: TNotifyEvent
       read FOnSyncWithSelectedNodeChanged write FOnSyncWithSelectedNodeChanged;
+    property OnSourceLineSelected: TRawViewSourceLineSelectedEvent
+      read FOnSourceLineSelected write FOnSourceLineSelected;
   end;
 
 implementation
@@ -101,6 +108,7 @@ begin
   FHighlighterControl.Font.Name := TExplorerTheme.FixedWidthFontName;
   FHighlighterControl.Font.Size := TExplorerTheme.FixedWidthFontSize;
   FHighlighterControl.ControlList1.MultiSelect := True;
+  FHighlighterControl.OnItemClick := HighlighterControlItemClick;
   cbFollowSelection.OnClick := cbFollowSelectionClick;
   SearchFilterBox.OnChange := SearchFilterBoxChange;
   SearchFilterBox.OnKeyDown := SearchFilterBoxKeyDown;
@@ -323,6 +331,20 @@ end;
 procedure TRawViewFrame.cbFollowSelectionClick(Sender: TObject);
 begin
   SetSyncWithSelectedNode(cbFollowSelection.Checked);
+end;
+
+procedure TRawViewFrame.HighlighterControlItemClick(Sender: TObject);
+begin
+  if not FSyncWithSelectedNode or (FDocument = nil) or
+    (FDocument.TextSource = nil) or not Assigned(FOnSourceLineSelected) then
+    Exit;
+
+  var LSourceIndex := FHighlighterControl.SelectedItemLineNumber;
+  if (LSourceIndex < 0) or (LSourceIndex >= FDocument.TextSource.LineCount) then
+    Exit;
+  // Tree source spans are one-based; the raw provider exposes the mapped
+  // zero-based source index used by its line-number gutter.
+  FOnSourceLineSelected(Self, LSourceIndex + 1);
 end;
 
 procedure TRawViewFrame.SearchFilterBoxChange(Sender: TObject);

@@ -49,6 +49,7 @@ type
     FTreeSelectionFillColor: TColor;
     FTreeSelectionBorderColor: TColor;
     FTreeHighlighter: TTinyHighlighter;
+    FSelectingTreeFromRawView: Boolean;
     function TreeTextColor(ADetailKind: TTreeDetailKind): TColor;
     function HeaderFormatCaption: string;
     function HeaderArchitectureCaption: string;
@@ -110,6 +111,8 @@ type
       out AStartLine, AEndLine: Integer);
     procedure SyncRawViewToNode(ANode: PVirtualNode);
     procedure RawViewSyncWithSelectedNodeChanged(Sender: TObject);
+    procedure RawViewSourceLineSelected(Sender: TObject; ASourceLine: Integer);
+    function FindTreeNodeForSourceLine(ASourceLine: Integer): PVirtualNode;
     procedure ActivateNode(ANode: PVirtualNode);
     procedure TreeFreeNode(Sender: TBaseVirtualTree; Node: PVirtualNode);
     procedure TreeFocusChanged(Sender: TBaseVirtualTree; Node: PVirtualNode;
@@ -256,6 +259,7 @@ begin
   ApplyTheme;
 
   frRawView.OnSyncWithSelectedNodeChanged := RawViewSyncWithSelectedNodeChanged;
+  frRawView.OnSourceLineSelected := RawViewSourceLineSelected;
   pnTop.OnResize := pnTopResize;
   UpdateDocumentHeader;
 end;
@@ -940,6 +944,8 @@ end;
 
 procedure TDumpDocumentFrame.SyncRawViewToNode(ANode: PVirtualNode);
 begin
+  if FSelectingTreeFromRawView then
+    Exit;
   if ANode = nil then
   begin
     frRawView.ShowLines(1, 1);
@@ -963,6 +969,56 @@ begin
     LSelectedNode := Tree.FocusedNode;
   if LSelectedNode <> nil then
     SyncRawViewToNode(LSelectedNode);
+end;
+
+function TDumpDocumentFrame.FindTreeNodeForSourceLine(
+  ASourceLine: Integer): PVirtualNode;
+begin
+  Result := nil;
+  if ASourceLine <= 0 then
+    Exit;
+
+  var LBestSpan := MaxInt;
+  var LNode := Tree.GetFirst;
+  while LNode <> nil do
+  begin
+    var LData := PTreeItemData(Tree.GetNodeData(LNode));
+    if (LData <> nil) and (LData.SourceStartLine > 0) and
+      (ASourceLine >= LData.SourceStartLine) and
+      (ASourceLine <= LData.SourceEndLine) then
+    begin
+      var LSpan := LData.SourceEndLine - LData.SourceStartLine;
+      if LSpan < LBestSpan then
+      begin
+        Result := LNode;
+        LBestSpan := LSpan;
+      end;
+    end;
+    LNode := Tree.GetNext(LNode);
+  end;
+end;
+
+procedure TDumpDocumentFrame.RawViewSourceLineSelected(Sender: TObject;
+  ASourceLine: Integer);
+begin
+  if not frRawView.SyncWithSelectedNode or FSelectingTreeFromRawView then
+    Exit;
+
+  var LNode := FindTreeNodeForSourceLine(ASourceLine);
+  if (LNode = nil) or (LNode = FActiveDetailNode) then
+    Exit;
+
+  FSelectingTreeFromRawView := True;
+  try
+    // Let VirtualTreeView expand the ancestor chain.  Walking Parent manually
+    // reaches its hidden root node and is unsafe for this tree implementation.
+    Tree.IsVisible[LNode] := True;
+    Tree.ClearSelection;
+    Tree.FocusedNode := LNode;
+    Tree.Selected[LNode] := True;
+  finally
+    FSelectingTreeFromRawView := False;
+  end;
 end;
 
 procedure TDumpDocumentFrame.ActivateNode(ANode: PVirtualNode);

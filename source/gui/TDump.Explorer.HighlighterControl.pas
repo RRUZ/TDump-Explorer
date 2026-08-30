@@ -76,6 +76,8 @@ type
       ARect: TRect; AState: TOwnerDrawState);
     procedure ControlList1KeyDown(Sender: TObject; var Key: Word;
       Shift: TShiftState);
+    procedure ControlList1KeyUp(Sender: TObject; var Key: Word;
+      Shift: TShiftState);
     procedure ControlList1Click(Sender: TObject);
     procedure CopySelectedItemsToClipboard;
     procedure ItemsChanged(Sender: TObject);
@@ -126,6 +128,7 @@ type
     procedure SetHighlightedRange(AStartItemIndex, AEndItemIndex: Integer);
     procedure SelectItem(AItemIndex: Integer);
     procedure ScrollItemToTop(AItemIndex: Integer);
+    function SelectedItemLineNumber: Integer;
     property Items: TStringList read FItems;
     property Count: Integer read ItemCount;
     property Images: TCustomImageList read FImages write SetImages;
@@ -182,6 +185,7 @@ begin
   ControlList1.MultiSelect := True;
   ControlList1.OnBeforeDrawItem := ControlList1BeforeDrawItem;
   ControlList1.OnKeyDown := ControlList1KeyDown;
+  ControlList1.OnKeyUp := ControlList1KeyUp;
   ControlList1.OnClick := ControlList1Click;
   UpdateControlList;
 end;
@@ -686,6 +690,15 @@ begin
     ControlList1.ItemIndex := EnsureRange(AItemIndex, 0, ItemCount - 1);
 end;
 
+function THighlighterControl.SelectedItemLineNumber: Integer;
+begin
+  Result := -1;
+  if (ControlList1.ItemIndex < 0) or
+    (ControlList1.ItemIndex >= ItemCount) then
+    Exit;
+  Result := DisplayLineNumber(ControlList1.ItemIndex);
+end;
+
 procedure THighlighterControl.ScrollItemToTop(AItemIndex: Integer);
 var
   LScrollInfo: TScrollInfo;
@@ -817,6 +830,14 @@ begin
           Key := 0;
         end;
     end;
+end;
+
+procedure THighlighterControl.ControlList1KeyUp(Sender: TObject;
+  var Key: Word; Shift: TShiftState);
+begin
+  if (Key in [VK_UP, VK_DOWN, VK_HOME, VK_END, VK_PRIOR, VK_NEXT]) and
+    (ControlList1.ItemIndex >= 0) and Assigned(FOnItemClick) then
+    FOnItemClick(Self);
 end;
 
 procedure THighlighterControl.ControlList1Click(Sender: TObject);
