@@ -100,8 +100,12 @@ type
   end;
 
   // Owns one TDUMP process result and, when requested, its parsed projection.
-  // OutputText combines the tool's standard output and error streams verbatim.
+  // OutputText is materialized only for callers that explicitly request it.
   TDumpRunResult = class
+  private
+    FOutputFileName: string;
+    FOwnsOutputFile: Boolean;
+    function GetOutputText: string;
   public
     InputFileName: string;
     ListFileName: string;
@@ -111,9 +115,10 @@ type
     ExitCode: Cardinal;
     ExecutionMilliseconds: Int64;
     ParsingMilliseconds: Int64;
-    OutputText: string;
     Document: TDumpDocument;
     destructor Destroy; override;
+    property OutputFileName: string read FOutputFileName;
+    property OutputText: string read GetOutputText;
   end;
 
   // Runs a selected TDUMP executable with redirected output.
@@ -170,7 +175,8 @@ uses
   System.Diagnostics,
   System.IOUtils,
   System.SysUtils,
-  Winapi.Windows;
+  Winapi.Windows,
+  TDump.Explorer.TextSource;
 
 function QuoteCommandLineArgument(const AValue: string): string;
 begin
@@ -193,7 +199,65 @@ end;
 destructor TDumpRunResult.Destroy;
 begin
   Document.Free;
+  if FOwnsOutputFile and (FOutputFileName <> '') and
+    FileExists(FOutputFileName) then
+    TFile.Delete(FOutputFileName);
   inherited;
+end;
+
+function TDumpRunResult.GetOutputText: string;
+begin
+  if (FOutputFileName = '') or not FileExists(FOutputFileName) then
+    Exit('');
+  Result := TFile.ReadAllText(FOutputFileName, TEncoding.Default);
+end;
+
+procedure CheckReportFileSize(const AFileName: string);
+begin
+  var LSize := TFile.GetSize(AFileName);
+  if LSize > CMaxTDumpReportSize then
+    raise ERangeError.CreateFmt('TDUMP output exceeds the %d MiB size limit: %s',
+      [CMaxTDumpReportSize div (1024 * 1024), AFileName]);
+end;
+
+function CombineReportFiles(const AFirstFileName,
+  ASecondFileName: string): string;
+const
+  CLineBreak: array[0..1] of Byte = (13, 10);
+begin
+  var LCombinedSize := TFile.GetSize(AFirstFileName) +
+    TFile.GetSize(ASecondFileName) + 2;
+  if LCombinedSize > CMaxTDumpReportSize then
+    raise ERangeError.CreateFmt('Combined TDUMP output exceeds the %d MiB size limit.',
+      [CMaxTDumpReportSize div (1024 * 1024)]);
+
+  Result := TPath.GetTempFileName;
+  try
+    var LOutput := TFileStream.Create(Result, fmCreate or fmShareDenyWrite);
+    try
+      var LInput := TFileStream.Create(AFirstFileName,
+        fmOpenRead or fmShareDenyNone);
+      try
+        LOutput.CopyFrom(LInput, 0);
+      finally
+        LInput.Free;
+      end;
+      LOutput.WriteBuffer(CLineBreak, SizeOf(CLineBreak));
+      LInput := TFileStream.Create(ASecondFileName,
+        fmOpenRead or fmShareDenyNone);
+      try
+        LOutput.CopyFrom(LInput, 0);
+      finally
+        LInput.Free;
+      end;
+    finally
+      LOutput.Free;
+    end;
+  except
+    if FileExists(Result) then
+      TFile.Delete(Result);
+    raise;
+  end;
 end;
 
 class function TDumpCommandOptions.Default: TDumpCommandOptions;
@@ -457,10 +521,10 @@ begin
     Result.ToolKind := AToolKind;
     Result.Options := Trim(AOptions);
 
-    var LTemporaryFileName := TPath.GetTempFileName;
-    try
-      var LOutputStream := TFileStream.Create(LTemporaryFileName,
-        fmCreate or fmShareDenyWrite);
+    Result.FOutputFileName := TPath.GetTempFileName;
+    Result.FOwnsOutputFile := True;
+    var LOutputStream := TFileStream.Create(Result.FOutputFileName,
+         fmCreate or fmShareDenyWrite);
       try
         var LInputHandle := CreateFile('NUL', GENERIC_READ,
           FILE_SHARE_READ or FILE_SHARE_WRITE, nil, OPEN_EXISTING,
@@ -529,20 +593,14 @@ begin
         LOutputStream.Free;
       end;
 
-      Result.OutputText := TFile.ReadAllText(LTemporaryFileName,
-        TEncoding.Default);
+      CheckReportFileSize(Result.FOutputFileName);
       if (Result.ListFileName <> '') and FileExists(Result.ListFileName) then
       begin
-        var LListOutputText := TFile.ReadAllText(Result.ListFileName,
-          TEncoding.Default);
-        if Result.OutputText <> '' then
-          Result.OutputText := LListOutputText + sLineBreak + Result.OutputText
-        else
-          Result.OutputText := LListOutputText;
+        var LCombinedFileName := CombineReportFiles(Result.ListFileName,
+          Result.FOutputFileName);
+        TFile.Delete(Result.FOutputFileName);
+        Result.FOutputFileName := LCombinedFileName;
       end;
-    finally
-      TFile.Delete(LTemporaryFileName);
-    end;
   except
     Result.Free;
     raise;
@@ -585,8 +643,14 @@ begin
         if Assigned(FOnProgress) then
           FOnProgress(APhase, ACompletedLines, ATotalLines);
       end;
-    AResult.Document := LParser.ParseText(AResult.OutputText,
-      AResult.InputFileName);
+    var LSource := TDumpMappedTextSource.Create(AResult.FOutputFileName, True);
+    AResult.FOwnsOutputFile := False;
+    try
+      AResult.Document := LParser.ParseSource(LSource, AResult.InputFileName);
+      LSource := nil;
+    finally
+      LSource.Free;
+    end;
     if AResult.Document.ToolKind = tkUnknown then
     begin
       AResult.Document.ToolKind := AToolKind;

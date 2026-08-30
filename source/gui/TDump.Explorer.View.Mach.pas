@@ -46,6 +46,7 @@ implementation
 uses
   System.SysUtils,
   TDump.Explorer.Highlighter,
+  TDump.Explorer.HighlighterProviders,
   TDump.Explorer.TinyParser;
 
 class function TMachView.ArchitectureCaption(
@@ -78,14 +79,17 @@ begin
     AControl.Clear;
     AControl.SetColumnHeaders(['CPU type', 'CPU subtype', 'File offset']);
     AControl.SetColumnDataTypes([thdtSymbol, thdtSymbol, thdtHexadecimal]);
-    for var LArchitecture in ADocument.MachArchitectures do
-    begin
-      var LOffset := '';
-      if LArchitecture.HasOffset then
-        LOffset := IntToHex(LArchitecture.Offset, 8);
-      AControl.AddColumns([LArchitecture.CPUType, LArchitecture.CPUSubtype,
-        LOffset]);
-    end;
+    AControl.SetItemProvider(TCallbackHighlighterRowProvider.Create(
+      ADocument.MachArchitectures.Count,
+      function(AIndex: Integer): string
+      begin
+        var LArchitecture := ADocument.MachArchitectures[AIndex];
+        var LOffset := '';
+        if LArchitecture.HasOffset then
+          LOffset := IntToHex(LArchitecture.Offset, 8);
+        Result := Format('%s'#9'%s'#9'%s',
+          [LArchitecture.CPUType, LArchitecture.CPUSubtype, LOffset]);
+      end));
   finally
     AControl.EndUpdate;
   end;
@@ -121,9 +125,14 @@ begin
     AControl.Clear;
     AControl.SetColumnHeaders(['#', 'Command', 'Sections']);
     AControl.SetColumnDataTypes([thdtInteger, thdtSymbol, thdtInteger]);
-    for var LCommand in ADocument.MachLoadCommands do
-      AControl.AddColumns([IntToStr(LCommand.Index), LCommand.Name,
-        IntToStr(LCommand.Sections.Count)]);
+    AControl.SetItemProvider(TCallbackHighlighterRowProvider.Create(
+      ADocument.MachLoadCommands.Count,
+      function(AIndex: Integer): string
+      begin
+        var LCommand := ADocument.MachLoadCommands[AIndex];
+        Result := Format('%d'#9'%s'#9'%d',
+          [LCommand.Index, LCommand.Name, LCommand.Sections.Count]);
+      end));
   finally
     AControl.EndUpdate;
   end;
@@ -180,9 +189,15 @@ begin
       'Name']);
     AControl.SetColumnDataTypes([thdtInteger, thdtSymbol, thdtSymbol,
       thdtHexadecimal, thdtHexadecimal, thdtAuto]);
-    for var LSymbol in ADocument.MachSymbols do
-      AControl.AddColumns([IntToStr(LSymbol.Index), LSymbol.TypeCode,
-        LSymbol.Section, LSymbol.Description, LSymbol.RawValue, LSymbol.Name]);
+    AControl.SetItemProvider(TCallbackHighlighterRowProvider.Create(
+      ADocument.MachSymbols.Count,
+      function(AIndex: Integer): string
+      begin
+        var LSymbol := ADocument.MachSymbols[AIndex];
+        Result := Format('%d'#9'%s'#9'%s'#9'%s'#9'%s'#9'%s',
+          [LSymbol.Index, LSymbol.TypeCode, LSymbol.Section,
+           LSymbol.Description, LSymbol.RawValue, LSymbol.Name]);
+      end));
   finally
     AControl.EndUpdate;
   end;
@@ -199,14 +214,20 @@ begin
     AControl.Clear;
     AControl.SetColumnHeaders(['Index', 'Name']);
     AControl.SetColumnDataTypes([thdtInteger, thdtAuto]);
-    case ADetailKind of
-      tdkMachDynamicImports:
-        for var LSymbol in ADocument.MachDynamicImports do
-          AControl.AddColumns([IntToStr(LSymbol.Index), LSymbol.Name]);
-      tdkMachIndirectSymbols:
-        for var LSymbol in ADocument.MachIndirectSymbols do
-          AControl.AddColumns([IntToStr(LSymbol.Index), LSymbol.Name]);
-    end;
+    var LUseImports := ADetailKind = tdkMachDynamicImports;
+    var LCount := ADocument.MachIndirectSymbols.Count;
+    if LUseImports then
+      LCount := ADocument.MachDynamicImports.Count;
+    AControl.SetItemProvider(TCallbackHighlighterRowProvider.Create(LCount,
+      function(AIndex: Integer): string
+      begin
+        var LSymbol: TDumpMachDynamicSymbol;
+        if LUseImports then
+          LSymbol := ADocument.MachDynamicImports[AIndex]
+        else
+          LSymbol := ADocument.MachIndirectSymbols[AIndex];
+        Result := Format('%d'#9'%s', [LSymbol.Index, LSymbol.Name]);
+      end));
   finally
     AControl.EndUpdate;
   end;

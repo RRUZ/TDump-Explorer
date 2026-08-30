@@ -489,14 +489,36 @@ end;
 procedure TDumpRelationBuilder.BuildSourceProcedureRelations(
   AGraph: TDumpRelationGraph);
 begin
-  // ModIndex first limits matching to the source module that owns the aligned
-  // symbol subsection.  Segment/range overlap then creates the actual join.
-  for var LSourceModule in AGraph.Document.SourceModules do
-    for var LSourceFile in LSourceModule.SourceFiles do
-      for var LSourceRange in LSourceFile.Ranges do
-        for var LAlignSection in AGraph.Document.AlignSymbolSections do
-          if LAlignSection.ModIndex = LSourceModule.ModIndex then
-            for var LRecord in LAlignSection.Records do
+  // Index procedures by module once. A large report can contain thousands of
+  // source ranges and symbol sections; rescanning every section per range made
+  // this relation an avoidable multiplicative join.
+  var LProceduresByModule :=
+    TObjectDictionary<Integer, TList<TDumpAlignSymbolRecord>>.Create(
+      [doOwnsValues]);
+  try
+    for var LAlignSection in AGraph.Document.AlignSymbolSections do
+    begin
+      var LProcedures: TList<TDumpAlignSymbolRecord>;
+      if not LProceduresByModule.TryGetValue(LAlignSection.ModIndex,
+        LProcedures) then
+      begin
+        LProcedures := TList<TDumpAlignSymbolRecord>.Create;
+        LProceduresByModule.Add(LAlignSection.ModIndex, LProcedures);
+      end;
+      for var LRecord in LAlignSection.Records do
+        if LRecord.Kind = bsrkProcedure then
+          LProcedures.Add(LRecord);
+    end;
+
+    for var LSourceModule in AGraph.Document.SourceModules do
+    begin
+      var LProcedures: TList<TDumpAlignSymbolRecord>;
+      if not LProceduresByModule.TryGetValue(LSourceModule.ModIndex,
+        LProcedures) then
+        Continue;
+      for var LSourceFile in LSourceModule.SourceFiles do
+        for var LSourceRange in LSourceFile.Ranges do
+          for var LRecord in LProcedures do
               begin
                 var LProcedureSegment: UInt64;
                 var LProcedureStart: UInt64;
@@ -548,6 +570,10 @@ begin
                 end;
                 AGraph.SourceProcedureRelations.Add(LRelation);
               end;
+    end;
+  finally
+    LProceduresByModule.Free;
+  end;
 end;
 
 procedure TDumpRelationBuilder.BuildProcedureReferenceRelations(

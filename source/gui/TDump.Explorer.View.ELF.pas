@@ -41,6 +41,7 @@ uses
   System.SysUtils,
   System.Generics.Collections,
   TDump.Explorer.Highlighter,
+  TDump.Explorer.HighlighterProviders,
   TDump.Explorer.TinyParser,
   TDump.Explorer.View.Shared;
 
@@ -64,17 +65,23 @@ begin
     AControl.SetColumnDataTypes([thdtInteger, thdtText, thdtSymbol,
       thdtSymbol, thdtHexadecimal, thdtHexadecimal, thdtHexadecimal,
       thdtHexadecimal, thdtHexadecimal, thdtHexadecimal, thdtHexadecimal]);
-    for var LSection in ADocument.Sections do
-      AControl.AddColumns([IntToStr(LSection.Index), LSection.Name,
-        PropertyValue(LSection.Properties, 'Type'),
-        PropertyValue(LSection.Properties, 'Flags'),
-        PropertyValue(LSection.Properties, 'Address'),
-        PropertyValue(LSection.Properties, 'Offset'),
-        PropertyValue(LSection.Properties, 'Size'),
-        PropertyValue(LSection.Properties, 'Link'),
-        PropertyValue(LSection.Properties, 'Info'),
-        PropertyValue(LSection.Properties, 'Align'),
-        PropertyValue(LSection.Properties, 'Entry size')]);
+    AControl.SetItemProvider(TCallbackHighlighterRowProvider.Create(
+      ADocument.Sections.Count,
+      function(AIndex: Integer): string
+      begin
+        var LSection := ADocument.Sections[AIndex];
+        Result := Format('%d'#9'%s'#9'%s'#9'%s'#9'%s'#9'%s'#9'%s'#9 +
+          '%s'#9'%s'#9'%s'#9'%s', [LSection.Index, LSection.Name,
+          PropertyValue(LSection.Properties, 'Type'),
+          PropertyValue(LSection.Properties, 'Flags'),
+          PropertyValue(LSection.Properties, 'Address'),
+          PropertyValue(LSection.Properties, 'Offset'),
+          PropertyValue(LSection.Properties, 'Size'),
+          PropertyValue(LSection.Properties, 'Link'),
+          PropertyValue(LSection.Properties, 'Info'),
+          PropertyValue(LSection.Properties, 'Align'),
+          PropertyValue(LSection.Properties, 'Entry size')]);
+      end));
   finally
     AControl.EndUpdate;
   end;
@@ -94,11 +101,16 @@ begin
     AControl.SetColumnDataTypes([thdtInteger, thdtSymbol, thdtHexadecimal,
       thdtHexadecimal, thdtHexadecimal, thdtHexadecimal, thdtHexadecimal,
       thdtSymbol, thdtHexadecimal]);
-    for var LHeader in ADocument.ELFProgramHeaders do
-      AControl.AddColumns([IntToStr(LHeader.Index), LHeader.HeaderType,
-        LHeader.Offset, LHeader.VirtualAddress, LHeader.PhysicalAddress,
-        LHeader.FileSize, LHeader.MemorySize, LHeader.Flags,
-        LHeader.Alignment]);
+    AControl.SetItemProvider(TCallbackHighlighterRowProvider.Create(
+      ADocument.ELFProgramHeaders.Count,
+      function(AIndex: Integer): string
+      begin
+        var LHeader := ADocument.ELFProgramHeaders[AIndex];
+        Result := Format('%d'#9'%s'#9'%s'#9'%s'#9'%s'#9'%s'#9'%s'#9 +
+          '%s'#9'%s', [LHeader.Index, LHeader.HeaderType, LHeader.Offset,
+          LHeader.VirtualAddress, LHeader.PhysicalAddress, LHeader.FileSize,
+          LHeader.MemorySize, LHeader.Flags, LHeader.Alignment]);
+      end));
   finally
     AControl.EndUpdate;
   end;
@@ -117,15 +129,21 @@ begin
       'Bind', 'Other', 'Section']);
     AControl.SetColumnDataTypes([thdtInteger, thdtAuto, thdtHexadecimal,
       thdtHexadecimal, thdtSymbol, thdtSymbol, thdtSymbol, thdtSymbol]);
-    for var LSymbol in ADocument.Symbols do
-      AControl.AddColumns([PropertyValue(LSymbol.Properties, 'Index'),
-        PropertyValue(LSymbol.Properties, 'Name'),
-        PropertyValue(LSymbol.Properties, 'Value'),
-        PropertyValue(LSymbol.Properties, 'Size'),
-        PropertyValue(LSymbol.Properties, 'Type'),
-        PropertyValue(LSymbol.Properties, 'Bind'),
-        PropertyValue(LSymbol.Properties, 'Other'),
-        PropertyValue(LSymbol.Properties, 'Section')]);
+    AControl.SetItemProvider(TCallbackHighlighterRowProvider.Create(
+      ADocument.Symbols.Count,
+      function(AIndex: Integer): string
+      begin
+        var LSymbol := ADocument.Symbols[AIndex];
+        Result := Format('%s'#9'%s'#9'%s'#9'%s'#9'%s'#9'%s'#9'%s'#9'%s',
+          [PropertyValue(LSymbol.Properties, 'Index'),
+           PropertyValue(LSymbol.Properties, 'Name'),
+           PropertyValue(LSymbol.Properties, 'Value'),
+           PropertyValue(LSymbol.Properties, 'Size'),
+           PropertyValue(LSymbol.Properties, 'Type'),
+           PropertyValue(LSymbol.Properties, 'Bind'),
+           PropertyValue(LSymbol.Properties, 'Other'),
+           PropertyValue(LSymbol.Properties, 'Section')]);
+      end));
   finally
     AControl.EndUpdate;
   end;
@@ -142,8 +160,14 @@ begin
     AControl.Clear;
     AControl.SetColumnHeaders(['Ndx', 'Tag', 'Value']);
     AControl.SetColumnDataTypes([thdtInteger, thdtSymbol, thdtHexadecimal]);
-    for var LEntry in ADocument.ELFDynamicEntries do
-      AControl.AddColumns([LEntry.Index.ToString, LEntry.Tag, LEntry.Value]);
+    AControl.SetItemProvider(TCallbackHighlighterRowProvider.Create(
+      ADocument.ELFDynamicEntries.Count,
+      function(AIndex: Integer): string
+      begin
+        var LEntry := ADocument.ELFDynamicEntries[AIndex];
+        Result := Format('%d'#9'%s'#9'%s',
+          [LEntry.Index, LEntry.Tag, LEntry.Value]);
+      end));
   finally
     AControl.EndUpdate;
   end;
@@ -183,12 +207,27 @@ begin
       AControl.SetColumnDataTypes([thdtInteger, thdtSymbol, thdtHexadecimal,
         thdtHexadecimal, thdtHexadecimal, thdtInteger, thdtHexadecimal,
         thdtAuto]);
-      for var LRelocation in ADocument.ELFRelocations do
-        if SameText(LRelocation.SectionName, ASectionName) then
-          AControl.AddColumns([IntToStr(LRelocation.Index),
-            LRelocation.RelocationType, LRelocation.Offset,
-            LRelocation.ParenthesizedAddend, LRelocation.Value,
-            LRelocation.SymbolIndex, LRelocation.Addend, LRelocation.Name]);
+      var LIndexes := TList<Integer>.Create;
+      try
+        for var LIndex := 0 to ADocument.ELFRelocations.Count - 1 do
+          if SameText(ADocument.ELFRelocations[LIndex].SectionName,
+            ASectionName) then
+            LIndexes.Add(LIndex);
+        var LIndexArray := LIndexes.ToArray;
+        AControl.SetItemProvider(TCallbackHighlighterRowProvider.Create(
+          Length(LIndexArray),
+          function(AIndex: Integer): string
+          begin
+            var LRelocation := ADocument.ELFRelocations[LIndexArray[AIndex]];
+            Result := Format('%d'#9'%s'#9'%s'#9'%s'#9'%s'#9'%s'#9'%s'#9'%s',
+              [LRelocation.Index, LRelocation.RelocationType,
+               LRelocation.Offset, LRelocation.ParenthesizedAddend,
+               LRelocation.Value, LRelocation.SymbolIndex,
+               LRelocation.Addend, LRelocation.Name]);
+          end));
+      finally
+        LIndexes.Free;
+      end;
     end;
   finally
     AControl.EndUpdate;

@@ -6,6 +6,7 @@ uses
   System.SysUtils,
   System.IOUtils,
   TDump.Explorer.Finder in '..\source\common\TDump.Explorer.Finder.pas',
+  TDump.Explorer.TextSource in '..\source\parser\TDump.Explorer.TextSource.pas',
   TDump.Explorer.Parser in '..\source\parser\TDump.Explorer.Parser.pas',
   TDump.Explorer.Runner in '..\source\common\TDump.Explorer.Runner.pas';
 

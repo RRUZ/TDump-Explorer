@@ -3,9 +3,13 @@ program TDumpParserProfiler;
 {$APPTYPE CONSOLE}
 
 uses
+  Winapi.Windows,
+  Winapi.PsAPI,
   System.SysUtils,
   System.Diagnostics,
   System.IOUtils,
+  System.Math,
+  TDump.Explorer.TextSource in '..\source\parser\TDump.Explorer.TextSource.pas',
   TDump.Explorer.Parser in '..\source\parser\TDump.Explorer.parser.pas';
 
 type
@@ -18,7 +22,20 @@ type
     UnsupportedStructureCount: Integer;
     UnsupportedStructures: TArray<string>;
     TotalMilliseconds: Double;
+    PeakPrivateBytes: UInt64;
+    RetainedPrivateBytes: UInt64;
   end;
+
+function CurrentPrivateBytes: UInt64;
+begin
+  var LCounters: TProcessMemoryCountersEx;
+  ZeroMemory(@LCounters, SizeOf(LCounters));
+  LCounters.cb := SizeOf(LCounters);
+  if not GetProcessMemoryInfo(GetCurrentProcess,
+    PPROCESS_MEMORY_COUNTERS(@LCounters), SizeOf(LCounters)) then
+    RaiseLastOSError;
+  Result := LCounters.PrivateUsage;
+end;
 
 function ProgressPhaseName(APhase: TDumpParserProgressPhase): string;
 begin
@@ -41,13 +58,15 @@ begin
       [AText]);
 end;
 
-function ProfileFixture(const AFileName: string; const AText: string;
+function ProfileFixture(const AFileName: string;
   AIterations: Integer): TFixtureProfile;
 begin
   Result.FileName := AFileName;
   Result.SizeBytes := TFile.GetSize(AFileName);
   for var LIteration := 1 to AIterations do
   begin
+    var LBaselinePrivateBytes := CurrentPrivateBytes;
+    var LPeakPrivateBytes := LBaselinePrivateBytes;
     var LParser := TDumpParser.Create;
     try
       var LShowProgress := False;
@@ -58,6 +77,7 @@ begin
         procedure(APhase: TDumpParserProgressPhase; ACompletedLines,
           ATotalLines: Integer)
         begin
+          LPeakPrivateBytes := Max(LPeakPrivateBytes, CurrentPrivateBytes);
           LShowProgress := ATotalLines >= 100000;
           if not LShowProgress then
             Exit;
@@ -79,8 +99,16 @@ begin
           LLastPercent := LPercent;
         end;
       var LStopwatch := TStopwatch.StartNew;
-      var LDocument := LParser.ParseText(AText, AFileName);
+      var LDocument := LParser.ParseFile(AFileName);
       LStopwatch.Stop;
+      var LRetainedPrivateBytes := CurrentPrivateBytes;
+      LPeakPrivateBytes := Max(LPeakPrivateBytes, LRetainedPrivateBytes);
+      if LPeakPrivateBytes > LBaselinePrivateBytes then
+        Result.PeakPrivateBytes := Max(Result.PeakPrivateBytes,
+          LPeakPrivateBytes - LBaselinePrivateBytes);
+      if LRetainedPrivateBytes > LBaselinePrivateBytes then
+        Result.RetainedPrivateBytes := Max(Result.RetainedPrivateBytes,
+          LRetainedPrivateBytes - LBaselinePrivateBytes);
       if LProgressWritten then
         Writeln;
       Result.TotalMilliseconds := Result.TotalMilliseconds +
@@ -125,6 +153,10 @@ begin
     ' MiB/s, relocations ', AProfile.RelocationCount, ', diagnostics ',
     AProfile.DiagnosticCount, ', unsupported ',
     AProfile.UnsupportedStructureCount);
+  Writeln('  Memory delta: peak ', FormatFloat('0.00',
+    AProfile.PeakPrivateBytes / (1024.0 * 1024.0)), ' MiB, retained ',
+    FormatFloat('0.00', AProfile.RetainedPrivateBytes / (1024.0 * 1024.0)),
+    ' MiB (mapped report pages excluded from private bytes)');
   for var LStructure in AProfile.UnsupportedStructures do
     Writeln('  Unsupported ', LStructure);
   if Length(AProfile.UnsupportedStructures) < AProfile.UnsupportedStructureCount then
@@ -142,12 +174,15 @@ begin
     var LIterations := 1;
     if ParamCount >= 2 then
       LIterations := ParseIterationCount(ParamStr(2));
-    if not TDirectory.Exists(LFixtureDirectory) then
-      raise EDirectoryNotFoundException.CreateFmt('Fixture directory was not found: %s',
-        [LFixtureDirectory]);
-
-    var LFiles := TDirectory.GetFiles(LFixtureDirectory, '*.tdump',
-      TSearchOption.soAllDirectories);
+    var LFiles: TArray<string>;
+    if TFile.Exists(LFixtureDirectory) then
+      LFiles := [LFixtureDirectory]
+    else if TDirectory.Exists(LFixtureDirectory) then
+      LFiles := TDirectory.GetFiles(LFixtureDirectory, '*.tdump',
+        TSearchOption.soAllDirectories)
+    else
+      raise EDirectoryNotFoundException.CreateFmt(
+        'Fixture file or directory was not found: %s', [LFixtureDirectory]);
     if Length(LFiles) = 0 then
       raise Exception.CreateFmt('No *.tdump fixtures found under: %s',
         [LFixtureDirectory]);
@@ -161,9 +196,7 @@ begin
     var LTotalMilliseconds := 0.0;
     for var LFileName in LFiles do
     begin
-      // Load once so this profile measures parser work rather than disk I/O.
-      var LText := TFile.ReadAllText(LFileName, TEncoding.Default);
-      var LProfile := ProfileFixture(LFileName, LText, LIterations);
+      var LProfile := ProfileFixture(LFileName, LIterations);
       WriteProfile(LProfile, LIterations);
       Inc(LTotalBytes, LProfile.SizeBytes);
       LTotalMilliseconds := LTotalMilliseconds + LProfile.TotalMilliseconds;

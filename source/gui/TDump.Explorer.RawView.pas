@@ -5,10 +5,14 @@ interface
 uses
   Winapi.Windows,
   Winapi.Messages,
-  System.Classes, System.SysUtils, System.Math, System.StrUtils, System.Generics.Collections,
+  System.Classes, System.SysUtils, System.Math, System.StrUtils,
+  System.Generics.Collections, System.Threading, System.SyncObjs,
   Vcl.Controls, Vcl.Forms,
   TDump.Explorer.HighlighterControl, TDump.Explorer.Parser, Vcl.ExtCtrls,
   Vcl.StdCtrls, Vcl.WinXCtrls;
+
+const
+  WM_RAW_FILTER_READY = WM_USER + $541;
 
 type
   TRawViewFrame = class(TFrame)
@@ -18,20 +22,35 @@ type
     cbFollowSelection: TCheckBox;
   private
     FHighlighterControl: THighlighterControl;
-    FSourceLines: TStringList;
-    FSourceParserModes: TList<Integer>;
+    FDocument: TDumpDocument;
+    FRowProvider: IHighlighterRowProvider;
     FVisibleSourceLineIndexes: TList<Integer>;
+    FUsingFilteredIndexes: Boolean;
+    FFilterTimer: TTimer;
+    FFilterTask: ITask;
+    FFilterGeneration: Integer;
     FSyncWithSelectedNode: Boolean;
     FOnSyncWithSelectedNodeChanged: TNotifyEvent;
     FLastSourceStartLine: Integer;
     FLastSourceEndLine: Integer;
     procedure ApplyFilter;
+    procedure ApplyFilteredIndexes(const AFilterText: string;
+      const AIndexes: TArray<Integer>; AGeneration: Integer;
+      ADocument: TDumpDocument);
+    procedure BeginFilterTask(const AFilterText: string);
+    procedure CancelFilterTask(AWait: Boolean);
+    procedure DisplayFullSource;
+    function FindFirstVisibleIndexAtOrAfter(ASourceIndex: Integer): Integer;
+    function FindLastVisibleIndexAtOrBefore(ASourceIndex: Integer): Integer;
     procedure cbFollowSelectionClick(Sender: TObject);
     procedure SearchFilterBoxChange(Sender: TObject);
+    procedure FilterTimerTimer(Sender: TObject);
     procedure SearchFilterBoxKeyDown(Sender: TObject; var Key: Word;
       Shift: TShiftState);
     procedure SetSyncWithSelectedNode(const AValue: Boolean);
     procedure CMStyleChanged(var AMessage: TMessage); message CM_STYLECHANGED;
+    procedure WMRawFilterReady(var AMessage: TMessage);
+      message WM_RAW_FILTER_READY;
     procedure ApplyTheme;
   public
     constructor Create(AOwner: TComponent); override;
@@ -49,16 +68,28 @@ type
 implementation
 
 uses
-  TDump.Explorer.TinyParser, TDump.Explorer.UI, Vcl.Graphics;
+  TDump.Explorer.TinyParser, TDump.Explorer.UI,
+  TDump.Explorer.HighlighterProviders, Vcl.Graphics;
 
 {$R *.dfm}
+
+type
+  TRawFilterResult = class
+  public
+    FilterText: string;
+    Indexes: TArray<Integer>;
+    Generation: Integer;
+    Document: TDumpDocument;
+  end;
 
 constructor TRawViewFrame.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
-  FSourceLines := TStringList.Create;
-  FSourceParserModes := TList<Integer>.Create;
   FVisibleSourceLineIndexes := TList<Integer>.Create;
+  FFilterTimer := TTimer.Create(Self);
+  FFilterTimer.Enabled := False;
+  FFilterTimer.Interval := 250;
+  FFilterTimer.OnTimer := FilterTimerTimer;
   FHighlighterControl := THighlighterControl.Create(nil);
   FHighlighterControl.Parent := Self;
   FHighlighterControl.Align := alClient;
@@ -80,18 +111,27 @@ end;
 
 destructor TRawViewFrame.Destroy;
 begin
+  CancelFilterTask(True);
+  var LMessage: TMsg;
+  while PeekMessage(LMessage, Handle, WM_RAW_FILTER_READY,
+    WM_RAW_FILTER_READY, PM_REMOVE) do
+    TObject(LMessage.lParam).Free;
+  FHighlighterControl.SetItemProvider(nil);
+  FRowProvider := nil;
+  FDocument := nil;
   FVisibleSourceLineIndexes.Free;
-  FSourceParserModes.Free;
-  FSourceLines.Free;
   FHighlighterControl.Free;
   inherited;
 end;
 
 procedure TRawViewFrame.Clear;
 begin
-  FSourceLines.Clear;
-  FSourceParserModes.Clear;
+  CancelFilterTask(True);
+  FHighlighterControl.SetItemProvider(nil);
+  FRowProvider := nil;
+  FDocument := nil;
   FVisibleSourceLineIndexes.Clear;
+  FUsingFilteredIndexes := False;
   FLastSourceStartLine := 0;
   FLastSourceEndLine := 0;
   FHighlighterControl.FilterText := '';
@@ -112,15 +152,7 @@ begin
     Exit;
   end;
 
-  FSourceLines.Text := ADocument.RawText;
-  FSourceParserModes.Clear;
-  for var LSourceIndex := 0 to FSourceLines.Count - 1 do
-    if (LSourceIndex < ADocument.Lines.Count) and
-      (ADocument.Lines[LSourceIndex].SourceSpan.SyntaxHint =
-        rshCppBuilderMethod) then
-      FSourceParserModes.Add(Ord(tpmCppBuilderMethod))
-    else
-      FSourceParserModes.Add(-1);
+  FDocument := ADocument;
   FLastSourceStartLine := 0;
   FLastSourceEndLine := 0;
   ApplyFilter;
@@ -128,32 +160,156 @@ end;
 
 procedure TRawViewFrame.ApplyFilter;
 begin
+  if (FDocument = nil) or (FDocument.TextSource = nil) then
+    Exit;
   var LFilterText := Trim(SearchFilterBox.Text);
-  FVisibleSourceLineIndexes.Clear;
-  FHighlighterControl.BeginUpdate;
-  try
-    FHighlighterControl.Clear;
-    FHighlighterControl.FilterText := LFilterText;
-    for var LSourceIndex := 0 to FSourceLines.Count - 1 do
-      if (LFilterText = '') or ContainsText(FSourceLines[LSourceIndex],
-        LFilterText) then
-      begin
-        if (LSourceIndex < FSourceParserModes.Count) and
-          (FSourceParserModes[LSourceIndex] >= 0) then
-          FHighlighterControl.Add(FSourceLines[LSourceIndex],
-            TTinyParserMode(FSourceParserModes[LSourceIndex]))
-        else
-          FHighlighterControl.Add(FSourceLines[LSourceIndex]);
-        FHighlighterControl.SetLineNumber(FHighlighterControl.Items.Count - 1,
-          LSourceIndex);
-        FVisibleSourceLineIndexes.Add(LSourceIndex);
-      end;
-  finally
-    FHighlighterControl.EndUpdate;
-  end;
+  if LFilterText = '' then
+  begin
+    CancelFilterTask(False);
+    DisplayFullSource
+  end
+  else
+    BeginFilterTask(LFilterText);
 
   if FSyncWithSelectedNode and (FLastSourceStartLine > 0) then
     ShowLines(FLastSourceStartLine, FLastSourceEndLine);
+end;
+
+procedure TRawViewFrame.ApplyFilteredIndexes(const AFilterText: string;
+  const AIndexes: TArray<Integer>; AGeneration: Integer;
+  ADocument: TDumpDocument);
+begin
+  if (AGeneration <> TInterlocked.CompareExchange(FFilterGeneration, 0, 0)) or
+    (ADocument <> FDocument) then
+    Exit;
+
+  FHighlighterControl.BeginUpdate;
+  try
+    FHighlighterControl.Clear;
+    FVisibleSourceLineIndexes.Clear;
+    FVisibleSourceLineIndexes.AddRange(AIndexes);
+    FUsingFilteredIndexes := True;
+    FHighlighterControl.FilterText := AFilterText;
+    FRowProvider := TDocumentLineRowProvider.CreateIndexes(FDocument,
+      FVisibleSourceLineIndexes);
+    FHighlighterControl.SetItemProvider(FRowProvider);
+  finally
+    FHighlighterControl.EndUpdate;
+  end;
+  if FSyncWithSelectedNode and (FLastSourceStartLine > 0) then
+    ShowLines(FLastSourceStartLine, FLastSourceEndLine);
+end;
+
+procedure TRawViewFrame.BeginFilterTask(const AFilterText: string);
+begin
+  CancelFilterTask(True);
+  var LGeneration := TInterlocked.Increment(FFilterGeneration);
+  var LDocument := FDocument;
+  FFilterTask := TTask.Run(
+    procedure
+    begin
+      var LIndexes := TList<Integer>.Create;
+      try
+        for var LSourceIndex := 0 to LDocument.TextSource.LineCount - 1 do
+        begin
+          if (LSourceIndex and $FF = 0) and
+            (LGeneration <> TInterlocked.CompareExchange(
+              FFilterGeneration, 0, 0)) then
+            Exit;
+          if ContainsText(LDocument.TextSource[LSourceIndex], AFilterText) then
+            LIndexes.Add(LSourceIndex);
+        end;
+        if LGeneration <> TInterlocked.CompareExchange(
+          FFilterGeneration, 0, 0) then
+          Exit;
+        var LResult := TRawFilterResult.Create;
+        LResult.FilterText := AFilterText;
+        LResult.Indexes := LIndexes.ToArray;
+        LResult.Generation := LGeneration;
+        LResult.Document := LDocument;
+        if not PostMessage(Handle, WM_RAW_FILTER_READY, 0,
+          LPARAM(LResult)) then
+          LResult.Free;
+      finally
+        LIndexes.Free;
+      end;
+    end);
+end;
+
+procedure TRawViewFrame.WMRawFilterReady(var AMessage: TMessage);
+begin
+  var LResult := TRawFilterResult(AMessage.LParam);
+  try
+    ApplyFilteredIndexes(LResult.FilterText, LResult.Indexes,
+      LResult.Generation, LResult.Document);
+  finally
+    LResult.Free;
+  end;
+end;
+
+procedure TRawViewFrame.CancelFilterTask(AWait: Boolean);
+begin
+  FFilterTimer.Enabled := False;
+  TInterlocked.Increment(FFilterGeneration);
+  if AWait and (FFilterTask <> nil) then
+  begin
+    FFilterTask.Wait;
+    FFilterTask := nil;
+  end;
+end;
+
+procedure TRawViewFrame.DisplayFullSource;
+begin
+  FVisibleSourceLineIndexes.Clear;
+  FUsingFilteredIndexes := False;
+  FHighlighterControl.BeginUpdate;
+  try
+    FHighlighterControl.Clear;
+    FHighlighterControl.FilterText := '';
+    FRowProvider := TDocumentLineRowProvider.CreateRange(FDocument, 0,
+      FDocument.TextSource.LineCount);
+    FHighlighterControl.SetItemProvider(FRowProvider);
+  finally
+    FHighlighterControl.EndUpdate;
+  end;
+end;
+
+function TRawViewFrame.FindFirstVisibleIndexAtOrAfter(
+  ASourceIndex: Integer): Integer;
+begin
+  Result := -1;
+  var LLow := 0;
+  var LHigh := FVisibleSourceLineIndexes.Count - 1;
+  while LLow <= LHigh do
+  begin
+    var LMiddle := LLow + ((LHigh - LLow) div 2);
+    if FVisibleSourceLineIndexes[LMiddle] >= ASourceIndex then
+    begin
+      Result := LMiddle;
+      LHigh := LMiddle - 1;
+    end
+    else
+      LLow := LMiddle + 1;
+  end;
+end;
+
+function TRawViewFrame.FindLastVisibleIndexAtOrBefore(
+  ASourceIndex: Integer): Integer;
+begin
+  Result := -1;
+  var LLow := 0;
+  var LHigh := FVisibleSourceLineIndexes.Count - 1;
+  while LLow <= LHigh do
+  begin
+    var LMiddle := LLow + ((LHigh - LLow) div 2);
+    if FVisibleSourceLineIndexes[LMiddle] <= ASourceIndex then
+    begin
+      Result := LMiddle;
+      LLow := LMiddle + 1;
+    end
+    else
+      LHigh := LMiddle - 1;
+  end;
 end;
 
 procedure TRawViewFrame.ApplyTheme;
@@ -171,6 +327,13 @@ end;
 
 procedure TRawViewFrame.SearchFilterBoxChange(Sender: TObject);
 begin
+  CancelFilterTask(False);
+  FFilterTimer.Enabled := True;
+end;
+
+procedure TRawViewFrame.FilterTimerTimer(Sender: TObject);
+begin
+  FFilterTimer.Enabled := False;
   ApplyFilter;
 end;
 
@@ -202,20 +365,31 @@ begin
   FLastSourceEndLine := AEndLine;
   if not FSyncWithSelectedNode then
     Exit;
+  if (FDocument = nil) or (FDocument.TextSource = nil) then
+    Exit;
 
   var LFirstSourceIndex := AStartLine - 1;
   var LLastSourceIndex := Max(LFirstSourceIndex, AEndLine - 1);
-  var LFirstVisibleIndex := -1;
-  var LLastVisibleIndex := -1;
-  for var LVisibleIndex := 0 to FVisibleSourceLineIndexes.Count - 1 do
-    if (FVisibleSourceLineIndexes[LVisibleIndex] >= LFirstSourceIndex) and
-      (FVisibleSourceLineIndexes[LVisibleIndex] <= LLastSourceIndex) then
-    begin
-      if LFirstVisibleIndex < 0 then
-        LFirstVisibleIndex := LVisibleIndex;
-      LLastVisibleIndex := LVisibleIndex;
-    end;
+  var LFirstVisibleIndex: Integer;
+  var LLastVisibleIndex: Integer;
+  if FUsingFilteredIndexes then
+  begin
+    LFirstVisibleIndex := FindFirstVisibleIndexAtOrAfter(LFirstSourceIndex);
+    LLastVisibleIndex := FindLastVisibleIndexAtOrBefore(LLastSourceIndex);
+  end
+  else
+  begin
+    LFirstVisibleIndex := EnsureRange(LFirstSourceIndex, 0,
+      Max(0, FDocument.TextSource.LineCount - 1));
+    LLastVisibleIndex := EnsureRange(LLastSourceIndex, LFirstVisibleIndex,
+      Max(0, FDocument.TextSource.LineCount - 1));
+  end;
   if LFirstVisibleIndex < 0 then
+  begin
+    FHighlighterControl.ClearHighlightedItems;
+    Exit;
+  end;
+  if LLastVisibleIndex < LFirstVisibleIndex then
   begin
     FHighlighterControl.ClearHighlightedItems;
     Exit;

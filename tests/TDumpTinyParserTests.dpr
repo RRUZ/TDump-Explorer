@@ -8,6 +8,7 @@ uses
   Vcl.Graphics,
   DUnitX.TestFramework,
   DUnitX.Loggers.Xml.NUnit,
+  TDump.Explorer.UI in '..\source\common\TDump.Explorer.UI.pas',
   TDump.Explorer.TinyParser in '..\source\common\TDump.Explorer.TinyParser.pas',
   TDump.Explorer.Highlighter in '..\source\common\TDump.Explorer.Highlighter.pas';
 
@@ -95,13 +96,13 @@ end;
 
 procedure TestHighlightThemes;
 begin
-  var LLightTheme := TTinyHighlighter.LightTheme;
-  var LDarkTheme := TTinyHighlighter.DarkTheme;
-  Require(LLightTheme.BackgroundColor <> LDarkTheme.BackgroundColor,
-    'Light and dark highlighter themes must have distinct backgrounds.');
+  var LLightTheme := TExplorerTheme.LightTheme;
+  var LDarkTheme := TExplorerTheme.DarkTheme;
+  Require(LLightTheme.StringLiteralColor <> LDarkTheme.StringLiteralColor,
+    'Light and dark highlighter themes must have distinct token palettes.');
   Require(LLightTheme.HexadecimalColor <> LLightTheme.NumberColor,
     'The light theme must distinguish hexadecimal and decimal values.');
-    Require(LDarkTheme.DateTimeColor <> LDarkTheme.StringColor,
+    Require(LDarkTheme.DateTimeColor <> LDarkTheme.TextColor,
       'The dark theme must distinguish date/time and string values.');
     Require(LDarkTheme.StringLiteralColor <> LDarkTheme.MethodColor,
       'The dark theme must distinguish string literals and methods.');
@@ -216,7 +217,7 @@ begin
   var LBitmap := TBitmap.Create;
   try
     LBitmap.SetSize(180, 24);
-    var LTheme := TTinyHighlighter.DarkTheme;
+    var LTheme := TExplorerTheme.DarkTheme;
     LBitmap.Canvas.Brush.Color := LTheme.BackgroundColor;
     LBitmap.Canvas.FillRect(Rect(0, 0, LBitmap.Width, LBitmap.Height));
     var LHighlighter := TTinyHighlighter.Create;

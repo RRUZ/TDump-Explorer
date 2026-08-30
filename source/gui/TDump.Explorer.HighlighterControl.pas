@@ -10,6 +10,17 @@ uses
   Vcl.WinXCtrls, Vcl.ComCtrls, Vcl.ImgList;
 
 type
+  // Supplies rows on demand. Implementations retain only row identifiers and
+  // reconstruct text for the item currently requested by TControlList.
+  IHighlighterRowProvider = interface
+    ['{129B91EA-9AE6-4C92-B908-999797434137}']
+    function GetCount: Integer;
+    function GetText(AIndex: Integer): string;
+    function GetImageName(AIndex: Integer): string;
+    function GetParserMode(AIndex: Integer): Integer;
+    function GetLineNumber(AIndex: Integer): Integer;
+  end;
+
   THighlighterControl = class(TFrame)
     ControlList1: TControlList;
     HeaderControl1: THeaderControl;
@@ -19,6 +30,7 @@ type
    private
       FHighlighter: TTinyHighlighter;
       FItems: TStringList;
+      FItemProvider: IHighlighterRowProvider;
       FItemImageNames: TStringList;
       FItemParserModes: TList<Integer>;
       FColumnHeaders: TStringList;
@@ -35,6 +47,8 @@ type
       FHighlightColor: TColor;
       FMatchColor: TColor;
       FHighlightedItems: TList<Integer>;
+      FHighlightedRangeStart: Integer;
+      FHighlightedRangeEnd: Integer;
       FLineNumbers: TList<Integer>;
       FFilterText: string;
       FUpdateDepth: Integer;
@@ -44,6 +58,10 @@ type
       FImages: TCustomImageList;
       FOnItemClick: TNotifyEvent;
     procedure AddItem(const AText, AImageName: string; AParserMode: Integer);
+    function ItemCount: Integer;
+    function ItemText(AItemIndex: Integer): string;
+    function ItemParserMode(AItemIndex: Integer): Integer;
+    function IsItemHighlighted(AItemIndex: Integer): Boolean;
     procedure SetMatchColor(const AValue: TColor);
     procedure SetImages(const AValue: TCustomImageList);
     function ColumnCount(const AText: string): Integer;
@@ -100,11 +118,13 @@ type
     procedure SetLineNumber(AItemIndex, ALineNumber: Integer);
     procedure SetFilterText(const AValue: string);
     procedure SetText(const AText: string);
+    procedure SetItemProvider(const AProvider: IHighlighterRowProvider);
     procedure SetHighlightedItems(const AItemIndexes: array of Integer);
     procedure SetHighlightedRange(AStartItemIndex, AEndItemIndex: Integer);
     procedure SelectItem(AItemIndex: Integer);
     procedure ScrollItemToTop(AItemIndex: Integer);
     property Items: TStringList read FItems;
+    property Count: Integer read ItemCount;
     property Images: TCustomImageList read FImages write SetImages;
     property OnItemClick: TNotifyEvent read FOnItemClick write FOnItemClick;
     property AutoSizeColumns: Boolean read FAutoSizeColumns
@@ -141,6 +161,8 @@ begin
   FColumnHeaders := TStringList.Create;
   FMeasureBitmap := TBitmap.Create;
   FHighlightedItems := TList<Integer>.Create;
+  FHighlightedRangeStart := -1;
+  FHighlightedRangeEnd := -1;
   FLineNumbers := TList<Integer>.Create;
   FAutoSizeColumns := True;
   FUseColumnMode := True;
@@ -225,20 +247,20 @@ function THighlighterControl.ColumnText(AItemIndex,
   AColumnIndex: Integer): string;
 begin
   Result := '';
-  if (AItemIndex < 0) or (AItemIndex >= FItems.Count) or
+  if (AItemIndex < 0) or (AItemIndex >= ItemCount) or
     (AColumnIndex < 0) then
     Exit;
 
+  var LText := ItemText(AItemIndex);
   if not FUseColumnMode then
   begin
     if AColumnIndex = 0 then
-      Result := FItems[AItemIndex];
+      Result := LText;
     Exit;
   end;
 
   var LStartIndex := 1;
   var LColumn := 0;
-  var LText := FItems[AItemIndex];
   for var LIndex := 1 to Length(LText) + 1 do
     if (LIndex > Length(LText)) or (LText[LIndex] = #9) then
     begin
@@ -259,6 +281,8 @@ end;
 
 function THighlighterControl.DisplayLineNumber(AItemIndex: Integer): Integer;
 begin
+  if FItemProvider <> nil then
+    Exit(FItemProvider.GetLineNumber(AItemIndex));
   if (AItemIndex >= 0) and (AItemIndex < FLineNumbers.Count) and
     (FLineNumbers[AItemIndex] >= 0) then
     Exit(FLineNumbers[AItemIndex]);
@@ -326,6 +350,7 @@ end;
 procedure THighlighterControl.AddItem(const AText, AImageName: string;
   AParserMode: Integer);
 begin
+  FItemProvider := nil;
   FItems.BeginUpdate;
   try
     FItems.Add(StringReplace(StringReplace(AText, #13, ' ', [rfReplaceAll]),
@@ -338,6 +363,29 @@ begin
   end;
   if FItems.Count = 1 then
     ControlList1.ItemIndex := 0;
+end;
+
+function THighlighterControl.ItemCount: Integer;
+begin
+  if FItemProvider <> nil then
+    Exit(FItemProvider.GetCount);
+  Result := FItems.Count;
+end;
+
+function THighlighterControl.ItemText(AItemIndex: Integer): string;
+begin
+  if FItemProvider <> nil then
+    Exit(FItemProvider.GetText(AItemIndex));
+  Result := FItems[AItemIndex];
+end;
+
+function THighlighterControl.ItemParserMode(AItemIndex: Integer): Integer;
+begin
+  if FItemProvider <> nil then
+    Exit(FItemProvider.GetParserMode(AItemIndex));
+  if (AItemIndex >= 0) and (AItemIndex < FItemParserModes.Count) then
+    Exit(FItemParserModes[AItemIndex]);
+  Result := -1;
 end;
 
 procedure THighlighterControl.ApplyTheme;
@@ -365,6 +413,7 @@ end;
 procedure THighlighterControl.Clear;
 begin
   ControlList1.ItemIndex := -1;
+  FItemProvider := nil;
   FItems.Clear;
   FItemImageNames.Clear;
   FItemParserModes.Clear;
@@ -397,10 +446,10 @@ begin
     UpdateControlList;
   if FRestoreItemIndexPending then
   begin
-    if FItems.Count = 0 then
+    if ItemCount = 0 then
       ControlList1.ItemIndex := -1
     else if FRestoreItemIndex >= 0 then
-      ControlList1.ItemIndex := Min(FRestoreItemIndex, FItems.Count - 1)
+      ControlList1.ItemIndex := Min(FRestoreItemIndex, ItemCount - 1)
     else if ControlList1.ItemIndex < 0 then
       ControlList1.ItemIndex := 0;
     FRestoreItemIndexPending := False;
@@ -435,6 +484,7 @@ end;
 
 procedure THighlighterControl.SetText(const AText: string);
 begin
+  FItemProvider := nil;
   var LPreviousItemIndex := ControlList1.ItemIndex;
   ClearHighlightedItems;
   FColumnHeaders.Clear;
@@ -463,8 +513,22 @@ begin
   end;
 end;
 
+procedure THighlighterControl.SetItemProvider(
+  const AProvider: IHighlighterRowProvider);
+begin
+  FItemProvider := AProvider;
+  ClearHighlightedItems;
+  UpdateControlList;
+  if ItemCount = 0 then
+    ControlList1.ItemIndex := -1
+  else
+    ControlList1.ItemIndex := 0;
+end;
+
 function THighlighterControl.ItemImageName(AItemIndex: Integer): string;
 begin
+  if FItemProvider <> nil then
+    Exit(FItemProvider.GetImageName(AItemIndex));
   Result := '';
   if (AItemIndex >= 0) and (AItemIndex < FItemImageNames.Count) then
     Result := FItemImageNames[AItemIndex];
@@ -522,10 +586,34 @@ end;
 
 procedure THighlighterControl.ClearHighlightedItems;
 begin
-  if FHighlightedItems.Count = 0 then
+  if (FHighlightedItems.Count = 0) and (FHighlightedRangeStart < 0) then
     Exit;
   FHighlightedItems.Clear;
+  FHighlightedRangeStart := -1;
+  FHighlightedRangeEnd := -1;
   ControlList1.Invalidate;
+end;
+
+function THighlighterControl.IsItemHighlighted(AItemIndex: Integer): Boolean;
+begin
+  if (FHighlightedRangeStart >= 0) and
+    (AItemIndex >= FHighlightedRangeStart) and
+    (AItemIndex <= FHighlightedRangeEnd) then
+    Exit(True);
+
+  var LLow := 0;
+  var LHigh := FHighlightedItems.Count - 1;
+  while LLow <= LHigh do
+  begin
+    var LMiddle := LLow + ((LHigh - LLow) div 2);
+    if FHighlightedItems[LMiddle] = AItemIndex then
+      Exit(True);
+    if FHighlightedItems[LMiddle] < AItemIndex then
+      LLow := LMiddle + 1
+    else
+      LHigh := LMiddle - 1;
+  end;
+  Result := False;
 end;
 
 procedure THighlighterControl.CMStyleChanged(var AMessage: TMessage);
@@ -538,10 +626,21 @@ procedure THighlighterControl.SetHighlightedItems(
   const AItemIndexes: array of Integer);
 begin
   FHighlightedItems.Clear;
+  FHighlightedRangeStart := -1;
+  FHighlightedRangeEnd := -1;
+  var LUniqueItems := TDictionary<Integer, Byte>.Create;
+  try
   for var LItemIndex in AItemIndexes do
-    if (LItemIndex >= 0) and (LItemIndex < FItems.Count) and
-      not FHighlightedItems.Contains(LItemIndex) then
+    if (LItemIndex >= 0) and (LItemIndex < ItemCount) and
+      not LUniqueItems.ContainsKey(LItemIndex) then
+    begin
+      LUniqueItems.Add(LItemIndex, 0);
       FHighlightedItems.Add(LItemIndex);
+    end;
+  finally
+    LUniqueItems.Free;
+  end;
+  FHighlightedItems.Sort;
   ControlList1.Invalidate;
 end;
 
@@ -549,32 +648,34 @@ procedure THighlighterControl.SetHighlightedRange(AStartItemIndex,
   AEndItemIndex: Integer);
 begin
   FHighlightedItems.Clear;
+  FHighlightedRangeStart := -1;
+  FHighlightedRangeEnd := -1;
   AStartItemIndex := Max(0, AStartItemIndex);
-  AEndItemIndex := Min(FItems.Count - 1, AEndItemIndex);
+  AEndItemIndex := Min(ItemCount - 1, AEndItemIndex);
   if AEndItemIndex < AStartItemIndex then
   begin
     ControlList1.Invalidate;
     Exit;
   end;
 
-  for var LItemIndex := AStartItemIndex to AEndItemIndex do
-    FHighlightedItems.Add(LItemIndex);
+  FHighlightedRangeStart := AStartItemIndex;
+  FHighlightedRangeEnd := AEndItemIndex;
   ControlList1.Invalidate;
 end;
 
 procedure THighlighterControl.SelectItem(AItemIndex: Integer);
 begin
-  if FItems.Count = 0 then
+  if ItemCount = 0 then
     ControlList1.ItemIndex := -1
   else
-    ControlList1.ItemIndex := EnsureRange(AItemIndex, 0, FItems.Count - 1);
+    ControlList1.ItemIndex := EnsureRange(AItemIndex, 0, ItemCount - 1);
 end;
 
 procedure THighlighterControl.ScrollItemToTop(AItemIndex: Integer);
 var
   LScrollInfo: TScrollInfo;
 begin
-  if (AItemIndex < 0) or (AItemIndex >= FItems.Count) then
+  if (AItemIndex < 0) or (AItemIndex >= ItemCount) then
     Exit;
 
   ControlList1.ItemIndex := AItemIndex;
@@ -597,10 +698,10 @@ var
   LFillColor: TColor;
   LTextFormat: TTextFormat;
 begin
-  if (AIndex < 0) or (AIndex >= FItems.Count) then
+  if (AIndex < 0) or (AIndex >= ItemCount) then
     Exit;
 
-  if FHighlightedItems.Contains(AIndex) then
+  if IsItemHighlighted(AIndex) then
   begin
     var LMarkerRect := ARect;
     //LMarkerRect.Right := Min(LMarkerRect.Right, LMarkerRect.Left + 3);
@@ -671,15 +772,16 @@ begin
     if LColumnRect.Left >= LTextRect.Right then
       Break;
     var LParserMode := FParserMode;
-    if (AIndex < FItemParserModes.Count) and
-      (FItemParserModes[AIndex] >= 0) then
-      LParserMode := TTinyParserMode(FItemParserModes[AIndex]);
+    var LItemParserMode := ItemParserMode(AIndex);
+    if LItemParserMode >= 0 then
+      LParserMode := TTinyParserMode(LItemParserMode);
     LTextFormat := [tfLeft, tfVerticalCenter, tfSingleLine, tfNoPrefix];
     if FUseEndEllipsis then
       Include(LTextFormat, tfEndEllipsis);
-    FHighlighter.TextRect(ACanvas, LColumnRect, ColumnText(AIndex, LColumnIndex), FThemeKind, LTextFormat,
+    var LColumnText := ColumnText(AIndex, LColumnIndex);
+    FHighlighter.TextRect(ACanvas, LColumnRect, LColumnText, FThemeKind, LTextFormat,
       LParserMode, ColumnDataType(LColumnIndex));
-    DrawFilterMatches(ACanvas, LColumnRect, ColumnText(AIndex, LColumnIndex));
+    DrawFilterMatches(ACanvas, LColumnRect, LColumnText);
     LLeft := LColumnRect.Right;
   end;
 end;
@@ -716,11 +818,11 @@ begin
     begin
       if LText.Length > 0 then
         LText.AppendLine;
-      LText.Append(FItems[LIndex]);
+      LText.Append(ItemText(LIndex));
     end;
     if (LText.Length = 0) and (ControlList1.ItemIndex >= 0) and
-      (ControlList1.ItemIndex < FItems.Count) then
-      LText.Append(FItems[ControlList1.ItemIndex]);
+      (ControlList1.ItemIndex < ItemCount) then
+      LText.Append(ItemText(ControlList1.ItemIndex));
     if LText.Length > 0 then
       Clipboard.AsText := LText.ToString;
   finally
@@ -738,6 +840,7 @@ end;
 
 procedure THighlighterControl.ItemsChanged(Sender: TObject);
 begin
+  FItemProvider := nil;
   UpdateControlList;
 end;
 
@@ -820,8 +923,9 @@ end;
 procedure THighlighterControl.UpdateColumnWidths;
 begin
   FColumnCount := Max(1, FColumnHeaders.Count);
-  for var LItem in FItems do
-    FColumnCount := Max(FColumnCount, ColumnCount(LItem));
+  if FUseColumnMode then
+    for var LItemIndex := 0 to Min(ItemCount, 10000) - 1 do
+      FColumnCount := Max(FColumnCount, ColumnCount(ItemText(LItemIndex)));
 
   SetLength(FColumnWidths, FColumnCount);
   if not FAutoSizeColumns then
@@ -841,7 +945,7 @@ begin
     var LWidth := CTextPadding * 2;
     if LColumnIndex < Length(LCaptionWidths) then
       LWidth := Max(LWidth, LCaptionWidths[LColumnIndex]);
-    for var LItemIndex := 0 to FItems.Count - 1 do
+    for var LItemIndex := 0 to Min(ItemCount, 10000) - 1 do
     begin
       var LItemWidth := FMeasureBitmap.Canvas.TextWidth(
         ColumnText(LItemIndex, LColumnIndex)) + (CTextPadding * 2);
@@ -915,21 +1019,24 @@ begin
   end;
 
   FUpdatePending := False;
-  while FItemParserModes.Count < FItems.Count do
-    FItemParserModes.Add(-1);
-  while FItemParserModes.Count > FItems.Count do
-    FItemParserModes.Delete(FItemParserModes.Count - 1);
-  while FItemImageNames.Count < FItems.Count do
-    FItemImageNames.Add('');
-  while FItemImageNames.Count > FItems.Count do
-    FItemImageNames.Delete(FItemImageNames.Count - 1);
-  while FLineNumbers.Count < FItems.Count do
-    FLineNumbers.Add(-1);
-  while FLineNumbers.Count > FItems.Count do
-    FLineNumbers.Delete(FLineNumbers.Count - 1);
+  if FItemProvider = nil then
+  begin
+    while FItemParserModes.Count < FItems.Count do
+      FItemParserModes.Add(-1);
+    while FItemParserModes.Count > FItems.Count do
+      FItemParserModes.Delete(FItemParserModes.Count - 1);
+    while FItemImageNames.Count < FItems.Count do
+      FItemImageNames.Add('');
+    while FItemImageNames.Count > FItems.Count do
+      FItemImageNames.Delete(FItemImageNames.Count - 1);
+    while FLineNumbers.Count < FItems.Count do
+      FLineNumbers.Add(-1);
+    while FLineNumbers.Count > FItems.Count do
+      FLineNumbers.Delete(FLineNumbers.Count - 1);
+  end;
   UpdateColumnWidths;
   UpdateHeaderControl;
-  ControlList1.ItemCount := FItems.Count;
+  ControlList1.ItemCount := ItemCount;
   ControlList1.Invalidate;
 end;
 

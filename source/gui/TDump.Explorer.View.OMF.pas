@@ -40,6 +40,7 @@ implementation
 uses
   System.SysUtils,
   TDump.Explorer.Highlighter,
+  TDump.Explorer.HighlighterProviders,
   TDump.Explorer.TinyParser;
 
 class procedure TOMFView.PopulateRecords(AControl: THighlighterControl;
@@ -77,9 +78,15 @@ begin
     AControl.Clear;
     AControl.SetColumnHeaders(['Member', 'Start line', 'End line', 'Lines']);
     AControl.SetColumnDataTypes([thdtText, thdtInteger, thdtInteger, thdtInteger]);
-    for var LMember in ADocument.LibraryMembers do
-      AControl.AddColumns([LMember.Name, IntToStr(LMember.StartLine),
-        IntToStr(LMember.EndLine), IntToStr(LMember.EndLine - LMember.StartLine + 1)]);
+    AControl.SetItemProvider(TCallbackHighlighterRowProvider.Create(
+      ADocument.LibraryMembers.Count,
+      function(AIndex: Integer): string
+      begin
+        var LMember := ADocument.LibraryMembers[AIndex];
+        Result := Format('%s'#9'%d'#9'%d'#9'%d', [LMember.Name,
+          LMember.StartLine, LMember.EndLine,
+          LMember.EndLine - LMember.StartLine + 1]);
+      end));
   finally
     AControl.EndUpdate;
   end;
@@ -132,9 +139,15 @@ begin
     AControl.Clear;
     AControl.SetColumnHeaders(['Index', 'Member', 'Offset', 'Size', 'Mode', 'UID', 'GID', 'Timestamp']);
     AControl.SetColumnDataTypes([thdtInteger, thdtText, thdtHexadecimal, thdtHexadecimal, thdtText, thdtInteger, thdtInteger, thdtText]);
-    for var LMember in ADocument.ArchiveMembers do
-      AControl.AddColumns([IntToStr(LMember.Index), LMember.Name, LMember.RawOffset,
-        LMember.RawSize, LMember.Mode, LMember.UserId, LMember.GroupId, LMember.Timestamp]);
+    AControl.SetItemProvider(TCallbackHighlighterRowProvider.Create(
+      ADocument.ArchiveMembers.Count,
+      function(AIndex: Integer): string
+      begin
+        var LMember := ADocument.ArchiveMembers[AIndex];
+        Result := Format('%d'#9'%s'#9'%s'#9'%s'#9'%s'#9'%s'#9'%s'#9'%s',
+          [LMember.Index, LMember.Name, LMember.RawOffset, LMember.RawSize,
+           LMember.Mode, LMember.UserId, LMember.GroupId, LMember.Timestamp]);
+      end));
   finally
     AControl.EndUpdate;
   end;
@@ -150,9 +163,15 @@ begin
     AControl.Clear;
     AControl.SetColumnHeaders(['Index', 'Symbol', 'Member', 'Offset', 'Size']);
     AControl.SetColumnDataTypes([thdtInteger, thdtText, thdtText, thdtHexadecimal, thdtHexadecimal]);
-    for var LSymbol in ADocument.ArchiveSymbols do
-      AControl.AddColumns([IntToStr(LSymbol.Index), LSymbol.Name, LSymbol.MemberName,
-        LSymbol.RawMemberOffset, LSymbol.RawMemberSize]);
+    AControl.SetItemProvider(TCallbackHighlighterRowProvider.Create(
+      ADocument.ArchiveSymbols.Count,
+      function(AIndex: Integer): string
+      begin
+        var LSymbol := ADocument.ArchiveSymbols[AIndex];
+        Result := Format('%d'#9'%s'#9'%s'#9'%s'#9'%s', [LSymbol.Index,
+          LSymbol.Name, LSymbol.MemberName, LSymbol.RawMemberOffset,
+          LSymbol.RawMemberSize]);
+      end));
   finally
     AControl.EndUpdate;
   end;

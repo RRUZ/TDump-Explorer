@@ -10,6 +10,7 @@ uses
   System.TypInfo, Vcl.Graphics, Vcl.Controls, Vcl.Forms,
   Vcl.Dialogs, Vcl.StdCtrls, Winapi.ShellAPI, TDump.Explorer.Finder,
   TDump.Explorer.Parser, TDump.Explorer.Phosphor.Font, TDump.Explorer.Runner,
+  TDump.Explorer.TextSource,
   TDump.Explorer.Frame, Vcl.ComCtrls, TDump.Explorer.LogControl, Vcl.ExtCtrls,
   Vcl.TitleBarCtrls, Vcl.WinXPanels, Vcl.VirtualImageList,
   TDump.Explorer.GlassTabs, TDump.Explorer.PopupMenu, Vcl.AppEvnts;
@@ -57,6 +58,8 @@ type
     FActiveRequest: TAnalysisRequest;
     FClosing: Boolean;
     FTDumpAvailable: Boolean;
+    FTDumpToolPath: string;
+    FTDumpToolKind: TDumpToolKind;
     FPendingFiles: TQueue<TAnalysisRequest>;
     FPhosphorIcon: TPhosphorIcon;
     FEmptyStateHost: TPanel;
@@ -106,7 +109,6 @@ type
     procedure CreateEmptyState;
     function DocumentTabImageName: System.UITypes.TImageName;
     function IsTextFile(const AFileName: string): Boolean;
-    procedure PhosphorIconClick(Sender: TObject);
     procedure ProcessDroppedFile(const AFileName: string);
     procedure RemoveDocumentCard(ACard: TCard; ADeleteTab: Boolean);
     procedure ResetAnalysisProgress;
@@ -164,7 +166,6 @@ uses
 const
   CTextProbeSize = 8192;
   CReportValidationProbeSize = 64 * 1024;
-  CMaxOpenFileSize: Int64 = 100 * 1024 * 1024;
   CTitleBarHeight = 40;
   CTitleBarButtonMargin = 150;
   CTabIconSize = 16;
@@ -329,16 +330,6 @@ begin
   end;
 end;
 
-function FormatFileSize(AFileSize: Int64): string;
-begin
-  if AFileSize >= 1024 * 1024 then
-    Result := Format('%.2f MiB', [AFileSize / (1024 * 1024)])
-  else if AFileSize >= 1024 then
-    Result := Format('%.2f KiB', [AFileSize / 1024])
-  else
-    Result := Format('%d bytes', [AFileSize]);
-end;
-
 function FormatProfile(AFileSize, ATotalMilliseconds, AExecutionMilliseconds,
   AParsingMilliseconds: Int64; AReportLines: Integer): string;
 begin
@@ -347,9 +338,14 @@ begin
     LSpeed := Format('%s lines/s', [FormatFloat('#,##0',
       AReportLines * 1000.0 / AParsingMilliseconds)]);
   Result := Format('Profile: size %s | total %.3f s | TDUMP %.3f s | parse %.3f s | %s lines | %s',
-    [FormatFileSize(AFileSize), ATotalMilliseconds / 1000.0,
+    [FormatByteSize(AFileSize), ATotalMilliseconds / 1000.0,
       AExecutionMilliseconds / 1000.0, AParsingMilliseconds / 1000.0,
       FormatFloat('#,##0', AReportLines), LSpeed]);
+end;
+
+function ParserProgressPhaseName(AValue: TDumpParserProgressPhase): string;
+begin
+  Result := GetEnumName(TypeInfo(TDumpParserProgressPhase), Ord(AValue));
 end;
 
 procedure PostAnalysisProgress(AWindowHandle: HWND; AAnalysisId: Integer;
@@ -389,8 +385,9 @@ begin
     LCompletion.Free;
 end;
 
-function BuildBinaryAnalysis(const AFileName: string; AWindowHandle: HWND;
-  AAnalysisId: Integer; out AExecutionMilliseconds,
+function BuildBinaryAnalysis(const AFileName, AToolPath: string;
+  AToolKind: TDumpToolKind; AWindowHandle: HWND; AAnalysisId: Integer;
+  out AExecutionMilliseconds,
   AParsingMilliseconds: Int64;
   out AReportLines, ATDumpExitCode, ADiagnosticCount: Integer;
   out ATDumpParameters: string; out ADocument: TDumpDocument): string;
@@ -402,55 +399,36 @@ begin
   ADiagnosticCount := 0;
   ATDumpParameters := '';
   ADocument := nil;
-  var LFinder := TDumpFinder.Create;
+  if (AToolPath = '') or not FileExists(AToolPath) then
+    raise Exception.Create('No installed TDUMP or TDUMP64 executable was found.');
+
+  var LRunner := TDumpRunner.Create;
   try
-    var LInstallations := LFinder.Find;
-    try
-      var LInstallation := LFinder.FindDefault(LInstallations);
-      if LInstallation = nil then
-        raise Exception.Create('No installed TDUMP or TDUMP64 executable was found.');
-
-      var LToolKind := tkTDump32;
-      var LToolPath := LInstallation.TDumpPath;
-      if LInstallation.HasTDump64 then
+    LRunner.OnCancellationCheck := IsCurrentTaskCancellationRequested;
+    LRunner.OnProgress :=
+      procedure(APhase: TDumpParserProgressPhase; ACompletedLines,
+        ATotalLines: Integer)
       begin
-        LToolKind := tkTDump64;
-        LToolPath := LInstallation.TDump64Path;
+        PostAnalysisProgress(AWindowHandle, AAnalysisId, APhase,
+          ACompletedLines, ATotalLines);
       end;
-
-      var LRunner := TDumpRunner.Create;
-      try
-        LRunner.OnCancellationCheck := IsCurrentTaskCancellationRequested;
-        LRunner.OnProgress :=
-          procedure(APhase: TDumpParserProgressPhase; ACompletedLines,
-            ATotalLines: Integer)
-          begin
-            PostAnalysisProgress(AWindowHandle, AAnalysisId, APhase,
-              ACompletedLines, ATotalLines);
-          end;
-        var LRun := LRunner.RunAndParse(AFileName, LToolPath, LToolKind);
-        try
-          AExecutionMilliseconds := LRun.ExecutionMilliseconds;
-          AParsingMilliseconds := LRun.ParsingMilliseconds;
-          AReportLines := LRun.Document.Lines.Count;
-          ATDumpExitCode := LRun.ExitCode;
-          ADiagnosticCount := LRun.Document.Diagnostics.Count;
-          ATDumpParameters := LRun.Options;
-          Result := BuildDocumentSummary(Format('TDUMP analysis (exit code %d)',
-            [LRun.ExitCode]), LRun.Document, LRun.Options);
-          ADocument := LRun.Document;
-          LRun.Document := nil;
-        finally
-          LRun.Free;
-        end;
-      finally
-        LRunner.Free;
-      end;
+    var LRun := LRunner.RunAndParse(AFileName, AToolPath, AToolKind);
+    try
+      AExecutionMilliseconds := LRun.ExecutionMilliseconds;
+      AParsingMilliseconds := LRun.ParsingMilliseconds;
+      AReportLines := LRun.Document.Lines.Count;
+      ATDumpExitCode := LRun.ExitCode;
+      ADiagnosticCount := LRun.Document.Diagnostics.Count;
+      ATDumpParameters := LRun.Options;
+      Result := BuildDocumentSummary(Format('TDUMP analysis (exit code %d)',
+        [LRun.ExitCode]), LRun.Document, LRun.Options);
+      ADocument := LRun.Document;
+      LRun.Document := nil;
     finally
-      LInstallations.Free;
+      LRun.Free;
     end;
   finally
-    LFinder.Free;
+    LRunner.Free;
   end;
 end;
 
@@ -467,7 +445,7 @@ begin
   ADiagnosticCount := 0;
   ATDumpParameters := '';
   ADocument := nil;
-  if TFile.GetSize(AFileName) > CMaxOpenFileSize then
+  if TFile.GetSize(AFileName) > CMaxTDumpReportSize then
   begin
     Result := Format('%s exceeds the 100 MB file limit.', [AFileName]);
     Exit;
@@ -479,18 +457,36 @@ begin
     Exit;
   end;
 
+  var LLastPhase := ppPreparing;
+  var LLastCompletedLines := 0;
+  var LLastTotalLines := 0;
   var LParser := TDumpParser.Create;
   try
     LParser.OnProgress :=
       procedure(APhase: TDumpParserProgressPhase; ACompletedLines,
         ATotalLines: Integer)
       begin
+        LLastPhase := APhase;
+        LLastCompletedLines := ACompletedLines;
+        LLastTotalLines := ATotalLines;
         CheckCurrentTaskCancellation;
         PostAnalysisProgress(AWindowHandle, AAnalysisId, APhase,
           ACompletedLines, ATotalLines);
-    end;
+      end;
     var LParseStopwatch := TStopwatch.StartNew;
-    ADocument := LParser.ParseFile(AFileName);
+    try
+      ADocument := LParser.ParseFile(AFileName);
+    except
+      on LException: Exception do
+      begin
+        LParseStopwatch.Stop;
+        AParsingMilliseconds := LParseStopwatch.ElapsedMilliseconds;
+        raise Exception.CreateFmt('%s: %s (parser phase %s, line %d of %d)',
+          [LException.ClassName, LException.Message,
+            ParserProgressPhaseName(LLastPhase), LLastCompletedLines,
+            LLastTotalLines]);
+      end;
+    end;
     try
       LParseStopwatch.Stop;
       AParsingMilliseconds := LParseStopwatch.ElapsedMilliseconds;
@@ -509,6 +505,8 @@ end;
 
 procedure TFrmMain.ApplyTheme;
 begin
+  EnableImmersiveDarkMode(not IsLightThemeActive);
+
   var LTheme := TExplorerTheme.ActiveTheme;
   var LPalette := ExplorerTabPalette(LTheme);
   Color := LTheme.BackgroundColor;
@@ -1045,6 +1043,8 @@ end;
 procedure TFrmMain.CheckTDumpAvailability;
 begin
   FTDumpAvailable := False;
+  FTDumpToolPath := '';
+  FTDumpToolKind := tkTDump32;
   LogControl1.Add('Checking TDUMP availability...');
   try
     var LFinder := TDumpFinder.Create;
@@ -1058,17 +1058,20 @@ begin
           Exit;
         end;
 
-        var LToolPath := LInstallation.TDumpPath;
+        FTDumpToolPath := LInstallation.TDumpPath;
         if LInstallation.HasTDump64 then
-          LToolPath := LInstallation.TDump64Path;
-        FTDumpAvailable := FileExists(LToolPath);
+        begin
+          FTDumpToolPath := LInstallation.TDump64Path;
+          FTDumpToolKind := tkTDump64;
+        end;
+        FTDumpAvailable := FileExists(FTDumpToolPath);
         if not FTDumpAvailable then
         begin
           LogControl1.Add('TDUMP was not found.', letError);
           Exit;
         end;
-        var LMessage := 'TDUMP available: ' + LToolPath;
-        var LVersion := GetTDumpVersion(LToolPath);
+        var LMessage := 'TDUMP available: ' + FTDumpToolPath;
+        var LVersion := GetTDumpVersion(FTDumpToolPath);
         if LVersion <> '' then
           LMessage := LMessage + ' (version ' + LVersion + ')';
         if LInstallation.StudioVersion <> '' then
@@ -1094,6 +1097,8 @@ begin
   var LAnalysisId := FAnalysisId;
   var LInputFileName := ARequest.FileName;
   var LKind := ARequest.Kind;
+  var LToolPath := FTDumpToolPath;
+  var LToolKind := FTDumpToolKind;
   var LWindowHandle := Handle;
   FCurrentFileProgress := 0;
   UpdateOverallProgress;
@@ -1102,20 +1107,22 @@ begin
     procedure
     begin
       var LDocument: TDumpDocument := nil;
+      var LFileSize: Int64 := 0;
+      var LExecutionMilliseconds: Int64 := 0;
+      var LParsingMilliseconds: Int64 := 0;
+      var LReportLines := 0;
+      var LTdumpExitCode := 0;
+      var LDiagnosticCount := 0;
+      var LTdumpParameters := '';
+      var LTotalStopwatch := TStopwatch.StartNew;
       try
         var LSummary := '';
-        var LFileSize := TFile.GetSize(LInputFileName);
-        var LExecutionMilliseconds: Int64 := 0;
-        var LParsingMilliseconds: Int64 := 0;
-        var LReportLines := 0;
-        var LTdumpExitCode := 0;
-        var LDiagnosticCount := 0;
-        var LTdumpParameters := '';
-        var LTotalStopwatch := TStopwatch.StartNew;
+        LFileSize := TFile.GetSize(LInputFileName);
         case LKind of
           akBinary:
-            LSummary := BuildBinaryAnalysis(LInputFileName, LWindowHandle,
-              LAnalysisId, LExecutionMilliseconds, LParsingMilliseconds,
+            LSummary := BuildBinaryAnalysis(LInputFileName, LToolPath,
+              LToolKind, LWindowHandle, LAnalysisId, LExecutionMilliseconds,
+              LParsingMilliseconds,
               LReportLines, LTdumpExitCode, LDiagnosticCount,
               LTdumpParameters, LDocument);
           akReport:
@@ -1133,11 +1140,14 @@ begin
       except
         on LException: Exception do
         begin
+          LTotalStopwatch.Stop;
           LDocument.Free;
           PostAnalysisCompletion(LWindowHandle, LAnalysisId, False,
             Format('Unable to process %s'#13#10'%s: %s', [LInputFileName,
-              LException.ClassName, LException.Message]), 0, 0, 0, 0, 0,
-            0, 0, '', nil);
+              LException.ClassName, LException.Message]), LFileSize,
+            LTotalStopwatch.ElapsedMilliseconds, LExecutionMilliseconds,
+            LParsingMilliseconds, LReportLines, LTdumpExitCode,
+            LDiagnosticCount, LTdumpParameters, nil);
         end;
       end;
     end);
@@ -1197,7 +1207,11 @@ begin
   else
     LogControl1.Add('TDUMP parameters: unavailable (pre-generated report)');
   if not ASucceeded then
+  begin
     LogControl1.Add('Failed: ' + FActiveRequest.FileName, letError);
+    LogControl1.Add('Error details: ' + StringReplace(ASummary, #13#10,
+      ' | ', [rfReplaceAll]), letError);
+  end;
   if ASucceeded and (FActiveRequest.Kind = akBinary) then
   begin
     if ATDumpExitCode <> 0 then
@@ -1297,20 +1311,6 @@ begin
     Result := True;
   finally
     LStream.Free;
-  end;
-end;
-
-procedure TFrmMain.PhosphorIconClick(Sender: TObject);
-begin
-  if FPhosphorIcon.Weight = pfwRegular then
-  begin
-    FPhosphorIcon.Weight := pfwDuotone;
-    Caption := 'TDump Explorer - Phosphor Duotone';
-  end
-  else
-  begin
-    FPhosphorIcon.Weight := pfwRegular;
-    Caption := 'TDump Explorer - Phosphor Regular';
   end;
 end;
 
@@ -1524,7 +1524,7 @@ begin
   var LExpandedFileName := ExpandFileName(AFileName);
   var LKind: TAnalysisKind;
   try
-    if TFile.GetSize(LExpandedFileName) > CMaxOpenFileSize then
+    if TFile.GetSize(LExpandedFileName) > CMaxTDumpReportSize then
     begin
       LogControl1.Add(Format('%s exceeds the 100 MB file limit.',
         [LExpandedFileName]), letWarning);

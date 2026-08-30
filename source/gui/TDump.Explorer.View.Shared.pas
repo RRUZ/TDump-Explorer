@@ -30,7 +30,7 @@ type
     tdkDataDirectories, tdkObjectTable, tdkImportDirectory,
     tdkImportModule, tdkDelayedImportTable, tdkDelayedImportModule,
     tdkExportDirectory, tdkResourceDirectory,
-    tdkResource, tdkBorlandSubsection, tdkBorlandSourceFile,
+    tdkResource, tdkBorlandSymbolTable, tdkBorlandSubsection, tdkBorlandSourceFile,
     tdkBorlandAlignSymbolRecord, tdkBorlandGlobalSymbolRecord,
     tdkBorlandGlobalTypeRecord, tdkMachHeader, tdkMachArchitectures,
     tdkMachArchitecture, tdkMachLoadCommands, tdkMachLoadCommand,
@@ -63,6 +63,7 @@ const
     (Caption: 'Export Directory'; ImageName: 'arrow-square-left'),
     (Caption: 'Resources'; ImageName: 'archive'),
     (Caption: 'Resource'; ImageName: ''),
+    (Caption: 'Borland 32-bit Symbol Table'; ImageName: 'package'),
     (Caption: 'Borland Subsection'; ImageName: 'package'),
     (Caption: 'Source File'; ImageName: 'file-code'),
     (Caption: 'Alignment Symbol'; ImageName: ''),
@@ -114,6 +115,8 @@ type
     RelocationBlock: TDumpRelocationBlock;
     ELFRelocationSectionName: string;
     DetailItemIndex: Integer;
+    SourceStartLine: Integer;
+    SourceEndLine: Integer;
   end;
 
 function PropertyValue(const AProperties: TList<TDumpProperty>;
@@ -133,6 +136,7 @@ type
     function HeaderDetailKind(const AHeader: TDumpHeader): TTreeDetailKind;
     function HasBorlandSymbolTable(ADocument: TDumpDocument): Boolean;
     function ResourceCaption(const AResource: TDumpResource): string;
+    procedure CacheSourceSpans(ADocument: TDumpDocument);
     procedure AddPENodes(AParent: PVirtualNode; ADocument: TDumpDocument);
     procedure AddELFNodes(AParent: PVirtualNode; ADocument: TDumpDocument);
     procedure AddOMFNodes(AParent: PVirtualNode; ADocument: TDumpDocument);
@@ -272,12 +276,25 @@ begin
     var LBuilder := TDocumentTreeBuilder.Create(ATree);
     try
       var LRootNode := LBuilder.Build(ADocument);
+      LBuilder.CacheSourceSpans(ADocument);
       ATree.Expanded[LRootNode] := True;
     finally
       LBuilder.Free;
     end;
   finally
     ATree.EndUpdate;
+  end;
+end;
+
+procedure TDocumentTreeBuilder.CacheSourceSpans(ADocument: TDumpDocument);
+begin
+  var LNode := FTree.GetFirst;
+  while LNode <> nil do
+  begin
+    var LData := PTreeItemData(FTree.GetNodeData(LNode));
+    TDocumentSourceNavigation.Resolve(ADocument, LData,
+      LData.SourceStartLine, LData.SourceEndLine);
+    LNode := FTree.GetNext(LNode);
   end;
 end;
 
@@ -398,17 +415,20 @@ begin
 
   var LRelocationsNode := AddNode(AParent, Format('Relocations [%d entries]',
     [ADocument.ELFRelocations.Count]), tdkELFRelocations);
-  var LSections := TList<string>.Create;
+  var LSectionCounts := TDictionary<string, Integer>.Create;
+  var LSectionOrder := TList<string>.Create;
   try
     for var LRelocation in ADocument.ELFRelocations do
-      if LSections.IndexOf(LRelocation.SectionName) < 0 then
-        LSections.Add(LRelocation.SectionName);
-    for var LSectionName in LSections do
     begin
       var LEntryCount := 0;
-      for var LRelocation in ADocument.ELFRelocations do
-        if SameText(LRelocation.SectionName, LSectionName) then
-          Inc(LEntryCount);
+      if not LSectionCounts.TryGetValue(LRelocation.SectionName, LEntryCount) then
+        LSectionOrder.Add(LRelocation.SectionName);
+      LSectionCounts.AddOrSetValue(LRelocation.SectionName, LEntryCount + 1);
+    end;
+    for var LSectionName in LSectionOrder do
+    begin
+      var LEntryCount: Integer;
+      LSectionCounts.TryGetValue(LSectionName, LEntryCount);
       var LSectionNode := AddNode(LRelocationsNode,
         Format('%s [%d entries]', [LSectionName, LEntryCount]),
         tdkELFRelocations);
@@ -416,7 +436,8 @@ begin
         .ELFRelocationSectionName := LSectionName;
     end;
   finally
-    LSections.Free;
+    LSectionOrder.Free;
+    LSectionCounts.Free;
   end;
 end;
 
@@ -518,7 +539,7 @@ begin
     Exit;
   var LBorlandNode := AddNode(AParent, Format(
     'Borland 32-bit Symbol Table [%d subsections]',
-    [ADocument.BorlandSubsections.Count]));
+    [ADocument.BorlandSubsections.Count]), tdkBorlandSymbolTable);
   for var LIndex := 0 to ADocument.BorlandSubsections.Count - 1 do
   begin
     var LSubsection := ADocument.BorlandSubsections[LIndex];
@@ -710,6 +731,12 @@ begin
   AEndLine := 0;
   if (ADocument = nil) or (AData = nil) then
     Exit;
+  if AData.SourceStartLine > 0 then
+  begin
+    AStartLine := AData.SourceStartLine;
+    AEndLine := Max(AStartLine, AData.SourceEndLine);
+    Exit;
+  end;
   case AData.DetailKind of
     tdkDocumentSummary:
       UseSpan(1, ADocument.Lines.Count);
@@ -851,6 +878,8 @@ begin
           ExtendRange(LFirst, LLast, LItem.StartLine, LItem.StartLine);
         if LFirst = MaxInt then UseNodeKind(nkLibrary) else UseSpan(LFirst, LLast);
       end;
+    tdkBorlandSymbolTable:
+      UseNodeKind(nkSymbols);
     tdkBorlandSubsection:
       if (AData.BorlandSubsectionIndex >= 0) and
         (AData.BorlandSubsectionIndex < ADocument.BorlandSubsections.Count) then

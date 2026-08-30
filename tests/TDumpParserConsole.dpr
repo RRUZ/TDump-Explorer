@@ -4,8 +4,9 @@ program TDumpParserConsole;
 
 uses
   System.SysUtils,
+  TDump.Explorer.TextSource in '..\source\parser\TDump.Explorer.TextSource.pas',
   TDump.Explorer.Parser in '..\source\parser\TDump.Explorer.parser.pas',
-  TDump.Explorer.Utils in '..\source\parser\TDump.Explorer.Utils.pas';
+  TDump.Explorer.Utils in '..\source\common\TDump.Explorer.Utils.pas';
 
 procedure DumpHeader(const AHeader: TDumpHeader);
 begin
@@ -263,9 +264,7 @@ begin
     begin
       var LRecord := LSection.Records[LRecordIndex];
       Writeln('    Record lines: ', LRecord.StartLine, '..', LRecord.EndLine);
-      // The record node is the authoritative lossless source for this content.
-      Writeln('      ', StringReplace(LRecord.Node.RawText, sLineBreak,
-        sLineBreak + '      ', [rfReplaceAll]));
+      Writeln('      ', ADocument.TextSource[LRecord.StartLine - 1]);
     end;
   end;
   Writeln;
@@ -279,14 +278,12 @@ begin
     var LSection := ADocument.GlobalSymbolSections[LIndex];
     Writeln('  sstGlobalSym records: ', LSection.Records.Count);
     Writeln('    Header fields: ', LSection.Properties.Count);
-    Writeln('    ', StringReplace(LSection.Node.RawText, sLineBreak,
-      sLineBreak + '    ', [rfReplaceAll]));
+    Writeln('    ', ADocument.TextSource[LSection.StartLine - 1]);
     for var LRecordIndex := 0 to LSection.Records.Count - 1 do
     begin
       var LRecord := LSection.Records[LRecordIndex];
       Writeln('    Record lines: ', LRecord.StartLine, '..', LRecord.EndLine);
-      Writeln('      ', StringReplace(LRecord.Node.RawText, sLineBreak,
-        sLineBreak + '      ', [rfReplaceAll]));
+      Writeln('      ', ADocument.TextSource[LRecord.StartLine - 1]);
     end;
   end;
   Writeln;
@@ -299,8 +296,7 @@ begin
   begin
     var LSection := ADocument.GlobalTypeSections[LIndex];
     Writeln('  sstGlobalTypes records: ', LSection.Records.Count);
-    Writeln('    ', StringReplace(LSection.Node.RawText, sLineBreak,
-      sLineBreak + '    ', [rfReplaceAll]));
+    Writeln('    ', ADocument.TextSource[LSection.StartLine - 1]);
     for var LRecordIndex := 0 to LSection.Records.Count - 1 do
     begin
       var LRecord := LSection.Records[LRecordIndex];
@@ -310,8 +306,7 @@ begin
         '  Details: ', LRecord.Details.Count);
       if LRecord.ResolvedName <> '' then
         Writeln('      Name ID ', LRecord.RawNameIndex, ': ', LRecord.ResolvedName);
-      Writeln('      ', StringReplace(LRecord.Node.RawText, sLineBreak,
-        sLineBreak + '      ', [rfReplaceAll]));
+      Writeln('      ', ADocument.TextSource[LRecord.StartLine - 1]);
     end;
   end;
   Writeln;
@@ -374,13 +369,8 @@ begin
       try
         Writeln('Source: ', LDocument.SourceFileName);
         Writeln('TDUMP version: ', LDocument.ToolVersion);
-        Writeln('Raw lines: ', RawLineCount(LDocument.RawText));
+        Writeln('Raw lines: ', LDocument.TextSource.LineCount);
         Writeln('Typed source lines: ', LDocument.Lines.Count);
-        var LUnclassifiedLineCount := 0;
-        for var LLine in LDocument.Lines do
-          if (LLine.Kind = tlkText) or (LLine.Kind = tlkUnknown) then
-            Inc(LUnclassifiedLineCount);
-        Writeln('Unclassified typed lines: ', LUnclassifiedLineCount);
         Writeln('Generic nodes: ', LDocument.Nodes.Count);
         Writeln('Headers: ', LDocument.Headers.Count);
         Writeln('Sections: ', LDocument.Sections.Count);

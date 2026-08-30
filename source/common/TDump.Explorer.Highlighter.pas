@@ -29,6 +29,7 @@ type
   TTinyHighlighter = class
   private
     FParser: TTinyParser;
+    FTokens: TTinyTokenList;
     function FitText(ACanvas: TCanvas; const AText: string; AMaximumWidth: Integer;
       ATextFormat: TTextFormat): string;
     function TokenColor(ATokenKind: TTinyTokenKind;
@@ -67,10 +68,12 @@ constructor TTinyHighlighter.Create;
 begin
   inherited Create;
   FParser := TTinyParser.Create;
+  FTokens := TTinyTokenList.Create;
 end;
 
 destructor TTinyHighlighter.Destroy;
 begin
+  FTokens.Free;
   FParser.Free;
   inherited;
 end;
@@ -90,10 +93,18 @@ begin
     Result := '';
     Exit;
   end;
-  while (Result <> '') and
-    (ACanvas.TextWidth(Result + CEllipsis) > AMaximumWidth) do
-    Delete(Result, Length(Result), 1);
-  Result := Result + CEllipsis;
+  var LLow := 0;
+  var LHigh := Length(AText);
+  while LLow < LHigh do
+  begin
+    var LMiddle := LLow + ((LHigh - LLow + 1) div 2);
+    if ACanvas.TextWidth(Copy(AText, 1, LMiddle) + CEllipsis) <=
+      AMaximumWidth then
+      LLow := LMiddle
+    else
+      LHigh := LMiddle - 1;
+  end;
+  Result := Copy(AText, 1, LLow) + CEllipsis;
 end;
 
 procedure TTinyHighlighter.TextRect(ACanvas: TCanvas; const ARect: TRect;
@@ -102,12 +113,11 @@ procedure TTinyHighlighter.TextRect(ACanvas: TCanvas; const ARect: TRect;
   ADataType: TTinyHighlightDataType);
 begin
   var LText := FitText(ACanvas, AText, ARect.Right - AX, ATextFormat);
-  var LTokens: TTinyTokenList;
+  FTokens.Clear;
   if ADataType = thdtAuto then
-    LTokens := FParser.Tokenize(LText, AParserMode)
+    FParser.Tokenize(LText, AParserMode, FTokens)
   else
   begin
-    LTokens := TTinyTokenList.Create;
     var LToken: TTinyToken;
     LToken.StartIndex := 1;
     LToken.Length := Length(LText);
@@ -125,7 +135,7 @@ begin
     else
       LToken.Kind := ttkString;
     end;
-    LTokens.Add(LToken);
+    FTokens.Add(LToken);
   end;
   var LOriginalFontColor := ACanvas.Font.Color;
   var LOriginalBrushStyle := ACanvas.Brush.Style;
@@ -136,7 +146,7 @@ begin
         ARect.Bottom);
     ACanvas.Brush.Style := bsClear;
     var LX := AX;
-    for var LToken in LTokens do
+    for var LToken in FTokens do
     begin
       ACanvas.Font.Color := TokenColor(LToken.Kind, ATheme);
       ACanvas.TextOut(LX, AY, LToken.Text);
@@ -147,7 +157,6 @@ begin
       RestoreDC(ACanvas.Handle, LSavedDeviceContext);
     ACanvas.Font.Color := LOriginalFontColor;
     ACanvas.Brush.Style := LOriginalBrushStyle;
-    LTokens.Free;
   end;
 end;
 

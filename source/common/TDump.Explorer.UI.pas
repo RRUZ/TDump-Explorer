@@ -58,11 +58,29 @@ procedure DrawSelectionBar(const Canvas: TCanvas; const ARect: TRect; FillColor,
 procedure DrawSplitterLine(const ACanvas: TCanvas; const ARect: TRect; AIsVertical: Boolean; AColor: TColor);
 function IsWindows11: Boolean;
 function IsLightThemeActive: Boolean;
+function FormatByteSize(AByteCount: Int64): string;
 
 implementation
 
 uses
   Winapi.Windows, Vcl.GraphUtil, Winapi.GDIPAPI, Winapi.GDIPOBJ, System.SysUtils, Vcl.Themes;
+
+function FormatByteSize(AByteCount: Int64): string;
+const
+  CUnits: array[0..4] of string = ('B', 'KiB', 'MiB', 'GiB', 'TiB');
+begin
+  var LSize := AByteCount * 1.0;
+  var LUnitIndex := 0;
+  while (Abs(LSize) >= 1024.0) and (LUnitIndex < High(CUnits)) do
+  begin
+    LSize := LSize / 1024.0;
+    Inc(LUnitIndex);
+  end;
+  if LUnitIndex = 0 then
+    Result := Format('%d %s', [AByteCount, CUnits[LUnitIndex]])
+  else
+    Result := Format('%.2f %s', [LSize, CUnits[LUnitIndex]]);
+end;
 
 function IsLightThemeActive: Boolean;
 begin

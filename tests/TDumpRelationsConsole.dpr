@@ -5,6 +5,7 @@ program TDumpRelationsConsole;
 uses
   System.SysUtils,
   System.StrUtils,
+  TDump.Explorer.TextSource in '..\source\parser\TDump.Explorer.TextSource.pas',
   TDump.Explorer.Parser in '..\source\parser\TDump.Explorer.Parser.pas',
   TDump.Explorer.Relations in '..\source\common\TDump.Explorer.Relations.pas';
 

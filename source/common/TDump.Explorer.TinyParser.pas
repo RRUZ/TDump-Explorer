@@ -79,7 +79,9 @@ type
       const AText: string; AStartIndex, AEndIndex: Integer);
   public
     function Tokenize(const AText: string;
-      AMode: TTinyParserMode = tpmTDumpValues): TTinyTokenList;
+      AMode: TTinyParserMode = tpmTDumpValues): TTinyTokenList; overload;
+    procedure Tokenize(const AText: string; AMode: TTinyParserMode;
+      AResult: TTinyTokenList); overload;
   end;
 
 implementation
@@ -188,6 +190,13 @@ function TTinyParser.Tokenize(const AText: string;
   AMode: TTinyParserMode): TTinyTokenList;
 begin
   Result := TTinyTokenList.Create;
+  Tokenize(AText, AMode, Result);
+end;
+
+procedure TTinyParser.Tokenize(const AText: string; AMode: TTinyParserMode;
+  AResult: TTinyTokenList);
+begin
+  AResult.Clear;
   var LIndex := 1;
   while LIndex <= Length(AText) do
   begin
@@ -198,14 +207,14 @@ begin
       repeat
         Inc(LIndex);
       until (LIndex > Length(AText)) or not CharInSet(AText[LIndex], [#0..#32]);
-      AddToken(Result, ttkWhitespace, AText, LStartIndex, LIndex);
+      AddToken(AResult, ttkWhitespace, AText, LStartIndex, LIndex);
       Continue;
     end;
 
     var LEndIndex := 0;
     if TryReadQuotedString(AText, LIndex, LEndIndex) then
     begin
-      AddToken(Result, ttkStringLiteral, AText, LStartIndex, LEndIndex);
+      AddToken(AResult, ttkStringLiteral, AText, LStartIndex, LEndIndex);
       LIndex := LEndIndex;
       Continue;
     end;
@@ -215,36 +224,36 @@ begin
       LMethodEndIndex, LEndIndex) then
     begin
       if LStartIndex < LMethodStartIndex then
-        AddToken(Result, ttkNamespace, AText, LStartIndex, LMethodStartIndex);
-      AddToken(Result, ttkMethodName, AText, LMethodStartIndex,
+        AddToken(AResult, ttkNamespace, AText, LStartIndex, LMethodStartIndex);
+      AddToken(AResult, ttkMethodName, AText, LMethodStartIndex,
         LMethodEndIndex);
       if LMethodEndIndex < LEndIndex then
-        AddToken(Result, ttkMangledSignature, AText, LMethodEndIndex,
+        AddToken(AResult, ttkMangledSignature, AText, LMethodEndIndex,
           LEndIndex);
       LIndex := LEndIndex;
       Continue;
     end;
     if TryReadDateTime(AText, LIndex, LEndIndex) then
     begin
-      AddToken(Result, ttkDateTime, AText, LStartIndex, LEndIndex);
+      AddToken(AResult, ttkDateTime, AText, LStartIndex, LEndIndex);
       LIndex := LEndIndex;
       Continue;
     end;
     if TryReadDate(AText, LIndex, LEndIndex) then
     begin
-      AddToken(Result, ttkDate, AText, LStartIndex, LEndIndex);
+      AddToken(AResult, ttkDate, AText, LStartIndex, LEndIndex);
       LIndex := LEndIndex;
       Continue;
     end;
     if TryReadTime(AText, LIndex, LEndIndex) then
     begin
-      AddToken(Result, ttkTime, AText, LStartIndex, LEndIndex);
+      AddToken(AResult, ttkTime, AText, LStartIndex, LEndIndex);
       LIndex := LEndIndex;
       Continue;
     end;
     if TryReadHexadecimal(AText, LIndex, LEndIndex) then
     begin
-      AddToken(Result, ttkHexadecimal, AText, LStartIndex, LEndIndex);
+      AddToken(AResult, ttkHexadecimal, AText, LStartIndex, LEndIndex);
       LIndex := LEndIndex;
       Continue;
     end;
@@ -252,7 +261,7 @@ begin
     var LNumberKind := ttkInteger;
     if TryReadNumber(AText, LIndex, LEndIndex, LNumberKind) then
     begin
-      AddToken(Result, LNumberKind, AText, LStartIndex, LEndIndex);
+      AddToken(AResult, LNumberKind, AText, LStartIndex, LEndIndex);
       LIndex := LEndIndex;
       Continue;
     end;
@@ -262,7 +271,7 @@ begin
       repeat
         Inc(LIndex);
       until (LIndex > Length(AText)) or not IsIdentifierCharacter(AText[LIndex]);
-      AddToken(Result, ttkString, AText, LStartIndex, LIndex);
+      AddToken(AResult, ttkString, AText, LStartIndex, LIndex);
       Continue;
     end;
 
@@ -271,15 +280,15 @@ begin
       repeat
         Inc(LIndex);
       until (LIndex > Length(AText)) or not IsIdentifierCharacter(AText[LIndex]);
-      AddToken(Result, ttkString, AText, LStartIndex, LIndex);
+      AddToken(AResult, ttkString, AText, LStartIndex, LIndex);
       Continue;
     end;
 
     Inc(LIndex);
-    AddToken(Result, ttkSymbol, AText, LStartIndex, LIndex);
+    AddToken(AResult, ttkSymbol, AText, LStartIndex, LIndex);
   end;
   if AMode = tpmCppBuilderMethod then
-    ApplyCppBuilderMethodMode(Result);
+    ApplyCppBuilderMethodMode(AResult);
 end;
 
 class function TTinyParser.TryReadDate(const AText: string;

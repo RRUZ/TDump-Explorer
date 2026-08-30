@@ -18,7 +18,8 @@ uses
   System.SysUtils,
   System.StrUtils,
   System.Classes,
-  System.Generics.Collections;
+  System.Generics.Collections,
+  TDump.Explorer.TextSource;
 
 function IsTDumpReport(const AText: string): Boolean;
 function IsTDumpBinaryFile(const AFileName: string): Boolean;
@@ -60,7 +61,6 @@ type
   TDumpGlobalTypeRecord = class;
   TDumpGlobalTypeMember = class;
   TDumpGlobalTypeDetail = class;
-  TDumpLine = class;
   TDumpNode = class;
   TDumpBorlandSymbolRecord = class;
   TDumpMachSection = class;
@@ -79,6 +79,47 @@ type
     EndLine: Integer;
     SyntaxHint: TDumpRawSyntaxHint;
     function IsValid: Boolean;
+  end;
+
+  // Compact, transient description of one source line. The report text and
+  // line starts remain owned by TDumpTextSource; no object is allocated here.
+  TDumpLine = record
+    LineNumber: Integer;
+    Indent: Integer;
+    Kind: TDumpLineKind;
+    SourceSpan: TDumpSourceSpan;
+  end;
+
+  TDumpLineCatalog = class;
+
+  TDumpLineEnumerator = class
+  private
+    FCatalog: TDumpLineCatalog;
+    FIndex: Integer;
+    function GetCurrent: TDumpLine;
+  public
+    constructor Create(ACatalog: TDumpLineCatalog);
+    function MoveNext: Boolean;
+    property Current: TDumpLine read GetCurrent;
+  end;
+
+  // Presents the legacy Lines contract without retaining a model per line.
+  // Only exceptional syntax hints are stored in the sparse dictionary.
+  TDumpLineCatalog = class
+  private
+    FSource: TDumpTextSource;
+    FRun: TDumpRun;
+    FSyntaxHints: TDictionary<Integer, TDumpRawSyntaxHint>;
+    function GetCount: Integer;
+    function GetLine(AIndex: Integer): TDumpLine;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    procedure Bind(ASource: TDumpTextSource; ARun: TDumpRun);
+    procedure SetSyntaxHint(AIndex: Integer; AHint: TDumpRawSyntaxHint);
+    function GetEnumerator: TDumpLineEnumerator;
+    property Count: Integer read GetCount;
+    property Items[AIndex: Integer]: TDumpLine read GetLine; default;
   end;
 
   // Captures one parsed TDUMP invocation. A document owns its runs and may later
@@ -131,20 +172,6 @@ type
     SourceSpan: TDumpSourceSpan;
   end;
 
-  // Provides the typed lexical projection of one physical source line.
-  // RawText remains document-owned; this model stores tokens and properties only.
-  TDumpLine = class
-  public
-    LineNumber: Integer;
-    Indent: Integer;
-    Kind: TDumpLineKind;
-    Tokens: TList<string>;
-    Properties: TList<TDumpProperty>;
-    SourceSpan: TDumpSourceSpan;
-    constructor Create;
-    destructor Destroy; override;
-  end;
-
   // Identifies one entry in the Borland subsection directory.
   // Both normalized offsets and their original hexadecimal text are retained.
   TDumpSymbolSubsection = record
@@ -195,8 +222,8 @@ type
     SourceSpan: TDumpSourceSpan;
   end;
 
-  // Forms the generic, hierarchical TDUMP document tree.
-  // Specialized models reference nodes while nodes own child structure and raw text.
+  // Forms the generic, hierarchical TDUMP document tree. Source text remains
+  // in the document text source and is addressed through StartLine/EndLine.
   TDumpNode = class
   public
     Kind: TDumpNodeKind;
@@ -206,7 +233,6 @@ type
     SourceSpan: TDumpSourceSpan;
     Properties: TList<TDumpProperty>;
     Children: TObjectList<TDumpNode>;
-    RawText: string;
     constructor Create;
     destructor Destroy; override;
   end;
@@ -759,7 +785,6 @@ type
     ScopeParent: TDumpBorlandSymbolRecord;
     ScopeChildren: TList<TDumpBorlandSymbolRecord>;
     HeaderLine: TDumpLine;
-    DetailLines: TList<TDumpLine>;
     ScopeDepth: Integer;
     StartLine: Integer;
     EndLine: Integer;
@@ -869,7 +894,6 @@ type
     Members: TObjectList<TDumpGlobalTypeMember>;
     Details: TObjectList<TDumpGlobalTypeDetail>;
     HeaderLine: TDumpLine;
-    DetailLines: TList<TDumpLine>;
     Node: TDumpNode;
     StartLine: Integer;
     EndLine: Integer;
@@ -956,6 +980,14 @@ type
 
   TDumpMergeConflictKind = (mckSourceText, mckToolDialect);
 
+  // First-occurrence catalog built in one pass over the mapped report. Parsers
+  // use these offsets instead of independently rescanning every report line.
+  TDumpLineMarker = (lmOldExecutableHeader, lmPortableExecutableHeader,
+    lmObjectTable, lmImportSection, lmCompactImport, lmExportSection,
+    lmCompactExport, lmResourceSection, lmFixupTable, lmRelocationBlock,
+    lmBorlandSymbols, lmOMFObject, lmARArchive, lmMachHeader, lmELFHeader,
+    lmCOFFDiagnostic, lmDelphiUnitDiagnostic);
+
   // A non-owning aggregate over independently parsed documents. Its lifetime
   // is bounded by the supplied documents; it never copies raw TDUMP text.
   TDumpDocumentMerge = class
@@ -979,6 +1011,10 @@ type
   // Owns the complete parsed TDUMP result and its lossless original text.
   // Specialized collections project supported data while diagnostics report tolerance issues.
   TDumpDocument = class
+  private
+    FRawText: string;
+    function GetRawText: string;
+    procedure SetRawText(const AValue: string);
   public
     SourceFileName: string;
     ToolKind: TDumpToolKind;
@@ -989,10 +1025,10 @@ type
     PackageDescription: string;
     FileKind: TDumpFileKind;
     Architecture: string;
-    RawText: string;
+    TextSource: TDumpTextSource;
     Runs: TObjectList<TDumpRun>;
     PrimaryRun: TDumpRun;
-    Lines: TObjectList<TDumpLine>;
+    Lines: TDumpLineCatalog;
     Headers: TObjectList<TDumpHeader>;
     DataDirectories: TList<TDumpDataDirectory>;
     Sections: TObjectList<TDumpSection>;
@@ -1035,6 +1071,8 @@ type
     Nodes: TObjectList<TDumpNode>;
     Diagnostics: TList<TDumpDiagnostic>;
     UnsupportedStructures: TObjectList<TDumpUnsupportedStructure>;
+    BorlandIndexOnly: Boolean;
+    property RawText: string read GetRawText write SetRawText;
     constructor Create;
     destructor Destroy; override;
     function MergeWith(AOther: TDumpDocument): TDumpDocumentMerge;
@@ -1044,11 +1082,12 @@ type
   // Individual malformed rows remain recoverable through diagnostics and generic models.
   TDumpParser = class
   private
-    FLines: TStringList;
+    FLines: TDumpTextSource;
     FDocument: TDumpDocument;
     FOnProgress: TDumpParserProgressEvent;
     FLastProgressPhase: TDumpParserProgressPhase;
     FLastProgressLine: Integer;
+    FMarkerLines: array[TDumpLineMarker] of Integer;
     function AddNode(AKind: TDumpNodeKind; const ATitle: string;
       AStartLine, AEndLine: Integer): TDumpNode;
     procedure AddDiagnostic(ASeverity: TDumpDiagnosticSeverity;
@@ -1074,6 +1113,7 @@ type
     procedure ParseResourceSection;
     procedure ParseRelocationSection;
     procedure ParseBorlandSymbolTable;
+    procedure ParseBorlandSymbolIndex;
     procedure BuildDebugInformation;
     procedure ParseStrings;
     procedure ParseOMF;
@@ -1143,6 +1183,9 @@ type
       write FOnProgress;
     function ParseText(const AText: string; const ASourceFileName: string = ''): TDumpDocument;
     function ParseFile(const AFileName: string): TDumpDocument;
+    // Transfers ownership of ASource to the returned document.
+    function ParseSource(ASource: TDumpTextSource;
+      const ASourceFileName: string): TDumpDocument;
   end;
 
 
@@ -1153,6 +1196,7 @@ function BorlandTypeCaption(const ARecord: TDumpGlobalTypeRecord): string;
 implementation
 
 const
+  CBorlandIndexedLineThreshold = 250000;
   SOldExecutableHeader = 'Old Executable Header';
   SPortableExecutableHeader = 'Portable Executable (PE) File';
   SGlobalSymbolHeaderLabels: array[0..8] of string = ('cbSymbols:',
@@ -1242,18 +1286,23 @@ end;
 
 function NormalizeTDumpHeading(const AText: string): string;
 begin
-  Result := '';
-  var LPendingSpace := False;
-  for var LCharacter in Trim(AText) do
-    if CharInSet(LCharacter, ['A'..'Z', 'a'..'z', '0'..'9']) then
-    begin
-      if LPendingSpace and (Result <> '') then
-        Result := Result + ' ';
-      Result := Result + LowerCase(LCharacter);
-      LPendingSpace := False;
-    end
-    else
-      LPendingSpace := True;
+  var LBuilder := TStringBuilder.Create;
+  try
+    var LPendingSpace := False;
+    for var LCharacter in Trim(AText) do
+      if CharInSet(LCharacter, ['A'..'Z', 'a'..'z', '0'..'9']) then
+      begin
+        if LPendingSpace and (LBuilder.Length > 0) then
+          LBuilder.Append(' ');
+        LBuilder.Append(LowerCase(LCharacter));
+        LPendingSpace := False;
+      end
+      else
+        LPendingSpace := True;
+    Result := LBuilder.ToString;
+  finally
+    LBuilder.Free;
+  end;
 end;
 
 function IsOldExecutableHeaderHeading(const ALine: string): Boolean;
@@ -1389,13 +1438,6 @@ begin
     ((Pos('rva', LHeading) > 0) or (Pos('address', LHeading) > 0));
 end;
 
-procedure AppendNodeRawLine(const ANode: TDumpNode; const ALine: string);
-begin
-  if ANode.RawText <> '' then
-    ANode.RawText := ANode.RawText + sLineBreak;
-  ANode.RawText := ANode.RawText + ALine;
-end;
-
 function ValueForLabel(const ALine, ALabel: string): string;
 begin
   var LLabelPos := Pos(ALabel, ALine);
@@ -1412,6 +1454,82 @@ begin
   Result := (Run <> nil) and (StartLine >= 1) and (EndLine >= StartLine);
 end;
 
+{ TDumpLineCatalog }
+
+constructor TDumpLineEnumerator.Create(ACatalog: TDumpLineCatalog);
+begin
+  inherited Create;
+  FCatalog := ACatalog;
+  FIndex := -1;
+end;
+
+function TDumpLineEnumerator.GetCurrent: TDumpLine;
+begin
+  Result := FCatalog[FIndex];
+end;
+
+function TDumpLineEnumerator.MoveNext: Boolean;
+begin
+  Inc(FIndex);
+  Result := FIndex < FCatalog.Count;
+end;
+
+constructor TDumpLineCatalog.Create;
+begin
+  inherited Create;
+  FSyntaxHints := TDictionary<Integer, TDumpRawSyntaxHint>.Create;
+end;
+
+destructor TDumpLineCatalog.Destroy;
+begin
+  FSyntaxHints.Free;
+  inherited;
+end;
+
+procedure TDumpLineCatalog.Bind(ASource: TDumpTextSource; ARun: TDumpRun);
+begin
+  FSource := ASource;
+  FRun := ARun;
+  FSyntaxHints.Clear;
+end;
+
+function TDumpLineCatalog.GetCount: Integer;
+begin
+  if FSource = nil then
+    Exit(0);
+  Result := FSource.LineCount;
+end;
+
+function TDumpLineCatalog.GetLine(AIndex: Integer): TDumpLine;
+begin
+  if (AIndex < 0) or (AIndex >= Count) then
+    raise EArgumentOutOfRangeException.CreateFmt(
+      'Line index %d is outside the valid range 0..%d.', [AIndex, Count - 1]);
+  Result := Default(TDumpLine);
+  Result.LineNumber := AIndex + 1;
+  Result.Kind := tlkUnknown;
+  Result.SourceSpan.Run := FRun;
+  Result.SourceSpan.StartLine := AIndex + 1;
+  Result.SourceSpan.EndLine := AIndex + 1;
+  FSyntaxHints.TryGetValue(AIndex, Result.SourceSpan.SyntaxHint);
+end;
+
+procedure TDumpLineCatalog.SetSyntaxHint(AIndex: Integer;
+  AHint: TDumpRawSyntaxHint);
+begin
+  if (AIndex < 0) or (AIndex >= Count) then
+    Exit;
+  if AHint = rshDefault then
+    FSyntaxHints.Remove(AIndex)
+  else
+    FSyntaxHints.AddOrSetValue(AIndex, AHint);
+end;
+
+function TDumpLineCatalog.GetEnumerator: TDumpLineEnumerator;
+begin
+  Result := TDumpLineEnumerator.Create(Self);
+end;
+
 { TDumpNode }
 
 constructor TDumpNode.Create;
@@ -1425,22 +1543,6 @@ destructor TDumpNode.Destroy;
 begin
   Children.Free;
   Properties.Free;
-  inherited;
-end;
-
-{ TDumpLine }
-
-constructor TDumpLine.Create;
-begin
-  inherited Create;
-  Tokens := TList<string>.Create;
-  Properties := TList<TDumpProperty>.Create;
-end;
-
-destructor TDumpLine.Destroy;
-begin
-  Properties.Free;
-  Tokens.Free;
   inherited;
 end;
 
@@ -1643,7 +1745,6 @@ begin
   ScopeChildren := TList<TDumpBorlandSymbolRecord>.Create;
   NameIndices := TList<UInt64>.Create;
   ResolvedNames := TList<string>.Create;
-  DetailLines := TList<TDumpLine>.Create;
 end;
 
 destructor TDumpBorlandSymbolRecord.Destroy;
@@ -1651,7 +1752,6 @@ begin
   ScopeChildren.Free;
   ResolvedNames.Free;
   NameIndices.Free;
-  DetailLines.Free;
   Properties.Free;
   inherited;
 end;
@@ -1696,7 +1796,6 @@ begin
   ReferencedTypes := TList<TDumpGlobalTypeRecord>.Create;
   Members := TObjectList<TDumpGlobalTypeMember>.Create(True);
   Details := TObjectList<TDumpGlobalTypeDetail>.Create(True);
-  DetailLines := TList<TDumpLine>.Create;
 end;
 
 destructor TDumpGlobalTypeRecord.Destroy;
@@ -1705,7 +1804,6 @@ begin
   ReferencedTypeIndices.Free;
   Details.Free;
   Members.Free;
-  DetailLines.Free;
   Properties.Free;
   inherited;
 end;
@@ -1829,7 +1927,7 @@ begin
   FileKind := dfUnknown;
   Runs := TObjectList<TDumpRun>.Create(True);
   PrimaryRun := nil;
-  Lines := TObjectList<TDumpLine>.Create(True);
+  Lines := TDumpLineCatalog.Create;
   Headers := TObjectList<TDumpHeader>.Create(True);
   DataDirectories := TList<TDumpDataDirectory>.Create;
   Sections := TObjectList<TDumpSection>.Create(True);
@@ -1880,6 +1978,7 @@ begin
   Diagnostics.Free;
   Nodes.Free;
   Lines.Free;
+  TextSource.Free;
   BorlandNameLookup.Free;
   BorlandNames.Free;
   BorlandSubsections.Free;
@@ -1922,7 +2021,30 @@ begin
   inherited;
 end;
 
+function TDumpDocument.GetRawText: string;
+begin
+  if TextSource <> nil then
+    Exit(TextSource.Text);
+  Result := FRawText;
+end;
+
+procedure TDumpDocument.SetRawText(const AValue: string);
+begin
+  FRawText := AValue;
+end;
+
 function TDumpDocument.MergeWith(AOther: TDumpDocument): TDumpDocumentMerge;
+  function SameSourceText(ALeft, ARight: TDumpDocument): Boolean;
+  begin
+    if (ALeft.TextSource = nil) or (ARight.TextSource = nil) then
+      Exit(ALeft.RawText = ARight.RawText);
+    if ALeft.TextSource.LineCount <> ARight.TextSource.LineCount then
+      Exit(False);
+    for var LIndex := 0 to ALeft.TextSource.LineCount - 1 do
+      if ALeft.TextSource[LIndex] <> ARight.TextSource[LIndex] then
+        Exit(False);
+    Result := True;
+  end;
 begin
   Result := TDumpDocumentMerge.Create;
   Result.Documents.Add(Self);
@@ -1934,7 +2056,7 @@ begin
   if (AOther = nil) or (AOther = Self) then
     Exit;
   if SameText(SourceFileName, AOther.SourceFileName) and
-    (RawText <> AOther.RawText) then
+    not SameSourceText(Self, AOther) then
     Result.Conflicts.Add('Source file has different TDUMP text across runs: ' +
       SourceFileName);
   if (ToolKind <> tkUnknown) and (AOther.ToolKind <> tkUnknown) and
@@ -1948,29 +2070,16 @@ end;
 constructor TDumpParser.Create;
 begin
   inherited Create;
-  FLines := TStringList.Create;
 end;
 
 destructor TDumpParser.Destroy;
 begin
-  FLines.Free;
   inherited;
 end;
 
 function TDumpParser.ParseFile(const AFileName: string): TDumpDocument;
 begin
-  var LText: string;
-  var LBytes: TBytes;
-  var LStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyWrite);
-  try
-    SetLength(LBytes, LStream.Size);
-    if Length(LBytes) > 0 then
-      LStream.ReadBuffer(LBytes[0], Length(LBytes));
-  finally
-    LStream.Free;
-  end;
-  LText := TEncoding.Default.GetString(LBytes);
-  Result := ParseText(LText, AFileName);
+  Result := ParseSource(TDumpMappedTextSource.Create(AFileName), AFileName);
 end;
 
 function TDumpParser.ClassifyTDumpLine(const ALine: string): TDumpLineKind;
@@ -2072,83 +2181,103 @@ end;
 
 procedure TDumpParser.BuildLineCatalog;
 begin
-  var LContextKind := tlkHeaderDetail;
-  var LInBorlandTable := False;
+  // The catalog is a view over TextSource. Lexical data is computed only by
+  // consumers that request a line, so there are no per-line objects or tokens.
+  // Retain only the first offset for well-known section markers.
+  for var LMarker := Low(TDumpLineMarker) to High(TDumpLineMarker) do
+    FMarkerLines[LMarker] := -1;
   for var LIndex := 0 to FLines.Count - 1 do
   begin
-    var LLine := TDumpLine.Create;
-    LLine.LineNumber := LIndex + 1;
-    while (LLine.Indent < Length(FLines[LIndex])) and
-      CharInSet(FLines[LIndex][LLine.Indent + 1], [' ', #9]) do
-      Inc(LLine.Indent);
-    LLine.Kind := ClassifyTDumpLine(FLines[LIndex]);
-    var LTrimmed := Trim(FLines[LIndex]);
-    if LLine.Kind = tlkSection then
+    var LLine := FLines[LIndex];
+    var LTrimmed := Trim(LLine);
+    if (FMarkerLines[lmOldExecutableHeader] < 0) and
+      IsOldExecutableHeaderHeading(LLine) then
+      FMarkerLines[lmOldExecutableHeader] := LIndex;
+    if (FMarkerLines[lmPortableExecutableHeader] < 0) and
+      IsPortableExecutableHeaderHeading(LLine) then
+      FMarkerLines[lmPortableExecutableHeader] := LIndex;
+    if (FMarkerLines[lmObjectTable] < 0) and IsObjectTableHeading(LLine) then
+      FMarkerLines[lmObjectTable] := LIndex;
+    if StartsWithText(LTrimmed, 'Section:') then
     begin
-      LInBorlandTable := Pos('Borland 32 bit symbol table', LTrimmed) > 0;
-      if Pos('Import', LTrimmed) > 0 then
-        LContextKind := tlkImportDetail
-      else if Pos('Export', LTrimmed) > 0 then
-        LContextKind := tlkExportDetail
-      else if Pos('Resource', LTrimmed) > 0 then
-        LContextKind := tlkResourceDetail
-      else if LInBorlandTable then
-        LContextKind := tlkBorlandDetail
-      else
-        LContextKind := tlkHeaderDetail;
-    end
-    else if LLine.Kind = tlkDataDirectory then
-      LContextKind := tlkDataDirectoryDetail
-    else if LLine.Kind = tlkObjectTable then
-      LContextKind := tlkObjectTableDetail
-    else if LLine.Kind = tlkBorlandSubsection then
+      var LSectionName := Trim(Copy(LTrimmed, Length('Section:') + 1,
+        MaxInt));
+      if (FMarkerLines[lmImportSection] < 0) and
+        SameText(LSectionName, 'Import') then
+        FMarkerLines[lmImportSection] := LIndex;
+      if (FMarkerLines[lmExportSection] < 0) and
+        SameText(LSectionName, 'Exports') then
+        FMarkerLines[lmExportSection] := LIndex;
+      if (FMarkerLines[lmResourceSection] < 0) and
+        SameText(LSectionName, 'Resources') then
+        FMarkerLines[lmResourceSection] := LIndex;
+    end;
+    if (FMarkerLines[lmCompactImport] < 0) and
+      StartsWithText(LTrimmed, 'IMPORT:') then
+      FMarkerLines[lmCompactImport] := LIndex;
+    if (FMarkerLines[lmCompactExport] < 0) and
+      StartsWithText(LTrimmed, 'EXPORT ') then
+      FMarkerLines[lmCompactExport] := LIndex;
+    if (FMarkerLines[lmFixupTable] < 0) and
+      StartsWithText(LTrimmed, 'Fixup Table') then
+      FMarkerLines[lmFixupTable] := LIndex;
+    if (FMarkerLines[lmRelocationBlock] < 0) and
+      StartsWithText(LTrimmed, 'Block #') then
+      FMarkerLines[lmRelocationBlock] := LIndex;
+    if (FMarkerLines[lmBorlandSymbols] < 0) and
+      SameText(LTrimmed, 'Borland 32 bit symbol table') then
+      FMarkerLines[lmBorlandSymbols] := LIndex;
+    if FMarkerLines[lmOMFObject] < 0 then
     begin
-      if Pos('sstGlobalTypes', LTrimmed) > 0 then
-        LContextKind := tlkGlobalTypeDetail
-      else if Pos('sstSrcModule', LTrimmed) > 0 then
-        LContextKind := tlkSourceModuleDetail
-      else if Pos('sstModule', LTrimmed) > 0 then
-        LContextKind := tlkModuleDetail
-      else if Pos('sstGlobalSym', LTrimmed) > 0 then
-        LContextKind := tlkGlobalSymbolDetail
-      else
-        LContextKind := tlkBorlandDetail;
-    end
-    else if (LLine.Kind = tlkText) and LInBorlandTable then
-      LLine.Kind := LContextKind
-    else if LLine.Kind = tlkText then
-      LLine.Kind := LContextKind;
-    var LTokenText := Trim(FLines[LIndex]);
-    while LTokenText <> '' do
-      LLine.Tokens.Add(FirstToken(LTokenText));
-    var LProperty: TDumpProperty;
-    if TryParsePropertyLine(FLines[LIndex], LLine.LineNumber, LProperty) then
-      LLine.Properties.Add(LProperty);
-    FDocument.Lines.Add(LLine);
-    if Assigned(FOnProgress) then
-      ReportProgress(ppLineCatalog, LIndex + 1);
+      var LWork := LTrimmed;
+      var LRawOffset := FirstToken(LWork);
+      var LRecordKind := FirstToken(LWork);
+      if (Length(LRawOffset) = 6) and SameText(LRecordKind, 'THEADR') then
+        FMarkerLines[lmOMFObject] := LIndex;
+    end;
+    if (FMarkerLines[lmARArchive] < 0) and StartsWithText(LTrimmed, 'Ar ') and
+      ContainsText(LTrimmed, 'archive file') then
+      FMarkerLines[lmARArchive] := LIndex;
+    if (FMarkerLines[lmMachHeader] < 0) and
+      (Pos('MACH Header', LLine) > 0) then
+      FMarkerLines[lmMachHeader] := LIndex;
+    if (FMarkerLines[lmELFHeader] < 0) and
+      ContainsText(LLine, 'Elf Header') then
+      FMarkerLines[lmELFHeader] := LIndex;
+    if (FMarkerLines[lmCOFFDiagnostic] < 0) and
+      StartsWithText(LTrimmed, 'ERROR: Invalid machine type') then
+      FMarkerLines[lmCOFFDiagnostic] := LIndex;
+    if (FMarkerLines[lmDelphiUnitDiagnostic] < 0) and
+      (StartsWithText(LTrimmed, 'Unable to read file header') or
+       StartsWithText(LTrimmed, 'Invalid unit magic number')) then
+      FMarkerLines[lmDelphiUnitDiagnostic] := LIndex;
+    ReportProgress(ppLineCatalog, LIndex + 1);
   end;
 end;
 
 function TDumpParser.ParseText(const AText: string;
   const ASourceFileName: string): TDumpDocument;
 begin
+  Result := ParseSource(TDumpStringTextSource.Create(AText), ASourceFileName);
+end;
+
+function TDumpParser.ParseSource(ASource: TDumpTextSource;
+  const ASourceFileName: string): TDumpDocument;
+begin
   FDocument := TDumpDocument.Create;
   try
+    FDocument.TextSource := ASource;
+    FLines := ASource;
     FDocument.SourceFileName := ASourceFileName;
-    FDocument.RawText := AText;
     FDocument.PrimaryRun := TDumpRun.Create;
     FDocument.PrimaryRun.Document := FDocument;
     FDocument.PrimaryRun.SourceFileName := ASourceFileName;
     FDocument.Runs.Add(FDocument.PrimaryRun);
+    FDocument.Lines.Bind(FDocument.TextSource, FDocument.PrimaryRun);
     FLastProgressPhase := ppComplete;
     FLastProgressLine := -1;
 
-    FLines.Text := NormalizeLineBreaks(AText);
-    for var LIndex := 0 to FLines.Count - 1 do
-      FLines[LIndex] := TrimRightWhitespace(FLines[LIndex]);
-
-    AddNode(nkDocument, 'TDUMP output', 1, FLines.Count).RawText := AText;
+    AddNode(nkDocument, 'TDUMP output', 1, FLines.LineCount);
     ReportProgress(ppPreparing, 0);
     BuildLineCatalog;
 
@@ -2162,7 +2291,11 @@ begin
     ParseExportSection;
     ParseResourceSection;
     ParseRelocationSection;
-    ParseBorlandSymbolTable;
+    FDocument.BorlandIndexOnly := FLines.Count > CBorlandIndexedLineThreshold;
+    if FDocument.BorlandIndexOnly then
+      ParseBorlandSymbolIndex
+    else
+      ParseBorlandSymbolTable;
     ParseStrings;
     ParseOMF;
     ParseARArchive;
@@ -2174,11 +2307,12 @@ begin
     BuildDebugInformation;
     DetectUnsupportedStructures;
     AttachRunProvenance;
-    ReportProgress(ppComplete, FLines.Count);
+    ReportProgress(ppComplete, FLines.LineCount);
 
     Result := FDocument;
     FDocument := nil;
   finally
+    FLines := nil;
     FDocument.Free;
   end;
 end;
@@ -2222,12 +2356,6 @@ begin
   LRun.ToolVersion := FDocument.ToolVersion;
   LRun.CommandLine := FDocument.CommandLine;
 
-  for var LLine in FDocument.Lines do
-  begin
-    LLine.SourceSpan.Run := LRun;
-    LLine.SourceSpan.StartLine := LLine.LineNumber;
-    LLine.SourceSpan.EndLine := LLine.LineNumber;
-  end;
   for var LNode in FDocument.Nodes do
     AttachNodeSourceSpans(LNode, LRun);
   for var LHeader in FDocument.Headers do
@@ -2262,8 +2390,8 @@ begin
       LImport.SourceSpan.EndLine := LImport.StartLine;
       if (LImport.StartLine >= 1) and
         (LImport.StartLine <= FDocument.Lines.Count) then
-      FDocument.Lines[LImport.StartLine - 1].SourceSpan.SyntaxHint :=
-          LImport.SourceSpan.SyntaxHint;
+        FDocument.Lines.SetSyntaxHint(LImport.StartLine - 1,
+          LImport.SourceSpan.SyntaxHint);
     end;
   end;
   if FDocument.DelayedImportTable <> nil then
@@ -2285,8 +2413,8 @@ begin
         LImport.SourceSpan.EndLine := LImport.StartLine;
         if (LImport.StartLine >= 1) and
           (LImport.StartLine <= FDocument.Lines.Count) then
-          FDocument.Lines[LImport.StartLine - 1].SourceSpan.SyntaxHint :=
-            LImport.SourceSpan.SyntaxHint;
+          FDocument.Lines.SetSyntaxHint(LImport.StartLine - 1,
+            LImport.SourceSpan.SyntaxHint);
       end;
     end;
   end;
@@ -2297,8 +2425,8 @@ begin
     LExport.SourceSpan.EndLine := LExport.StartLine;
     if (LExport.StartLine >= 1) and
       (LExport.StartLine <= FDocument.Lines.Count) then
-      FDocument.Lines[LExport.StartLine - 1].SourceSpan.SyntaxHint :=
-        LExport.SourceSpan.SyntaxHint;
+      FDocument.Lines.SetSyntaxHint(LExport.StartLine - 1,
+        LExport.SourceSpan.SyntaxHint);
   end;
   for var LMetadata in [FDocument.ImportMetadata, FDocument.ExportMetadata,
     FDocument.ResourceMetadata] do
@@ -2425,8 +2553,8 @@ begin
       LSymbol.SourceSpan.SyntaxHint := rshCppBuilderMethod;
       if (LSymbol.StartLine >= 1) and
         (LSymbol.StartLine <= FDocument.Lines.Count) then
-        FDocument.Lines[LSymbol.StartLine - 1].SourceSpan.SyntaxHint :=
-          rshCppBuilderMethod;
+        FDocument.Lines.SetSyntaxHint(LSymbol.StartLine - 1,
+          rshCppBuilderMethod);
     end;
   end;
   if FDocument.DebugInformation <> nil then
@@ -2509,7 +2637,6 @@ begin
   LStructure.Description := ADescription;
   LStructure.SourceLine := FDocument.Lines[ALineNumber - 1];
   LStructure.Node := AddNode(nkUnknown, ADescription, ALineNumber, ALineNumber);
-  LStructure.Node.RawText := FLines[ALineNumber - 1];
   FDocument.UnsupportedStructures.Add(LStructure);
 end;
 
@@ -2532,18 +2659,6 @@ begin
   LStructure.Description := ADescription;
   LStructure.SourceLine := FDocument.Lines[AStartLine - 1];
   LStructure.Node := AddNode(nkUnknown, ADescription, AStartLine, AEndLine);
-  var LRaw := TStringBuilder.Create;
-  try
-    for var LLineIndex := AStartLine - 1 to AEndLine - 1 do
-    begin
-      if LRaw.Length > 0 then
-        LRaw.AppendLine;
-      LRaw.Append(FLines[LLineIndex]);
-    end;
-    LStructure.Node.RawText := LRaw.ToString;
-  finally
-    LRaw.Free;
-  end;
   FDocument.UnsupportedStructures.Add(LStructure);
 end;
 
@@ -2678,13 +2793,7 @@ end;
 
 procedure TDumpParser.ParseOldExecutableHeader;
 begin
-  var LHeaderStart := -1;
-  for var LIndex := 0 to FLines.Count - 1 do
-    if IsOldExecutableHeaderHeading(FLines[LIndex]) then
-    begin
-      LHeaderStart := LIndex;
-      Break;
-    end;
+  var LHeaderStart := FMarkerLines[lmOldExecutableHeader];
 
   if LHeaderStart < 0 then
     Exit;
@@ -2706,13 +2815,8 @@ begin
     FDocument.FileKind := dfDOS;
 
   var LNode := AddNode(nkHeader, SOldExecutableHeader, LHeader.StartLine, LHeader.EndLine);
-  var LRaw := TStringBuilder.Create;
-  try
-    for var LIndex := LHeaderStart to LHeaderEnd do
-    begin
-      if LRaw.Length > 0 then
-        LRaw.AppendLine;
-      LRaw.Append(FLines[LIndex]);
+  for var LIndex := LHeaderStart to LHeaderEnd do
+  begin
       var LLine := FLines[LIndex];
       if (LIndex = LHeaderStart) or (Trim(LLine) = '') then
         Continue;
@@ -2728,22 +2832,12 @@ begin
           'Unsupported Old Executable Header line.');
         AddDiagnostic(dsWarning, LIndex + 1, 'Unrecognized Old Executable Header line.', LLine);
       end;
-    end;
-    LNode.RawText := LRaw.ToString;
-  finally
-    LRaw.Free;
   end;
 end;
 
 procedure TDumpParser.ParsePortableExecutableHeader;
 begin
-  var LHeaderStart := -1;
-  for var LIndex := 0 to FLines.Count - 1 do
-    if IsPortableExecutableHeaderHeading(FLines[LIndex]) then
-    begin
-      LHeaderStart := LIndex;
-      Break;
-    end;
+  var LHeaderStart := FMarkerLines[lmPortableExecutableHeader];
   if LHeaderStart < 0 then
     Exit;
 
@@ -2768,13 +2862,8 @@ begin
   var LDirectoryNode: TDumpNode := nil;
   var LInDirectoryTable := False;
   var LDirectoryIndex := 0;
-  var LRaw := TStringBuilder.Create;
-  try
-    for var LIndex := LHeaderStart to LHeaderEnd do
-    begin
-      if LRaw.Length > 0 then
-        LRaw.AppendLine;
-      LRaw.Append(FLines[LIndex]);
+  for var LIndex := LHeaderStart to LHeaderEnd do
+  begin
       var LLine := FLines[LIndex];
       if (LIndex = LHeaderStart) or (Trim(LLine) = '') then
         Continue;
@@ -2826,24 +2915,12 @@ begin
         AddDiagnostic(dsWarning, LIndex + 1,
           'Unrecognized Portable Executable header line.', LLine);
       end;
-    end;
-    LHeaderNode.RawText := LRaw.ToString;
-    if LDirectoryNode <> nil then
-      LDirectoryNode.RawText := LRaw.ToString;
-  finally
-    LRaw.Free;
   end;
 end;
 
 procedure TDumpParser.ParseObjectTable;
 begin
-  var LTableStart := -1;
-  for var LIndex := 0 to FLines.Count - 1 do
-    if IsObjectTableHeading(FLines[LIndex]) then
-    begin
-      LTableStart := LIndex;
-      Break;
-    end;
+  var LTableStart := FMarkerLines[lmObjectTable];
   if LTableStart < 0 then
     Exit;
 
@@ -2857,13 +2934,8 @@ begin
 
   var LNode := AddNode(nkSections, 'Object table', LTableStart + 1,
     LTableEnd + 1);
-  var LRaw := TStringBuilder.Create;
-  try
-    for var LIndex := LTableStart to LTableEnd do
-    begin
-      if LRaw.Length > 0 then
-        LRaw.AppendLine;
-      LRaw.Append(FLines[LIndex]);
+  for var LIndex := LTableStart to LTableEnd do
+  begin
       var LLine := FLines[LIndex];
       if (LIndex = LTableStart) or (Trim(LLine) = '') or
         (Pos('----', LLine) > 0) or (Pos('****', Trim(LLine)) > 0) or
@@ -2912,31 +2984,15 @@ begin
         AddDiagnostic(dsWarning, LIndex + 1, 'Unrecognized object table row.',
           LLine);
       end;
-    end;
-    LNode.RawText := LRaw.ToString;
-  finally
-    LRaw.Free;
   end;
 end;
 
 procedure TDumpParser.ParseImportSection;
 begin
-  var LSectionStart := -1;
-  var LCompactMode := False;
-  for var LIndex := 0 to FLines.Count - 1 do
-    if SameText(Trim(FLines[LIndex]), 'Section:             Import') then
-    begin
-      LSectionStart := LIndex;
-      Break;
-    end;
-  if LSectionStart < 0 then
-    for var LCompactIndex := 0 to FLines.Count - 1 do
-      if StartsWithText(Trim(FLines[LCompactIndex]), 'IMPORT:') then
-      begin
-        LSectionStart := LCompactIndex;
-        LCompactMode := True;
-        Break;
-      end;
+  var LSectionStart := FMarkerLines[lmImportSection];
+  var LCompactMode := LSectionStart < 0;
+  if LCompactMode then
+    LSectionStart := FMarkerLines[lmCompactImport];
   if LSectionStart < 0 then
     Exit;
 
@@ -2954,7 +3010,7 @@ begin
       end;
       if LDelayedLoadActive then
       begin
-        if FDocument.Lines[LIndex].Kind = tlkSection then
+        if ClassifyTDumpLine(FLines[LIndex]) = tlkSection then
         begin
           LSectionEnd := LIndex - 1;
           Break;
@@ -2971,7 +3027,7 @@ begin
   else
   begin
     for var LEndIndex := LSectionStart + 1 to FLines.Count - 1 do
-      if (FDocument.Lines[LEndIndex].Kind = tlkSection) and
+      if (ClassifyTDumpLine(FLines[LEndIndex]) = tlkSection) and
         (LEndIndex > LSectionStart) then
       begin
         LSectionEnd := LEndIndex - 1;
@@ -2993,13 +3049,8 @@ begin
   var LModuleNode: TDumpNode := nil;
   var LDelayedMode := False;
   var LDelayedTableNode: TDumpNode := nil;
-  var LRaw := TStringBuilder.Create;
-  try
-    for var LIndex := LSectionStart to LSectionEnd do
-    begin
-      if LRaw.Length > 0 then
-        LRaw.AppendLine;
-      LRaw.Append(FLines[LIndex]);
+  for var LIndex := LSectionStart to LSectionEnd do
+  begin
       var LLine := FLines[LIndex];
       var LTrimmed := Trim(LLine);
       if (LIndex = LSectionStart) or (LTrimmed = '') or
@@ -3204,44 +3255,27 @@ begin
           'Unsupported import entry.');
         AddDiagnostic(dsWarning, LIndex + 1, 'Unrecognized import entry.', LLine);
       end;
-    end;
-    if LCurrentModule <> nil then
+  end;
+  if LCurrentModule <> nil then
     begin
       LCurrentModule.EndLine := LSectionEnd + 1;
       if LModuleNode <> nil then
         LModuleNode.EndLine := LSectionEnd + 1;
-    end;
-    if FDocument.DelayedImportTable <> nil then
+  end;
+  if FDocument.DelayedImportTable <> nil then
     begin
       FDocument.DelayedImportTable.EndLine := LSectionEnd + 1;
       if LDelayedTableNode <> nil then
         LDelayedTableNode.EndLine := LSectionEnd + 1;
-    end;
-    LNode.RawText := LRaw.ToString;
-  finally
-    LRaw.Free;
   end;
 end;
 
 procedure TDumpParser.ParseExportSection;
 begin
-  var LSectionStart := -1;
-  var LCompactMode := False;
-  for var LIndex := 0 to FLines.Count - 1 do
-    if StartsWithText(Trim(FLines[LIndex]), 'Section:') and
-      SameText(Trim(Copy(Trim(FLines[LIndex]), Length('Section:') + 1, MaxInt)), 'Exports') then
-    begin
-      LSectionStart := LIndex;
-      Break;
-    end;
-  if LSectionStart < 0 then
-    for var LCompactIndex := 0 to FLines.Count - 1 do
-      if StartsWithText(Trim(FLines[LCompactIndex]), 'EXPORT ') then
-      begin
-        LSectionStart := LCompactIndex;
-        LCompactMode := True;
-        Break;
-      end;
+  var LSectionStart := FMarkerLines[lmExportSection];
+  var LCompactMode := LSectionStart < 0;
+  if LCompactMode then
+    LSectionStart := FMarkerLines[lmCompactExport];
   if LSectionStart < 0 then
     Exit;
 
@@ -3275,14 +3309,8 @@ begin
   FDocument.ExportMetadata.Node := LNode;
   FDocument.ExportMetadata.StartLine := LSectionStart + 1;
   FDocument.ExportMetadata.EndLine := LSectionEnd + 1;
-  var LRaw := TStringBuilder.Create;
-  try
-    for var LIndex := LSectionStart to LSectionEnd do
-    begin
-      if LRaw.Length > 0 then
-        LRaw.AppendLine;
-      LRaw.Append(FLines[LIndex]);
-
+  for var LIndex := LSectionStart to LSectionEnd do
+  begin
       var LLine := FLines[LIndex];
       var LTrimmed := Trim(LLine);
       if LCompactMode then
@@ -3357,23 +3385,12 @@ begin
         LProperty.StartLine := LExport.StartLine;
         LNode.Properties.Add(LProperty);
       end;
-    end;
-    LNode.RawText := LRaw.ToString;
-  finally
-    LRaw.Free;
   end;
 end;
 
 procedure TDumpParser.ParseResourceSection;
 begin
-  var LSectionStart := -1;
-  for var LIndex := 0 to FLines.Count - 1 do
-    if StartsWithText(Trim(FLines[LIndex]), 'Section:') and
-      SameText(Trim(Copy(Trim(FLines[LIndex]), Length('Section:') + 1, MaxInt)), 'Resources') then
-    begin
-      LSectionStart := LIndex;
-      Break;
-    end;
+  var LSectionStart := FMarkerLines[lmResourceSection];
   if LSectionStart < 0 then
     Exit;
 
@@ -3409,17 +3426,12 @@ begin
   FDocument.ResourceMetadata.Node := LNode;
   FDocument.ResourceMetadata.StartLine := LSectionStart + 1;
   FDocument.ResourceMetadata.EndLine := LSectionEnd + 1;
-  var LRaw := TStringBuilder.Create;
   var LResourceStack := TList<TDumpResource>.Create;
   var LNodeStack := TList<TDumpNode>.Create;
   var LIndentStack := TList<Integer>.Create;
   try
     for var LIndex := LSectionStart to LSectionEnd do
     begin
-      if LRaw.Length > 0 then
-        LRaw.AppendLine;
-      LRaw.Append(FLines[LIndex]);
-
       var LLine := FLines[LIndex];
       var LTrimmed := Trim(LLine);
       var LIndent: Integer;
@@ -3453,7 +3465,6 @@ begin
         LResourceNode.Title := LResource.Name;
         LResourceNode.StartLine := LIndex + 1;
         LResourceNode.EndLine := LIndex + 1;
-        LResourceNode.RawText := LLine;
         for var LPropertyIndex := 0 to LResource.Properties.Count - 1 do
           LResourceNode.Properties.Add(LResource.Properties[LPropertyIndex]);
         if LResourceStack.Count = 0 then
@@ -3549,47 +3560,28 @@ begin
       LResourceStack.Delete(LResourceStack.Count - 1);
       LIndentStack.Delete(LIndentStack.Count - 1);
     end;
-    LNode.RawText := LRaw.ToString;
   finally
     LIndentStack.Free;
     LNodeStack.Free;
     LResourceStack.Free;
-    LRaw.Free;
   end;
 end;
 
 procedure TDumpParser.ParseRelocationSection;
 begin
-  var LSectionStart := -1;
-  for var LIndex := 0 to FLines.Count - 1 do
-    if StartsWithText(Trim(FLines[LIndex]), 'Fixup Table') then
-    begin
-      LSectionStart := LIndex;
-      Break;
-    end;
+  var LSectionStart := FMarkerLines[lmFixupTable];
   if LSectionStart < 0 then
-    for var LBlockSearchIndex := 0 to FLines.Count - 1 do
-      if StartsWithText(Trim(FLines[LBlockSearchIndex]), 'Block #') then
-      begin
-        LSectionStart := LBlockSearchIndex;
-        Break;
-      end;
+    LSectionStart := FMarkerLines[lmRelocationBlock];
   if LSectionStart < 0 then
     Exit;
 
-  var LNode := AddNode(nkRelocations, 'Relocations', LSectionStart + 1,
-    FLines.Count);
-  var LRaw := TStringBuilder.Create;
-  try
+  AddNode(nkRelocations, 'Relocations', LSectionStart + 1, FLines.Count);
     var LBlockIndex: UInt64 := 0;
     var LPageRVA: UInt64 := 0;
     var LBlockSize: UInt64 := 0;
     var LCurrentBlock: TDumpRelocationBlock := nil;
     for var LIndex := LSectionStart to FLines.Count - 1 do
     begin
-      if LRaw.Length > 0 then
-        LRaw.AppendLine;
-      LRaw.Append(FLines[LIndex]);
       if TryParseRelocationBlock(FLines[LIndex], LBlockIndex, LPageRVA,
         LBlockSize) then
       begin
@@ -3631,21 +3623,72 @@ begin
     end;
     if LCurrentBlock <> nil then
       LCurrentBlock.EndLine := FLines.Count;
-    LNode.RawText := LRaw.ToString;
-  finally
-    LRaw.Free;
+end;
+
+procedure TDumpParser.ParseBorlandSymbolIndex;
+begin
+  var LTableStart := FMarkerLines[lmBorlandSymbols];
+  if LTableStart < 0 then
+    Exit;
+
+  AddNode(nkSymbols, 'Borland 32 bit symbol table', LTableStart + 1,
+    FLines.Count);
+  var LInDirectory := False;
+  var LCurrentSubsection: TDumpBorlandSubsection := nil;
+  for var LIndex := LTableStart + 1 to FLines.Count - 1 do
+  begin
+    var LLine := FLines[LIndex];
+    var LTrimmed := Trim(LLine);
+    if Assigned(FOnProgress) then
+      ReportProgress(ppBorlandSymbols, LIndex + 1);
+
+    if StartsWithText(LTrimmed, 'SubSection Directory') then
+    begin
+      LInDirectory := True;
+      Continue;
+    end;
+    if LInDirectory and StartsWithText(LTrimmed,
+      '--------------------------------') then
+    begin
+      LInDirectory := False;
+      Continue;
+    end;
+    if LInDirectory and StartsWithText(LTrimmed, 'ModIndex:') then
+    begin
+      var LDirectoryEntry: TDumpSymbolSubsection;
+      if TryParseBorlandSubsectionDirectoryLine(LLine, LIndex + 1,
+        LDirectoryEntry) then
+        FDocument.SymbolSubsections.Add(LDirectoryEntry);
+      Continue;
+    end;
+
+    if StartsWithText(LTrimmed, 'ModIndex:') and
+      (Pos(' sst', LTrimmed) > 0) then
+    begin
+      var LModIndex: Integer;
+      var LFileOffset: UInt64;
+      var LSubsectionType: string;
+      if not TryParseBorlandSubsectionHeader(LLine, LModIndex, LFileOffset,
+        LSubsectionType) then
+        Continue;
+      if LCurrentSubsection <> nil then
+        LCurrentSubsection.EndLine := LIndex;
+      LCurrentSubsection := TDumpBorlandSubsection.Create;
+      LCurrentSubsection.ModIndex := LModIndex;
+      LCurrentSubsection.FileOffset := LFileOffset;
+      LCurrentSubsection.SubsectionType := LSubsectionType;
+      LCurrentSubsection.StartLine := LIndex + 1;
+      LCurrentSubsection.EndLine := LIndex + 1;
+      FDocument.BorlandSubsections.Add(LCurrentSubsection);
+    end;
   end;
+  if LCurrentSubsection <> nil then
+    LCurrentSubsection.EndLine := FLines.Count;
 end;
 
 procedure TDumpParser.ParseBorlandSymbolTable;
 begin
-  var LTableStart := -1;
-  for var LIndex := 0 to FLines.Count - 1 do
-    if SameText(Trim(FLines[LIndex]), 'Borland 32 bit symbol table') then
-    begin
-      LTableStart := LIndex;
-      Break;
-    end;
+  var LTableStart := FMarkerLines[lmBorlandSymbols];
   if LTableStart < 0 then
     Exit;
 
@@ -3655,7 +3698,7 @@ begin
     LTableStart + 1, LTableEnd + 1);
   var LDirectoryNode: TDumpNode := nil;
   var LCurrentSubsection: TDumpNode := nil;
-  var LCurrentRecord: TDumpNode := nil;
+  var LCurrentRecordStartLine := 0;
   var LCurrentRecordKind := '';
   var LCurrentRecordHasSymbol := False;
   var LInSubsectionDirectory := False;
@@ -3682,7 +3725,6 @@ begin
       var LSymbolSearch: TDumpSymbolSearch;
       var LSourceFile: TDumpSourceFile;
       var LSourceRange: TDumpSourceRange;
-      AppendNodeRawLine(LTableNode, LLine);
       if Assigned(FOnProgress) then
         ReportProgress(ppBorlandSymbols, LIndex + 1);
 
@@ -3691,8 +3733,6 @@ begin
 
       if StartsWithText(LTrimmed, 'SubSection Directory') then
       begin
-        if LCurrentRecord <> nil then
-          LCurrentRecord.EndLine := LIndex;
         if LCurrentAlignRecord <> nil then
           LCurrentAlignRecord.EndLine := LIndex;
         if LCurrentGlobalSymbolRecord <> nil then
@@ -3707,10 +3747,9 @@ begin
         LCurrentSubsection.Title := 'SubSection Directory';
         LCurrentSubsection.StartLine := LIndex + 1;
         LCurrentSubsection.EndLine := LIndex + 1;
-        LCurrentSubsection.RawText := LLine;
         LTableNode.Children.Add(LCurrentSubsection);
         LDirectoryNode := LCurrentSubsection;
-        LCurrentRecord := nil;
+        LCurrentRecordStartLine := 0;
         LCurrentAlignRecord := nil;
         LAlignScopeStack.Clear;
         LCurrentGlobalSymbolRecord := nil;
@@ -3722,17 +3761,15 @@ begin
 
       if LInSubsectionDirectory and StartsWithText(LTrimmed, '--------------------------------') then
       begin
-        AppendNodeRawLine(LDirectoryNode, LLine);
         LDirectoryNode.EndLine := LIndex + 1;
         LCurrentSubsection := nil;
-        LCurrentRecord := nil;
+        LCurrentRecordStartLine := 0;
         LInSubsectionDirectory := False;
         Continue;
       end;
 
       if LInSubsectionDirectory and StartsWithText(LTrimmed, 'ModIndex:') then
       begin
-        AppendNodeRawLine(LDirectoryNode, LLine);
         LDirectoryNode.EndLine := LIndex + 1;
         var LSubsection: TDumpSymbolSubsection;
         if TryParseBorlandSubsectionDirectoryLine(LLine, LIndex + 1, LSubsection) then
@@ -3743,7 +3780,6 @@ begin
           LDirectoryEntryNode.Title := LSubsection.SubsectionType;
           LDirectoryEntryNode.StartLine := LIndex + 1;
           LDirectoryEntryNode.EndLine := LIndex + 1;
-          LDirectoryEntryNode.RawText := LLine;
           LProperty.Name := 'Subsection';
           LProperty.RawValue := LLine;
           LProperty.ValueKind := vkText;
@@ -3759,8 +3795,6 @@ begin
 
       if StartsWithText(LTrimmed, 'ModIndex:') and (Pos(' sst', LTrimmed) > 0) then
       begin
-        if LCurrentRecord <> nil then
-          LCurrentRecord.EndLine := LIndex;
         if LCurrentAlignRecord <> nil then
           LCurrentAlignRecord.EndLine := LIndex;
         if LCurrentGlobalSymbolRecord <> nil then
@@ -3793,7 +3827,6 @@ begin
         LCurrentSubsection.Title := LSubsectionType;
         LCurrentSubsection.StartLine := LIndex + 1;
         LCurrentSubsection.EndLine := LIndex + 1;
-        LCurrentSubsection.RawText := LLine;
         LTableNode.Children.Add(LCurrentSubsection);
 
         LCurrentBorlandSubsection := TDumpBorlandSubsection.Create;
@@ -3807,7 +3840,7 @@ begin
 
         if TryParsePropertyLine(LLine, LIndex + 1, LProperty) then
           LCurrentSubsection.Properties.Add(LProperty);
-        LCurrentRecord := nil;
+        LCurrentRecordStartLine := 0;
         LCurrentAlignRecord := nil;
         LAlignScopeStack.Clear;
         LCurrentGlobalSymbolRecord := nil;
@@ -4002,23 +4035,12 @@ begin
         var LGlobalTypeRecord: TDumpGlobalTypeRecord;
         if TryParseBorlandGlobalTypeLine(LLine, LIndex + 1, LGlobalTypeRecord) then
         begin
-          if LCurrentRecord <> nil then
-            LCurrentRecord.EndLine := LIndex;
           if LCurrentGlobalTypeRecord <> nil then
             LCurrentGlobalTypeRecord.EndLine := LIndex;
 
-          LCurrentRecord := TDumpNode.Create;
-          LCurrentRecord.Kind := nkSymbols;
-          LCurrentRecord.Title := 'Type ' + LGlobalTypeRecord.RawTypeIndex +
-            ' ' + LGlobalTypeRecord.TypeKind;
-          LCurrentRecord.StartLine := LIndex + 1;
-          LCurrentRecord.EndLine := LIndex + 1;
-          LCurrentRecord.RawText := LLine;
-          LCurrentSubsection.Children.Add(LCurrentRecord);
-
-          LGlobalTypeRecord.Node := LCurrentRecord;
+          LCurrentRecordStartLine := LIndex + 1;
+          LGlobalTypeRecord.Node := nil;
           LGlobalTypeRecord.HeaderLine := FDocument.Lines[LIndex];
-          LGlobalTypeRecord.DetailLines.Add(LGlobalTypeRecord.HeaderLine);
           LCurrentGlobalTypeSection.Records.Add(LGlobalTypeRecord);
           LCurrentGlobalTypeRecord := LGlobalTypeRecord;
           ParseBorlandGlobalTypeDetails(LCurrentGlobalTypeRecord, LLine,
@@ -4039,8 +4061,6 @@ begin
       end;
       if LIsRecord then
       begin
-        if LCurrentRecord <> nil then
-          LCurrentRecord.EndLine := LIndex;
         if LCurrentAlignRecord <> nil then
           LCurrentAlignRecord.EndLine := LIndex;
         if LCurrentGlobalSymbolRecord <> nil then
@@ -4049,16 +4069,7 @@ begin
         var LRecordText := Copy(LTrimmed, LRecordPos, MaxInt);
         var LRecordKind := FirstToken(LRecordText);
         var LRecordOffsetText := Trim(Copy(LTrimmed, 1, LRecordPos - 1));
-        LCurrentRecord := TDumpNode.Create;
-        LCurrentRecord.Kind := nkSymbols;
-        LCurrentRecord.Title := LRecordKind;
-        LCurrentRecord.StartLine := LIndex + 1;
-        LCurrentRecord.EndLine := LIndex + 1;
-        LCurrentRecord.RawText := LLine;
-        if LCurrentSubsection <> nil then
-          LCurrentSubsection.Children.Add(LCurrentRecord)
-        else
-          LTableNode.Children.Add(LCurrentRecord);
+        LCurrentRecordStartLine := LIndex + 1;
 
         LCurrentAlignRecord := nil;
         if LCurrentAlignSection <> nil then
@@ -4068,9 +4079,8 @@ begin
           TryParseHexUIntToken(LRecordOffsetText,
             LCurrentAlignRecord.RecordOffset);
           LCurrentAlignRecord.RecordKind := LRecordKind;
-          LCurrentAlignRecord.Node := LCurrentRecord;
+          LCurrentAlignRecord.Node := nil;
           LCurrentAlignRecord.HeaderLine := FDocument.Lines[LIndex];
-          LCurrentAlignRecord.DetailLines.Add(LCurrentAlignRecord.HeaderLine);
           LCurrentAlignRecord.StartLine := LIndex + 1;
           LCurrentAlignRecord.EndLine := LIndex + 1;
           LCurrentAlignSection.Records.Add(LCurrentAlignRecord);
@@ -4097,10 +4107,8 @@ begin
           TryParseHexUIntToken(LRecordOffsetText,
             LCurrentGlobalSymbolRecord.RecordOffset);
           LCurrentGlobalSymbolRecord.RecordKind := LRecordKind;
-          LCurrentGlobalSymbolRecord.Node := LCurrentRecord;
+          LCurrentGlobalSymbolRecord.Node := nil;
           LCurrentGlobalSymbolRecord.HeaderLine := FDocument.Lines[LIndex];
-          LCurrentGlobalSymbolRecord.DetailLines.Add(
-            LCurrentGlobalSymbolRecord.HeaderLine);
           LCurrentGlobalSymbolRecord.StartLine := LIndex + 1;
           LCurrentGlobalSymbolRecord.EndLine := LIndex + 1;
           LCurrentGlobalSymbolSection.Records.Add(LCurrentGlobalSymbolRecord);
@@ -4113,7 +4121,7 @@ begin
           LIndex + 1, LSymbol);
         if LCurrentRecordHasSymbol then
         begin
-          LSymbol.Node := LCurrentRecord;
+          LSymbol.Node := nil;
           if LCurrentAlignRecord <> nil then
             LSymbol.RecordModel := LCurrentAlignRecord
           else
@@ -4128,11 +4136,10 @@ begin
           LProperty.HasUIntValue := LSymbol.HasAddress;
           LProperty.TextValue := LSymbol.Name;
           LProperty.StartLine := LSymbol.StartLine;
-          LCurrentRecord.Properties.Add(LProperty);
         end;
         if TryParseBorlandSymbolSearchLine(LLine, LIndex + 1, LSymbolSearch) then
         begin
-          LSymbolSearch.Node := LCurrentRecord;
+          LSymbolSearch.Node := nil;
           FDocument.SymbolSearches.Add(LSymbolSearch);
           if LCurrentAlignSection <> nil then
             LCurrentAlignSection.Searches.Add(LSymbolSearch);
@@ -4140,38 +4147,31 @@ begin
         Continue;
       end;
 
-      if LCurrentRecord <> nil then
+      if LCurrentRecordStartLine > 0 then
       begin
-        AppendNodeRawLine(LCurrentRecord, LLine);
-        LCurrentRecord.EndLine := LIndex + 1;
         if LCurrentGlobalSymbolRecord <> nil then
           LCurrentGlobalSymbolRecord.EndLine := LIndex + 1;
         if LCurrentGlobalTypeRecord <> nil then
           LCurrentGlobalTypeRecord.EndLine := LIndex + 1;
         if LCurrentAlignRecord <> nil then
         begin
-          LCurrentAlignRecord.DetailLines.Add(FDocument.Lines[LIndex]);
           ParseBorlandSymbolRecordDetails(LCurrentAlignRecord, LLine,
             LIndex + 1);
         end;
         if LCurrentGlobalSymbolRecord <> nil then
         begin
-          LCurrentGlobalSymbolRecord.DetailLines.Add(FDocument.Lines[LIndex]);
           ParseBorlandSymbolRecordDetails(LCurrentGlobalSymbolRecord, LLine,
             LIndex + 1);
         end;
         if LCurrentGlobalTypeRecord <> nil then
         begin
-          LCurrentGlobalTypeRecord.DetailLines.Add(FDocument.Lines[LIndex]);
           ParseBorlandGlobalTypeDetails(LCurrentGlobalTypeRecord, LLine,
             LIndex + 1);
         end;
-        if TryParsePropertyLine(LLine, LIndex + 1, LProperty) then
-          LCurrentRecord.Properties.Add(LProperty);
         if not LCurrentRecordHasSymbol and TryParseBorlandSymbolLine(
           LCurrentRecordKind, LLine, LIndex + 1, LSymbol) then
         begin
-          LSymbol.Node := LCurrentRecord;
+          LSymbol.Node := nil;
           if LCurrentAlignRecord <> nil then
             LSymbol.RecordModel := LCurrentAlignRecord
           else
@@ -4187,14 +4187,12 @@ begin
           LProperty.HasUIntValue := LSymbol.HasAddress;
           LProperty.TextValue := LSymbol.Name;
           LProperty.StartLine := LSymbol.StartLine;
-          LCurrentRecord.Properties.Add(LProperty);
         end;
         Continue;
       end;
 
       if LCurrentSubsection <> nil then
       begin
-        AppendNodeRawLine(LCurrentSubsection, LLine);
         LCurrentSubsection.EndLine := LIndex + 1;
         if TryParsePropertyLine(LLine, LIndex + 1, LProperty) then
           LCurrentSubsection.Properties.Add(LProperty);
@@ -4202,8 +4200,6 @@ begin
     end;
   finally
     LAlignScopeStack.Free;
-    if LCurrentRecord <> nil then
-      LCurrentRecord.EndLine := LTableEnd + 1;
     if LCurrentAlignRecord <> nil then
       LCurrentAlignRecord.EndLine := LTableEnd + 1;
     if LCurrentGlobalSymbolRecord <> nil then
@@ -4352,18 +4348,7 @@ procedure TDumpParser.ParseOMF;
   end;
 
 begin
-  var LStartLine := -1;
-  for var LIndex := 0 to FLines.Count - 1 do
-  begin
-    var LRawOffset, LRecordKind, LRemainder: string;
-    var LOffset: UInt64;
-    if TryRecordHeader(FLines[LIndex], LRawOffset, LRecordKind, LRemainder,
-      LOffset) and SameText(LRecordKind, 'THEADR') then
-    begin
-      LStartLine := LIndex;
-      Break;
-    end;
-  end;
+  var LStartLine := FMarkerLines[lmOMFObject];
   if LStartLine < 0 then
     Exit;
 
@@ -4455,18 +4440,9 @@ begin
     LCurrentMember.EndLine := FLines.Count;
   for var LRecord in FDocument.ObjectRecords do
   begin
-    var LRawText := TStringBuilder.Create;
-    try
       var LLastLineIndex := LRecord.EndLine - 1;
       if LLastLineIndex >= FLines.Count then
         LLastLineIndex := FLines.Count - 1;
-      for var LLineIndex := LRecord.StartLine - 1 to LLastLineIndex do
-      begin
-        if LRawText.Length > 0 then
-          LRawText.AppendLine;
-        LRawText.Append(FLines[LLineIndex]);
-      end;
-      LRecord.RawText := LRawText.ToString;
       for var LLineIndex := LRecord.StartLine to LLastLineIndex do
       begin
         var LDetailText := Trim(FLines[LLineIndex]);
@@ -4483,9 +4459,6 @@ begin
         end;
         LRecord.Details.Add(LDetail);
       end;
-    finally
-      LRawText.Free;
-    end;
   end;
   if FDocument.ObjectRecords.Count > 0 then
     AddNode(nkObjectRecord, 'OMF records', LStartLine + 1, FLines.Count);
@@ -4590,13 +4563,7 @@ procedure TDumpParser.ParseARArchive;
   end;
 
 begin
-  var LArchiveBannerLine := -1;
-  for var LIndex := 0 to FLines.Count - 1 do
-    if IsArchiveBanner(FLines[LIndex]) then
-    begin
-      LArchiveBannerLine := LIndex;
-      Break;
-    end;
+  var LArchiveBannerLine := FMarkerLines[lmARArchive];
   if LArchiveBannerLine < 0 then
     Exit;
 
@@ -4776,13 +4743,7 @@ procedure TDumpParser.ParseMach;
   end;
 
 begin
-  var LHeaderLine := -1;
-  for var LIndex := 0 to FLines.Count - 1 do
-    if Pos('MACH Header', FLines[LIndex]) > 0 then
-    begin
-      LHeaderLine := LIndex;
-      Break;
-    end;
+  var LHeaderLine := FMarkerLines[lmMachHeader];
   if LHeaderLine < 0 then
     Exit;
   FDocument.FileKind := dfMach;
@@ -5264,13 +5225,7 @@ procedure TDumpParser.ParseELF;
   end;
 
 begin
-  var LHeaderLine := -1;
-  for var LIndex := 0 to FLines.Count - 1 do
-    if ContainsText(FLines[LIndex], 'Elf Header') then
-    begin
-      LHeaderLine := LIndex;
-      Break;
-    end;
+  var LHeaderLine := FMarkerLines[lmELFHeader];
   if LHeaderLine < 0 then
     Exit;
 
@@ -5362,13 +5317,11 @@ end;
 
 procedure TDumpParser.ParseCOFF;
 begin
-  for var LIndex := 0 to FLines.Count - 1 do
-    if StartsWithText(Trim(FLines[LIndex]), 'ERROR: Invalid machine type') then
-    begin
-      FDocument.FileKind := dfCOFFObject;
-      AddNode(nkObjectRecord, 'COFF diagnostic', LIndex + 1, LIndex + 1);
-      Exit;
-    end;
+  var LIndex := FMarkerLines[lmCOFFDiagnostic];
+  if LIndex < 0 then
+    Exit;
+  FDocument.FileKind := dfCOFFObject;
+  AddNode(nkObjectRecord, 'COFF diagnostic', LIndex + 1, LIndex + 1);
 end;
 
 procedure TDumpParser.ParseDelphiUnit;
@@ -5382,17 +5335,12 @@ begin
     Exit;
   end;
 
-  for var LIndex := 0 to FLines.Count - 1 do
+  var LIndex := FMarkerLines[lmDelphiUnitDiagnostic];
+  if LIndex >= 0 then
   begin
-    var LLine := Trim(FLines[LIndex]);
-    if StartsWithText(LLine, 'Unable to read file header') or
-      StartsWithText(LLine, 'Invalid unit magic number') then
-    begin
-      FDocument.FileKind := dfDelphiUnit;
-      AddNode(nkObjectRecord, 'Delphi unit diagnostic', LIndex + 1,
-        LIndex + 1);
-      Exit;
-    end;
+    FDocument.FileKind := dfDelphiUnit;
+    AddNode(nkObjectRecord, 'Delphi unit diagnostic', LIndex + 1,
+      LIndex + 1);
   end;
 end;
 

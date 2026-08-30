@@ -52,6 +52,7 @@ implementation
 uses
   System.SysUtils,
   TDump.Explorer.Highlighter,
+  TDump.Explorer.HighlighterProviders,
   TDump.Explorer.TinyParser;
 
 class procedure TPEView.PopulateDataDirectories(AControl: THighlighterControl;
@@ -64,16 +65,19 @@ begin
     AControl.Clear;
     AControl.SetColumnHeaders(['Name', 'RVA', 'Size']);
     AControl.SetColumnDataTypes([thdtText, thdtHexadecimal, thdtHexadecimal]);
-    for var LDirectory in ADocument.DataDirectories do
-    begin
-      var LRVA := LDirectory.RawRVA;
-      if LRVA = '' then
-        LRVA := IntToHex(LDirectory.RVA, 8);
-      var LSize := LDirectory.RawSize;
-      if LSize = '' then
-        LSize := IntToHex(LDirectory.Size, 8);
-      AControl.AddColumns([LDirectory.Name, LRVA, LSize]);
-    end;
+    AControl.SetItemProvider(TCallbackHighlighterRowProvider.Create(
+      ADocument.DataDirectories.Count,
+      function(AIndex: Integer): string
+      begin
+        var LDirectory := ADocument.DataDirectories[AIndex];
+        var LRVA := LDirectory.RawRVA;
+        if LRVA = '' then
+          LRVA := IntToHex(LDirectory.RVA, 8);
+        var LSize := LDirectory.RawSize;
+        if LSize = '' then
+          LSize := IntToHex(LDirectory.Size, 8);
+        Result := Format('%s'#9'%s'#9'%s', [LDirectory.Name, LRVA, LSize]);
+      end));
   finally
     AControl.EndUpdate;
   end;
@@ -91,14 +95,22 @@ begin
       'Phys off', 'Flags']);
     AControl.SetColumnDataTypes([thdtHexadecimal, thdtText, thdtHexadecimal,
       thdtHexadecimal, thdtHexadecimal, thdtHexadecimal, thdtSymbol]);
-    for var LSection in ADocument.Sections do
-      AControl.AddColumns([IntToHex(LSection.Index, 2), LSection.Name,
-        IntToHex(LSection.VirtualSize, 8), IntToHex(LSection.RVA, 8),
-        IntToHex(LSection.RawSize, 8), IntToHex(LSection.RawOffset, 8),
-        LSection.FlagsText]);
-    AControl.AddColumns(['Key to section flags:', '', '', '', '', '', '']);
-    AControl.AddColumns(['C - code', 'D - discardable', 'E - executable',
-      'I - initialized', 'R - readable', 'W - writeable', '']);
+    AControl.SetItemProvider(TCallbackHighlighterRowProvider.Create(
+      ADocument.Sections.Count + 2,
+      function(AIndex: Integer): string
+      begin
+        if AIndex = ADocument.Sections.Count then
+          Exit('Key to section flags:'#9#9#9#9#9#9);
+        if AIndex = ADocument.Sections.Count + 1 then
+          Exit('C - code'#9'D - discardable'#9'E - executable'#9 +
+            'I - initialized'#9'R - readable'#9'W - writeable'#9);
+        var LSection := ADocument.Sections[AIndex];
+        Result := Format('%s'#9'%s'#9'%s'#9'%s'#9'%s'#9'%s'#9'%s',
+          [IntToHex(LSection.Index, 2), LSection.Name,
+           IntToHex(LSection.VirtualSize, 8), IntToHex(LSection.RVA, 8),
+           IntToHex(LSection.RawSize, 8), IntToHex(LSection.RawOffset, 8),
+           LSection.FlagsText]);
+      end));
   finally
     AControl.EndUpdate;
   end;
@@ -115,9 +127,15 @@ begin
     AControl.SetColumnHeaders(['Block', 'Page RVA', 'Block size', 'Entries']);
     AControl.SetColumnDataTypes([thdtInteger, thdtHexadecimal,
       thdtHexadecimal, thdtInteger]);
-    for var LBlock in ADocument.RelocationBlocks do
-      AControl.AddColumns([UIntToStr(LBlock.Index), IntToHex(LBlock.PageRVA, 8),
-        IntToHex(LBlock.BlockSize, 8), IntToStr(LBlock.Entries.Count)]);
+    AControl.SetItemProvider(TCallbackHighlighterRowProvider.Create(
+      ADocument.RelocationBlocks.Count,
+      function(AIndex: Integer): string
+      begin
+        var LBlock := ADocument.RelocationBlocks[AIndex];
+        Result := Format('%s'#9'%s'#9'%s'#9'%d',
+          [UIntToStr(LBlock.Index), IntToHex(LBlock.PageRVA, 8),
+           IntToHex(LBlock.BlockSize, 8), LBlock.Entries.Count]);
+      end));
   finally
     AControl.EndUpdate;
   end;
@@ -133,13 +151,16 @@ begin
     AControl.Clear;
     AControl.SetColumnHeaders(['Type', 'Offset']);
     AControl.SetColumnDataTypes([thdtSymbol, thdtHexadecimal]);
-    for var LRelocation in ABlock.Entries do
-    begin
-      var LOffset := LRelocation.RawOffset;
-      if (LOffset = '') and LRelocation.HasOffset then
-        LOffset := IntToHex(LRelocation.Offset, 4);
-      AControl.AddColumns([LRelocation.RelocationType, LOffset]);
-    end;
+    AControl.SetItemProvider(TCallbackHighlighterRowProvider.Create(
+      ABlock.Entries.Count,
+      function(AIndex: Integer): string
+      begin
+        var LRelocation := ABlock.Entries[AIndex];
+        var LOffset := LRelocation.RawOffset;
+        if (LOffset = '') and LRelocation.HasOffset then
+          LOffset := IntToHex(LRelocation.Offset, 4);
+        Result := LRelocation.RelocationType + #9 + LOffset;
+      end));
   finally
     AControl.EndUpdate;
   end;
@@ -155,13 +176,16 @@ begin
     AControl.Clear;
     AControl.SetColumnHeaders(['Offset', 'String']);
     AControl.SetColumnDataTypes([thdtInteger, thdtText]);
-    for var LEntry in ADocument.Strings do
-    begin
-      var LOffset := '';
-      if LEntry.HasOffset then
-        LOffset := UIntToStr(LEntry.Offset);
-      AControl.AddColumns([LOffset, LEntry.Value]);
-    end;
+    AControl.SetItemProvider(TCallbackHighlighterRowProvider.Create(
+      ADocument.Strings.Count,
+      function(AIndex: Integer): string
+      begin
+        var LEntry := ADocument.Strings[AIndex];
+        var LOffset := '';
+        if LEntry.HasOffset then
+          LOffset := UIntToStr(LEntry.Offset);
+        Result := LOffset + #9 + LEntry.Value;
+      end));
   finally
     AControl.EndUpdate;
   end;
@@ -281,15 +305,19 @@ begin
     AControl.SetColumnHeaders(['RVA', 'Ord.', 'Hint', 'Name']);
     AControl.SetColumnDataTypes([thdtHexadecimal, thdtInteger,
       thdtHexadecimal, thdtAuto]);
-    for var LExport in ADocument.ExportList do
-    begin
-      var LRVA := ''; if LExport.HasRVA then LRVA := IntToHex(LExport.RVA, 8);
-      var LOrdinal := ''; if LExport.HasOrdinal then LOrdinal := LExport.Ordinal.ToString;
-      var LHint := ''; if LExport.HasHint then LHint := IntToHex(LExport.Hint, 4);
-      var LName := LExport.DemangledName;
-      if LName = '' then LName := LExport.Name;
-      AControl.AddColumns([LRVA, LOrdinal, LHint, LName]);
-    end;
+    AControl.SetItemProvider(TCallbackHighlighterRowProvider.Create(
+      ADocument.ExportList.Count,
+      function(AIndex: Integer): string
+      begin
+        var LExport := ADocument.ExportList[AIndex];
+        var LRVA := ''; if LExport.HasRVA then LRVA := IntToHex(LExport.RVA, 8);
+        var LOrdinal := ''; if LExport.HasOrdinal then LOrdinal := LExport.Ordinal.ToString;
+        var LHint := ''; if LExport.HasHint then LHint := IntToHex(LExport.Hint, 4);
+        var LName := LExport.DemangledName;
+        if LName = '' then LName := LExport.Name;
+        Result := Format('%s'#9'%s'#9'%s'#9'%s',
+          [LRVA, LOrdinal, LHint, LName]);
+      end));
   finally
     AControl.EndUpdate;
   end;
@@ -315,13 +343,17 @@ begin
     AControl.Clear;
     AControl.SetColumnHeaders(['Type', 'Name', 'Lang', 'Id']);
     AControl.SetColumnDataTypes([thdtText, thdtText, thdtText, thdtInteger]);
-    for var LResource in ADocument.Resources do
-    begin
-      var LName := LResource.Name;
-      if SameText(LResource.ResourceType, LName) then LName := '';
-      var LId := ''; if LResource.HasId then LId := LResource.Id.ToString;
-      AControl.AddColumns([LResource.ResourceType, LName, LResource.Language, LId]);
-    end;
+    AControl.SetItemProvider(TCallbackHighlighterRowProvider.Create(
+      ADocument.Resources.Count,
+      function(AIndex: Integer): string
+      begin
+        var LResource := ADocument.Resources[AIndex];
+        var LName := LResource.Name;
+        if SameText(LResource.ResourceType, LName) then LName := '';
+        var LId := ''; if LResource.HasId then LId := LResource.Id.ToString;
+        Result := Format('%s'#9'%s'#9'%s'#9'%s',
+          [LResource.ResourceType, LName, LResource.Language, LId]);
+      end));
   finally
     AControl.EndUpdate;
   end;

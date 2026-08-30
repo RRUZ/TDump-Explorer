@@ -55,6 +55,9 @@ uses
 
 {$R *.dfm}
 
+const
+  CMaximumRetainedLogEntries = 10000;
+
 constructor TLogControl.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
@@ -91,6 +94,8 @@ begin
   LEntry.Message := StringReplace(LEntry.Message, #13, ' ', [rfReplaceAll]);
   LEntry.Message := StringReplace(LEntry.Message, #10, ' ', [rfReplaceAll]);
   FEntries.Add(LEntry);
+  while FEntries.Count > CMaximumRetainedLogEntries do
+    FEntries.Delete(0);
 
   UpdateControlList;
   ControlList1.ItemIndex := FEntries.Count - 1;

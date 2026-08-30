@@ -20,6 +20,8 @@ uses
 
 type
   TBorlandView = record
+    class procedure PopulateSymbolTable(AControl: THighlighterControl;
+      ADocument: TDumpDocument); static;
     class procedure PopulateSubsection(AControl: THighlighterControl;
       ADocument: TDumpDocument; ASubsectionIndex: Integer); static;
     class procedure PopulateSymbolRecord(AControl: THighlighterControl;
@@ -42,7 +44,40 @@ uses
   System.SysUtils,
   System.StrUtils,
   TDump.Explorer.Highlighter,
+  TDump.Explorer.HighlighterProviders,
   TDump.Explorer.TinyParser;
+
+class procedure TBorlandView.PopulateSymbolTable(AControl: THighlighterControl;
+  ADocument: TDumpDocument);
+begin
+  if (AControl = nil) or (ADocument = nil) then
+    Exit;
+
+  AControl.ParserMode := tpmTDumpValues;
+  AControl.BeginUpdate;
+  try
+    AControl.Clear;
+    AControl.SetColumnHeaders(['Module', 'File offset', 'Size', 'Type']);
+    AControl.SetColumnDataTypes([thdtHexadecimal, thdtHexadecimal,
+      thdtHexadecimal, thdtText]);
+    for var LSubsection in ADocument.SymbolSubsections do
+    begin
+      var LModule := LSubsection.RawModIndex;
+      if LModule = '' then
+        LModule := IntToHex(LSubsection.ModIndex, 4);
+      var LFileOffset := LSubsection.RawFileOffset;
+      if LFileOffset = '' then
+        LFileOffset := IntToHex(LSubsection.FileOffset, 8);
+      var LSize := LSubsection.RawSize;
+      if LSize = '' then
+        LSize := IntToHex(LSubsection.Size, 6);
+      AControl.AddColumns([LModule, LFileOffset, LSize,
+        LSubsection.SubsectionType]);
+    end;
+  finally
+    AControl.EndUpdate;
+  end;
+end;
 
 class function TBorlandView.PackageCaption(const ACaption: string;
   ADocument: TDumpDocument): string;
@@ -93,6 +128,19 @@ begin
   AControl.BeginUpdate;
   try
     AControl.Clear;
+    if ADocument.BorlandIndexOnly then
+    begin
+      AControl.UseColumnMode := False;
+      AControl.AutoSizeColumns := False;
+      AControl.ShowLineNumbers := True;
+      AControl.SetItemProvider(TDocumentLineRowProvider.CreateRange(ADocument,
+        LSubsection.StartLine - 1,
+        LSubsection.EndLine - LSubsection.StartLine + 1));
+      Exit;
+    end;
+    AControl.UseColumnMode := True;
+    AControl.AutoSizeColumns := True;
+    AControl.ShowLineNumbers := False;
     if SameText(LSubsection.SubsectionType, 'sstNames') then
     begin
       AControl.SetColumnHeaders(['Index', 'Name']);

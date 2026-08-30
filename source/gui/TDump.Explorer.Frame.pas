@@ -40,6 +40,9 @@ type
     FDocument: TDumpDocument;
     FSummaryCard: TCard;
     FSummaryControl: THighlighterControl;
+    FDetailCard: TCard;
+    FDetailControl: THighlighterControl;
+    FCurrentDetailKind: TTreeDetailKind;
     FHighlighterCards: array[TTreeDetailKind] of TCard;
     FHighlighterControls: array[TTreeDetailKind] of THighlighterControl;
     FActiveDetailNode: PVirtualNode;
@@ -47,7 +50,6 @@ type
     FTreeSelectionBorderColor: TColor;
     function HeaderFormatCaption: string;
     function HeaderArchitectureCaption: string;
-    function FormatFileSize(AByteCount: Int64): string;
     procedure UpdateDocumentHeader;
     function EnsureHighlighterDetailControl(
       ADetailKind: TTreeDetailKind): THighlighterControl;
@@ -77,6 +79,7 @@ type
     procedure ShowExportDirectoryDetails;
     procedure ShowResourceDirectoryDetails;
     procedure ShowResourceDetails(AResource: TDumpResource);
+    procedure ShowBorlandSymbolTableDetails;
     procedure ShowBorlandSubsectionDetails(ASubsectionIndex: Integer);
     procedure ShowBorlandSourceFileDetails(ASourceFile: TDumpSourceFile);
     procedure ShowBorlandSymbolRecordDetails(ADetailKind: TTreeDetailKind;
@@ -236,27 +239,6 @@ begin
   inherited;
 end;
 
-function TDumpDocumentFrame.FormatFileSize(AByteCount: Int64): string;
-const
-  cUnits: array[0..4] of string = ('B', 'KB', 'MB', 'GB', 'TB');
-var
-  LSize: Double;
-  LUnitIndex: Integer;
-begin
-  LSize := AByteCount;
-  LUnitIndex := 0;
-  while (LSize >= 1024) and (LUnitIndex < High(cUnits)) do
-  begin
-    LSize := LSize / 1024;
-    Inc(LUnitIndex);
-  end;
-
-  if LUnitIndex = 0 then
-    Result := Format('%d %s', [AByteCount, cUnits[LUnitIndex]])
-  else
-    Result := Format('%.2f %s', [LSize, cUnits[LUnitIndex]]);
-end;
-
 function TDumpDocumentFrame.HeaderArchitectureCaption: string;
 begin
   Result := '';
@@ -340,7 +322,7 @@ begin
   begin
     lblTimestampValue.Caption := FormatDateTime('yyyy-mm-dd hh:nn:ss',
       TFile.GetLastWriteTime(LSourceFileName));
-    lblSizeValue.Caption := FormatFileSize(TFile.GetSize(LSourceFileName));
+    lblSizeValue.Caption := FormatByteSize(TFile.GetSize(LSourceFileName));
   end
   else
   begin
@@ -352,19 +334,27 @@ end;
 function TDumpDocumentFrame.EnsureHighlighterDetailControl(
   ADetailKind: TTreeDetailKind): THighlighterControl;
 begin
-  if FHighlighterControls[ADetailKind] = nil then
+  if FDetailControl = nil then
   begin
-    var LCard := TCard.Create(cpViews);
-    LCard.Parent := cpViews;
-    LCard.Caption := cTreeDetailKindInfos[ADetailKind].Caption;
-    FHighlighterCards[ADetailKind] := LCard;
-
-    var LControl := THighlighterControl.Create(LCard);
-    LControl.Parent := LCard;
-    LControl.Align := alClient;
-    FHighlighterControls[ADetailKind] := LControl;
+    FDetailCard := TCard.Create(cpViews);
+    FDetailCard.Parent := cpViews;
+    FDetailControl := THighlighterControl.Create(FDetailCard);
+    FDetailControl.Parent := FDetailCard;
+    FDetailControl.Align := alClient;
   end;
-  Result := FHighlighterControls[ADetailKind];
+  if FCurrentDetailKind <> ADetailKind then
+  begin
+    if FCurrentDetailKind <> tdkNone then
+    begin
+      FHighlighterCards[FCurrentDetailKind] := nil;
+      FHighlighterControls[FCurrentDetailKind] := nil;
+    end;
+    FCurrentDetailKind := ADetailKind;
+    FDetailCard.Caption := cTreeDetailKindInfos[ADetailKind].Caption;
+    FHighlighterCards[ADetailKind] := FDetailCard;
+    FHighlighterControls[ADetailKind] := FDetailControl;
+  end;
+  Result := FDetailControl;
 end;
 
 procedure TDumpDocumentFrame.ShowHeaderDetails(ADetailKind: TTreeDetailKind;
@@ -711,6 +701,15 @@ begin
   cpViews.ActiveCard := FHighlighterCards[tdkBorlandSubsection];
 end;
 
+procedure TDumpDocumentFrame.ShowBorlandSymbolTableDetails;
+begin
+  if FDocument = nil then
+    Exit;
+  TBorlandView.PopulateSymbolTable(
+    EnsureHighlighterDetailControl(tdkBorlandSymbolTable), FDocument);
+  cpViews.ActiveCard := FHighlighterCards[tdkBorlandSymbolTable];
+end;
+
 procedure TDumpDocumentFrame.ShowBorlandSymbolRecordDetails(
   ADetailKind: TTreeDetailKind; ARecord: TDumpBorlandSymbolRecord);
 begin
@@ -952,6 +951,8 @@ begin
       ShowResourceDirectoryDetails;
     tdkResource:
       ShowResourceDetails(LNodeData.Resource);
+    tdkBorlandSymbolTable:
+      ShowBorlandSymbolTableDetails;
     tdkBorlandSubsection:
       ShowBorlandSubsectionDetails(LNodeData.BorlandSubsectionIndex);
     tdkBorlandSourceFile:

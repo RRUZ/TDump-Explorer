@@ -3,11 +3,14 @@ program TDumpParserTests;
 {$APPTYPE CONSOLE}
 
 uses
+  Winapi.Windows,
+  Winapi.PsAPI,
   System.SysUtils,
   System.IOUtils,
   System.StrUtils,
   DUnitX.TestFramework,
   DUnitX.Loggers.Xml.NUnit,
+  TDump.Explorer.TextSource in '..\source\parser\TDump.Explorer.TextSource.pas',
   TDump.Explorer.Parser in '..\source\parser\TDump.Explorer.Parser.pas',
   TDump.Explorer.Relations in '..\source\common\TDump.Explorer.Relations.pas',
   TDump.Explorer.Runner in '..\source\common\TDump.Explorer.Runner.pas';
@@ -18,6 +21,8 @@ const
   CTestResultsFile = CTestResultsDirectory + '\TDumpParserTests.nunit.xml';
   CTurboDumpBannerFixture =
     'C:\dev\TDump-Explorer\fixtures\PlainVanilla.Delphi.Package.bpl.tdump';
+  CLargeVCLFixture =
+    'C:\dev\TDump-Explorer\fixtures\PlainVanilla.VCL.Application.tdump';
 
 type
   [TestFixture]
@@ -50,11 +55,23 @@ type
     [Test] procedure RelationGraph;
     [Test] procedure ARArchiveProjection;
     [Test] procedure ELFProgramHeadersProjection;
+    [Test] procedure LargeReportIndexedStorage;
   end;
 
 procedure Require(ACondition: Boolean; const AMessage: string);
 begin
   Assert.IsTrue(ACondition, AMessage);
+end;
+
+function CurrentPrivateBytes: UInt64;
+begin
+  var LCounters: TProcessMemoryCountersEx;
+  ZeroMemory(@LCounters, SizeOf(LCounters));
+  LCounters.cb := SizeOf(LCounters);
+  if not GetProcessMemoryInfo(GetCurrentProcess,
+    PPROCESS_MEMORY_COUNTERS(@LCounters), SizeOf(LCounters)) then
+    RaiseLastOSError;
+  Result := LCounters.PrivateUsage;
 end;
 
 function ParseGeneratedFixture(const AFileName: string): TDumpDocument;
@@ -680,7 +697,7 @@ begin
         (LDocument.DebugInformation.Methods.Count > 0),
         LFixtureName + ' must create generic debug information and methods.');
       var LMethod := LDocument.DebugInformation.Methods[0];
-      Require((LMethod.Symbol <> nil) and (LMethod.Node <> nil) and
+      Require((LMethod.Symbol <> nil) and
         LMethod.SourceSpan.IsValid and
         (LMethod.SourceSpan.Run = LDocument.PrimaryRun),
         LFixtureName +
@@ -782,6 +799,43 @@ begin
     finally
       LDocument.Free;
     end;
+  end;
+end;
+
+procedure TestLargeReportIndexedStorage;
+begin
+  Require(TFile.Exists(CLargeVCLFixture),
+    'The large VCL regression fixture must be available.');
+  var LParser := TDumpParser.Create;
+  try
+    var LBaselinePrivateBytes := CurrentPrivateBytes;
+    var LDocument := LParser.ParseFile(CLargeVCLFixture);
+    try
+      Require(LDocument.TextSource <> nil,
+        'File parsing must retain an indexed text source.');
+      Require(LDocument.Lines.Count = LDocument.TextSource.LineCount,
+        'The line catalog must be a view over the indexed source.');
+      Require(LDocument.Lines.Count = 1052806,
+        'The large fixture line count must remain stable.');
+      Require(LDocument.Nodes.Count < 1000,
+        'Borland records must not create a duplicate generic-node graph.');
+      Require(LDocument.BorlandSubsections.Count = 312,
+        'The large fixture must retain its Borland subsection index.');
+      Require(LDocument.BorlandIndexOnly,
+        'The large fixture must use the lazy Borland index.');
+      Require((LDocument.AlignSymbolSections.Count = 0) and
+        (LDocument.GlobalTypeSections.Count = 0),
+        'Indexed mode must not eagerly allocate per-record Borland models.');
+      var LPrivateDelta := CurrentPrivateBytes - LBaselinePrivateBytes;
+      Require(LPrivateDelta <= 64 * 1024 * 1024,
+        Format('The large indexed parse retained %.2f MiB private memory; '+
+          'the regression ceiling is 64 MiB.',
+          [LPrivateDelta / (1024.0 * 1024.0)]));
+    finally
+      LDocument.Free;
+    end;
+  finally
+    LParser.Free;
   end;
 end;
 
@@ -1131,6 +1185,11 @@ end;
 procedure TParserFixture.ELFProgramHeadersProjection;
 begin
   TestELFProgramHeadersProjection;
+end;
+
+procedure TParserFixture.LargeReportIndexedStorage;
+begin
+  TestLargeReportIndexedStorage;
 end;
 
 begin

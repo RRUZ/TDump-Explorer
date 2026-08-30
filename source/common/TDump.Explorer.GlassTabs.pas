@@ -18,7 +18,8 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.Classes, System.Types, System.SysUtils,
-  System.UITypes, Vcl.Controls, Vcl.Graphics, Vcl.ImgList;
+  System.UITypes, System.Generics.Collections, Winapi.GDIPOBJ, Vcl.Controls,
+  Vcl.Graphics, Vcl.ImgList;
 
 type
   TGlassGradientDirection = (ggdVertical, ggdHorizontal,
@@ -116,6 +117,10 @@ type
     FFirstVisibleIndex: Integer;
     FHotLeftNavigation: Boolean;
     FHotRightNavigation: Boolean;
+    FTabWidthCache: TList<Integer>;
+    FTabPositionCache: TList<Integer>;
+    FTabWidthCachePPI: Integer;
+    FTabWidthCacheValid: Boolean;
     FOnChange: TTabChangingEvent;
     FOnCloseTab: TTabCloseEvent;
     FOnAddButtonClick: TNotifyEvent;
@@ -125,6 +130,8 @@ type
     FOnAfterPaintBackground: TGlassTabBackgroundPaintEvent;
     FOnAfterPaintTab: TGlassTabPaintEvent;
     procedure Changed(Sender: TObject);
+    procedure EnsureTabWidthCache;
+    procedure InvalidateTabWidthCache;
     procedure ImagesChanged(Sender: TObject);
     procedure SetImages(const AValue: TCustomImageList);
     procedure SetItems(const AValue: TGlassTabItems);
@@ -154,7 +161,6 @@ type
     procedure SetButtonHoverBackground(const AValue: Boolean);
     procedure SetLeftInset(const AValue: Integer);
     function GetTabRect(AIndex: Integer): TRect;
-    function GetTabWidth(AIndex: Integer): Integer;
     function GetCloseRect(AIndex: Integer): TRect;
     function GetAddButtonRect: TRect;
     function GetChevronButtonRect: TRect;
@@ -176,11 +182,14 @@ type
       AItem: TGlassTabItem): System.UITypes.TImageIndex;
     function TabAt(const APoint: TPoint): Integer;
     function CloseAt(const APoint: TPoint): Integer;
-    procedure DrawTab(ACanvas: TCanvas; AIndex: Integer; ASelected: Boolean);
-    procedure DrawNavigationButton(ACanvas: TCanvas; const ARect: TRect;
-      ALeft, AHot, AEnabled: Boolean);
-    procedure DrawChevronButton(ACanvas: TCanvas; const ARect: TRect;
-      AHot: Boolean);
+    procedure DrawTab(ACanvas: TCanvas; AGraphics: TGPGraphics;
+      AShape, AStrokePath, AFirstShoulderPath,
+      ABaselinePath: TGPGraphicsPath; AInactiveOutlinePen,
+      AClosePen, AHotClosePen: TGPPen; AIndex: Integer; ASelected: Boolean);
+    procedure DrawNavigationButton(AGraphics: TGPGraphics;
+      const ARect: TRect; ALeft, AHot, AEnabled: Boolean);
+    procedure DrawChevronButton(AGraphics: TGPGraphics;
+      const ARect: TRect; AHot: Boolean);
   protected
     procedure DoAddButtonClick; virtual;
     procedure DoChevronButtonClick; virtual;
@@ -275,7 +284,7 @@ type
 implementation
 
 uses
-  Winapi.GDIPAPI, Winapi.GDIPOBJ, System.Math;
+  Winapi.GDIPAPI, System.Math;
 
 function GradientMode(ADirection: TGlassGradientDirection): LinearGradientMode;
 begin
@@ -501,6 +510,9 @@ begin
   FFirstVisibleIndex := 0;
   FHotLeftNavigation := False;
   FHotRightNavigation := False;
+  FTabWidthCache := TList<Integer>.Create;
+  FTabPositionCache := TList<Integer>.Create;
+  FTabWidthCacheValid := False;
   Height := ScaleValue(FTabHeight);
 end;
 
@@ -508,6 +520,8 @@ destructor TGlassTabStrip.Destroy;
 begin
   if Assigned(FImages) then
     FImages.UnRegisterChanges(FImageChangeLink);
+  FTabPositionCache.Free;
+  FTabWidthCache.Free;
   FImageChangeLink.Free;
   FItems.Free;
   inherited;
@@ -519,7 +533,42 @@ begin
     FActiveIndex := FItems.Count - 1;
   FFirstVisibleIndex := EnsureRange(FFirstVisibleIndex, 0,
     Max(0, FItems.Count - 1));
+  InvalidateTabWidthCache;
   Invalidate;
+end;
+
+procedure TGlassTabStrip.EnsureTabWidthCache;
+const
+  CTabFixedContentWidth = 72;
+begin
+  if FTabWidthCacheValid and (FTabWidthCachePPI = CurrentPPI) and
+    (FTabWidthCache.Count = FItems.Count) then
+    Exit;
+
+  FTabWidthCache.Clear;
+  FTabPositionCache.Clear;
+  FTabPositionCache.Add(0);
+  Canvas.Font.Assign(Font);
+  Canvas.Font.Name := 'Segoe UI';
+  Canvas.Font.Height := -ScaleValue(CTextHeight);
+  var LPosition := 0;
+  for var LIndex := 0 to FItems.Count - 1 do
+  begin
+    var LCaptionWidth := Canvas.TextWidth(FItems[LIndex].Caption);
+    var LTabWidth := EnsureRange(
+      ScaleValue(CTabFixedContentWidth) + LCaptionWidth,
+      ScaleValue(FMinTabWidth), ScaleValue(FMaxTabWidth));
+    FTabWidthCache.Add(LTabWidth);
+    Inc(LPosition, LTabWidth - ScaleValue(FTabOverlap));
+    FTabPositionCache.Add(LPosition);
+  end;
+  FTabWidthCachePPI := CurrentPPI;
+  FTabWidthCacheValid := True;
+end;
+
+procedure TGlassTabStrip.InvalidateTabWidthCache;
+begin
+  FTabWidthCacheValid := False;
 end;
 
 procedure TGlassTabStrip.ImagesChanged(Sender: TObject);
@@ -819,32 +868,14 @@ begin
   if Assigned(FOnChange) then FOnChange(Self, FActiveIndex);
 end;
 
-function TGlassTabStrip.GetTabWidth(AIndex: Integer): Integer;
-const
-  CTabFixedContentWidth = 72;
-begin
-  if (AIndex < 0) or (AIndex >= FItems.Count) then
-    Exit(0);
-  Canvas.Font.Assign(Font);
-  Canvas.Font.Name := 'Segoe UI';
-  Canvas.Font.Height := -ScaleValue(CTextHeight);
-  var LCaptionWidth := Canvas.TextWidth(FItems[AIndex].Caption);
-  Result := EnsureRange(
-    ScaleValue(CTabFixedContentWidth) + LCaptionWidth,
-    ScaleValue(FMinTabWidth), ScaleValue(FMaxTabWidth));
-end;
-
 function TGlassTabStrip.IsOverflowing: Boolean;
 begin
   if FItems.Count = 0 then
     Exit(False);
+  EnsureTabWidthCache;
   var LRequiredWidth := ScaleValue(FLeftInset + CSelectedShoulderWidth);
-  for var LIndex := 0 to FItems.Count - 1 do
-  begin
-    Inc(LRequiredWidth, GetTabWidth(LIndex));
-    if LIndex < FItems.Count - 1 then
-      Dec(LRequiredWidth, ScaleValue(FTabOverlap));
-  end;
+  Inc(LRequiredWidth, FTabPositionCache[FItems.Count] +
+    ScaleValue(FTabOverlap));
   if FShowAddButton then
   begin
     Inc(LRequiredWidth, ScaleValue(FAddButtonSpacing));
@@ -1003,10 +1034,10 @@ begin
     LLeft := LNavigationCenterX +
       ScaleValue(CButtonHoverHalfWidth + CNavigationTabSpacing);
   end;
-  for var LIndex := LFirstIndex to AIndex - 1 do
-    Inc(LLeft, GetTabWidth(LIndex) - ScaleValue(FTabOverlap));
+  EnsureTabWidthCache;
+  Inc(LLeft, FTabPositionCache[AIndex] - FTabPositionCache[LFirstIndex]);
   Result := Rect(LLeft, ScaleValue(CTabTop),
-    LLeft + GetTabWidth(AIndex), Height);
+    LLeft + FTabWidthCache[AIndex], Height);
 end;
 
 function TGlassTabStrip.GetCloseRect(AIndex: Integer): TRect;
@@ -1142,8 +1173,10 @@ begin
   Result := -1;
 end;
 
-procedure TGlassTabStrip.DrawTab(ACanvas: TCanvas; AIndex: Integer;
-  ASelected: Boolean);
+procedure TGlassTabStrip.DrawTab(ACanvas: TCanvas; AGraphics: TGPGraphics;
+  AShape, AStrokePath, AFirstShoulderPath,
+  ABaselinePath: TGPGraphicsPath; AInactiveOutlinePen,
+  AClosePen, AHotClosePen: TGPPen; AIndex: Integer; ASelected: Boolean);
 const
   CSelectedShoulderControlOffset = 5;
   CSelectedShoulderRise = 4;
@@ -1166,14 +1199,11 @@ const
   CSelectedGlowWidth = 2.0;
   CSelectedOutlineWidth = 1.0;
   CBaselineWidth = 1.0;
-  CInactiveOutlineWidth = 1.0;
-  CCloseLineWidth = 1.25;
 begin
   var LClose, LHoverRect: TRect;
   var LTextRect: TRect;
   var LTop, LBottom: ARGB;
   var LTextColor: TColor;
-  var LCloseColor: TColor;
   var LOldBkMode: Integer;
   var LOldTextColor: COLORREF;
   var LFlags: Cardinal;
@@ -1221,21 +1251,20 @@ begin
     LTextColor := FPalette.InactiveText;
   end;
 
-  var LGraphics := TGPGraphics.Create(ACanvas.Handle);
+  var LGraphics := AGraphics;
+  var LShape := AShape;
+  var LStrokePath := AStrokePath;
+  var LFirstShoulderPath := AFirstShoulderPath;
+  var LBaselinePath := ABaselinePath;
+  LShape.Reset;
+  LStrokePath.Reset;
+  LFirstShoulderPath.Reset;
+  LBaselinePath.Reset;
+  var LFill := TGPLinearGradientBrush.Create(MakeRect(LTab.Left,
+    LTab.Top, LTab.Width, LTab.Height - LTab.Top), LTop, LBottom,
+    GradientMode(FTabGradientDirection));
   try
-    var LShape := TGPGraphicsPath.Create;
-    try
-      var LStrokePath := TGPGraphicsPath.Create;
-      try
-        var LFirstShoulderPath := TGPGraphicsPath.Create;
-        try
-          var LBaselinePath := TGPGraphicsPath.Create;
-          try
-            var LFill := TGPLinearGradientBrush.Create(MakeRect(LTab.Left,
-              LTab.Top, LTab.Width, LTab.Height - LTab.Top), LTop, LBottom,
-              GradientMode(FTabGradientDirection));
-            try
-              LGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
+    LGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
 
     if ASelected then
     begin
@@ -1515,22 +1544,15 @@ begin
     end
     else
     begin
-      var LInactiveOutlinePen := TGPPen.Create(
-        ToArgb(FPalette.StripBorder, 180),
-        ScaleValue(CInactiveOutlineWidth));
-      try
-        LGraphics.DrawPath(LInactiveOutlinePen, LStrokePath);
-      finally
-        LInactiveOutlinePen.Free;
-      end;
+      LGraphics.DrawPath(AInactiveOutlinePen, LStrokePath);
     end;
 
+    LGraphics.Flush(FlushIntentionSync);
     LContentCenterY := LTab.Top + LTab.Height div 2;
     var LTextLeft := LTab.Left + ScaleValue(CTextLeftInset);
     var LImageIndex := ResolveImageIndex(FItems[AIndex]);
     if LImageIndex >= 0 then
     begin
-      LGraphics.Flush(FlushIntentionSync);
       var LImageLeft := LTab.Left + ScaleValue(CImageLeftInset);
       var LImageTop := LContentCenterY - FImages.Height div 2;
       FImages.Draw(ACanvas, LImageLeft, LImageTop, LImageIndex, Enabled);
@@ -1585,50 +1607,26 @@ begin
             LClose.Bottom - ScaleValue(CCloseGlyphInset),
             FPalette.Accent, ScaleValue(1.0));
       end;
+      var LGlyphPen := AClosePen;
       if FHotCloseIndex = AIndex then
-        LCloseColor := FPalette.Accent
-      else
-        LCloseColor := FPalette.InactiveText;
-      var LClosePen := TGPPen.Create(ToArgb(LCloseColor),
-        ScaleValue(CCloseLineWidth));
-      try
-        LClosePen.SetStartCap(LineCapRound);
-        LClosePen.SetEndCap(LineCapRound);
-        LGraphics.DrawLine(LClosePen,
+        LGlyphPen := AHotClosePen;
+      LGraphics.DrawLine(LGlyphPen,
           LClose.Left + ScaleValue(CCloseGlyphInset),
           LClose.Top + ScaleValue(CCloseGlyphInset),
           LClose.Right - ScaleValue(CCloseGlyphInset),
           LClose.Bottom - ScaleValue(CCloseGlyphInset));
-        LGraphics.DrawLine(LClosePen,
+      LGraphics.DrawLine(LGlyphPen,
           LClose.Right - ScaleValue(CCloseGlyphInset),
           LClose.Top + ScaleValue(CCloseGlyphInset),
           LClose.Left + ScaleValue(CCloseGlyphInset),
           LClose.Bottom - ScaleValue(CCloseGlyphInset));
-      finally
-        LClosePen.Free;
-      end;
-    end;
-            finally
-              LFill.Free;
-            end;
-          finally
-            LBaselinePath.Free;
-          end;
-        finally
-          LFirstShoulderPath.Free;
-        end;
-      finally
-        LStrokePath.Free;
-      end;
-    finally
-      LShape.Free;
     end;
   finally
-    LGraphics.Free;
+    LFill.Free;
   end;
 end;
 
-procedure TGlassTabStrip.DrawNavigationButton(ACanvas: TCanvas;
+procedure TGlassTabStrip.DrawNavigationButton(AGraphics: TGPGraphics;
   const ARect: TRect; ALeft, AHot, AEnabled: Boolean);
 const
   CNavigationGlyphHalfWidth = 3;
@@ -1636,20 +1634,9 @@ const
   CNavigationLineWidth = 1.5;
   CNavigationDisabledAlpha = 72;
 begin
-  var LGraphics := TGPGraphics.Create(ACanvas.Handle);
-  try
-    LGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
-    LGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);
-    var LBackground := TGPLinearGradientBrush.Create(
-      MakeRect(0, 0, Width, Height), ToArgb(FPalette.StripTop),
-      ToArgb(FPalette.StripBottom),
-      GradientMode(FBackgroundGradientDirection));
-    try
-      LGraphics.FillRectangle(LBackground, ARect.Left, ARect.Top,
-        ARect.Width, Max(0, ARect.Height - ScaleValue(CBaselineOffset)));
-    finally
-      LBackground.Free;
-    end;
+  var LGraphics := AGraphics;
+  LGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
+  LGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);
 
     var LCenterX := (ARect.Left + ARect.Right) div 2;
     var LCenterY := (ARect.Top + ARect.Bottom) div 2;
@@ -1709,22 +1696,18 @@ begin
     finally
       LChevronPen.Free;
     end;
-  finally
-    LGraphics.Free;
-  end;
 end;
 
-procedure TGlassTabStrip.DrawChevronButton(ACanvas: TCanvas;
+procedure TGlassTabStrip.DrawChevronButton(AGraphics: TGPGraphics;
   const ARect: TRect; AHot: Boolean);
 const
   CChevronGlyphHalfWidth = 4;
   CChevronGlyphHalfHeight = 2;
   CChevronLineWidth = 1.35;
 begin
-  var LGraphics := TGPGraphics.Create(ACanvas.Handle);
-  try
-    LGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
-    LGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);
+  var LGraphics := AGraphics;
+  LGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
+  LGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);
     var LCenterX := (ARect.Left + ARect.Right) div 2;
     var LCenterY := (ARect.Top + ARect.Bottom) div 2;
     var LX1 := LCenterX - ScaleValue(CChevronGlyphHalfWidth);
@@ -1765,9 +1748,6 @@ begin
     finally
       LChevronPen.Free;
     end;
-  finally
-    LGraphics.Free;
-  end;
 end;
 
 procedure TGlassTabStrip.Paint;
@@ -1775,73 +1755,111 @@ const
   CPlusGlyphHalfSize = 5;
   CPlusHotLineWidth = 1.45;
   CPlusLineWidth = 1.35;
+  CInactiveOutlineWidth = 1.0;
+  CCloseLineWidth = 1.25;
 begin
   { Draw directly to VCL's double-buffered paint surface. Rendering into a
     second TBitmap here softens ClearType and path edges on scaled displays. }
   var LGraphics := TGPGraphics.Create(Canvas.Handle);
   try
+    LGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
+    LGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);
     var LBack := TGPLinearGradientBrush.Create(MakeRect(0, 0, Width, Height),
       ToArgb(FPalette.StripTop), ToArgb(FPalette.StripBottom),
       GradientMode(FBackgroundGradientDirection));
     try
-      LGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
       LGraphics.FillRectangle(LBack, 0, 0, Width, Height);
     finally
       LBack.Free;
     end;
-  finally
-    LGraphics.Free;
-  end;
-  EnsureActiveTabVisible;
-  DoAfterPaintBackground(Canvas, GetAvailableBackgroundRect);
-  var LViewport := GetTabsViewport;
-  var LFirstIndex := 0;
-  if IsOverflowing then
-    LFirstIndex := FFirstVisibleIndex;
-  var LSavedDC := SaveDC(Canvas.Handle);
-  try
-    var LTabClipRegion := CreateRectRgn(LViewport.Left, LViewport.Top,
-      LViewport.Right, LViewport.Bottom);
+
+    EnsureActiveTabVisible;
+    LGraphics.Flush(FlushIntentionSync);
+    DoAfterPaintBackground(Canvas, GetAvailableBackgroundRect);
+    var LViewport := GetTabsViewport;
+    var LFirstIndex := 0;
+    if IsOverflowing then
+      LFirstIndex := FFirstVisibleIndex;
+    var LSavedDC := SaveDC(Canvas.Handle);
     try
-      var LBaselineClipRegion := CreateRectRgn(LViewport.Left,
-        Max(0, Height - ScaleValue(2)), Width, Height);
+      var LTabClipRegion := CreateRectRgn(LViewport.Left, LViewport.Top,
+        LViewport.Right, LViewport.Bottom);
       try
-        CombineRgn(LTabClipRegion, LTabClipRegion, LBaselineClipRegion,
-          RGN_OR);
-        ExtSelectClipRgn(Canvas.Handle, LTabClipRegion, RGN_AND);
-      finally
-        DeleteObject(LBaselineClipRegion);
-      end;
-      for var LIndex := LFirstIndex to FItems.Count - 1 do
-      begin
-        var LTabRect := GetTabRect(LIndex);
-        if LTabRect.Left >= LViewport.Right then
-          Break;
-        if LIndex <> FActiveIndex then
-        begin
-          DrawTab(Canvas, LIndex, False);
-          DoAfterPaintTab(Canvas, LTabRect, LIndex, False,
-            LIndex = FHotIndex);
+        var LBaselineClipRegion := CreateRectRgn(LViewport.Left,
+          Max(0, Height - ScaleValue(2)), Width, Height);
+        try
+          CombineRgn(LTabClipRegion, LTabClipRegion, LBaselineClipRegion,
+            RGN_OR);
+          ExtSelectClipRgn(Canvas.Handle, LTabClipRegion, RGN_AND);
+        finally
+          DeleteObject(LBaselineClipRegion);
         end;
-      end;
-      if FActiveIndex >= 0 then
-      begin
-        DrawTab(Canvas, FActiveIndex, True);
-        DoAfterPaintTab(Canvas, GetTabRect(FActiveIndex), FActiveIndex, True,
-          FActiveIndex = FHotIndex);
+
+        { One graphics context and one set of mutable paths serve every visible
+          tab. The paths are reset by DrawTab before the next geometry is built. }
+        var LTabGraphics := TGPGraphics.Create(Canvas.Handle);
+        var LShape := TGPGraphicsPath.Create;
+        var LStrokePath := TGPGraphicsPath.Create;
+        var LFirstShoulderPath := TGPGraphicsPath.Create;
+        var LBaselinePath := TGPGraphicsPath.Create;
+        var LInactiveOutlinePen := TGPPen.Create(
+          ToArgb(FPalette.StripBorder, 180),
+          ScaleValue(CInactiveOutlineWidth));
+        var LClosePen := TGPPen.Create(ToArgb(FPalette.InactiveText),
+          ScaleValue(CCloseLineWidth));
+        var LHotClosePen := TGPPen.Create(ToArgb(FPalette.Accent),
+          ScaleValue(CCloseLineWidth));
+        try
+          LTabGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
+          LTabGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);
+          LClosePen.SetStartCap(LineCapRound);
+          LClosePen.SetEndCap(LineCapRound);
+          LHotClosePen.SetStartCap(LineCapRound);
+          LHotClosePen.SetEndCap(LineCapRound);
+          for var LIndex := LFirstIndex to FItems.Count - 1 do
+          begin
+            var LTabRect := GetTabRect(LIndex);
+            if LTabRect.Left >= LViewport.Right then
+              Break;
+            if LIndex <> FActiveIndex then
+            begin
+              DrawTab(Canvas, LTabGraphics, LShape, LStrokePath,
+                LFirstShoulderPath, LBaselinePath, LInactiveOutlinePen,
+                LClosePen, LHotClosePen, LIndex, False);
+              LTabGraphics.Flush(FlushIntentionSync);
+              DoAfterPaintTab(Canvas, LTabRect, LIndex, False,
+                LIndex = FHotIndex);
+            end;
+          end;
+          if FActiveIndex >= 0 then
+          begin
+            DrawTab(Canvas, LTabGraphics, LShape, LStrokePath,
+              LFirstShoulderPath, LBaselinePath, LInactiveOutlinePen,
+              LClosePen, LHotClosePen, FActiveIndex, True);
+            LTabGraphics.Flush(FlushIntentionSync);
+            DoAfterPaintTab(Canvas, GetTabRect(FActiveIndex), FActiveIndex,
+              True, FActiveIndex = FHotIndex);
+          end;
+        finally
+          LHotClosePen.Free;
+          LClosePen.Free;
+          LInactiveOutlinePen.Free;
+          LBaselinePath.Free;
+          LFirstShoulderPath.Free;
+          LStrokePath.Free;
+          LShape.Free;
+          LTabGraphics.Free;
+        end;
+      finally
+        DeleteObject(LTabClipRegion);
       end;
     finally
-      DeleteObject(LTabClipRegion);
+      RestoreDC(Canvas.Handle, LSavedDC);
     end;
-  finally
-    RestoreDC(Canvas.Handle, LSavedDC);
-  end;
 
-  if IsAddButtonVisible then
-  begin
-    var LAdd := GetAddButtonRect;
-    LGraphics := TGPGraphics.Create(Canvas.Handle);
-    try
+    if IsAddButtonVisible then
+    begin
+      var LAdd := GetAddButtonRect;
       var LPlusPen: TGPPen;
       if FHotAddButton then
         LPlusPen := TGPPen.Create(ToArgb(FPalette.Accent),
@@ -1886,20 +1904,20 @@ begin
       finally
         LPlusPen.Free;
       end;
-    finally
-      LGraphics.Free;
     end;
-  end;
 
-  if IsChevronButtonVisible then
-    DrawChevronButton(Canvas, GetChevronButtonRect, FHotChevronButton);
+    if IsChevronButtonVisible then
+      DrawChevronButton(LGraphics, GetChevronButtonRect, FHotChevronButton);
 
-  if IsOverflowing then
-  begin
-    DrawNavigationButton(Canvas, GetLeftNavigationRect, True,
-      FHotLeftNavigation, CanNavigateLeft);
-    DrawNavigationButton(Canvas, GetRightNavigationRect, False,
-      FHotRightNavigation, CanNavigateRight);
+    if IsOverflowing then
+    begin
+      DrawNavigationButton(LGraphics, GetLeftNavigationRect, True,
+        FHotLeftNavigation, CanNavigateLeft);
+      DrawNavigationButton(LGraphics, GetRightNavigationRect, False,
+        FHotRightNavigation, CanNavigateRight);
+    end;
+  finally
+    LGraphics.Free;
   end;
 end;
 

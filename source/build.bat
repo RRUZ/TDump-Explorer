@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions
 
-rem Build entry point for the TDump Explorer parser while the console harness is the only target.
+rem Build entry point for the TDump Explorer application and parser/test tools.
 set "STUDIO_ROOT=C:\Program Files (x86)\Embarcadero\Studio\37.0"
 set "RSVARS=%STUDIO_ROOT%\bin\rsvars.bat"
 set "PROJECT_ROOT=%~dp0.."
@@ -20,6 +20,8 @@ set "PROFILER_SOURCE=%PROJECT_ROOT%\tests\TDumpParserProfiler.dpr"
 set "PROFILER_EXE=%PROJECT_ROOT%\tests\TDumpParserProfiler.exe"
 set "RELATIONS_SOURCE=%PROJECT_ROOT%\tests\TDumpRelationsConsole.dpr"
 set "RELATIONS_EXE=%PROJECT_ROOT%\tests\TDumpRelationsConsole.exe"
+set "APP_PROJECT=%PROJECT_ROOT%\source\gui\TDump.Explorer.dproj"
+set "APP_EXE=%PROJECT_ROOT%\source\gui\Win32\Debug\TDump.Explorer.exe"
 set "INTERMEDIATE_ROOT=%PROJECT_ROOT%\build\dcu\win32-debug"
 set "DEFAULT_FIXTURE=%PROJECT_ROOT%\fixtures\PlainVanilla.Delphi.Package.bpl.tdump"
 
@@ -32,6 +34,7 @@ if /I "%~1"=="test" goto TEST
 if /I "%~1"=="tinyparser" goto TINY_PARSER
 if /I "%~1"=="profile" goto PROFILE
 if /I "%~1"=="relations" goto RELATIONS
+if /I "%~1"=="app" goto APP
 goto USAGE
 
 :INIT_RAD_STUDIO
@@ -276,8 +279,17 @@ exit /b %ERRORLEVEL%
 :RUNNER
 call :BUILD_RUNNER
 if errorlevel 1 exit /b 1
-"%RUNNER_EXE%" "%~2" "%~3" "%~4"
+if "%~2"=="" goto RUNNER_DEFAULT
+"%RUNNER_EXE%" "%~2" "%~3" "%~4" "%~5" "%~6"
 exit /b %ERRORLEVEL%
+
+:RUNNER_DEFAULT
+pushd "%PROJECT_ROOT%\tests"
+if errorlevel 1 exit /b 1
+"%RUNNER_EXE%"
+set "RUNNER_RESULT=%ERRORLEVEL%"
+popd
+exit /b %RUNNER_RESULT%
 
 :FINDER
 call :BUILD_FINDER
@@ -366,8 +378,27 @@ if not exist "%FIXTURE%" (
 "%RELATIONS_EXE%" "%FIXTURE%"
 exit /b %ERRORLEVEL%
 
+:APP
+call :INIT_RAD_STUDIO
+if errorlevel 1 exit /b 1
+if not exist "%APP_PROJECT%" (
+  echo Application project was not found:
+  echo   %APP_PROJECT%
+  exit /b 1
+)
+echo Rebuilding TDump Explorer application ^(Win32 Debug^)...
+msbuild.exe "%APP_PROJECT%" /t:Rebuild /p:Config=Debug /p:Platform=Win32 /nologo /verbosity:minimal
+if errorlevel 1 exit /b %ERRORLEVEL%
+if not exist "%APP_EXE%" (
+  echo Build completed, but the expected application executable was not found:
+  echo   %APP_EXE%
+  exit /b 1
+)
+echo Build succeeded: %APP_EXE%
+exit /b 0
+
 :USAGE
-echo Usage: build.bat [build^|run [fixture]^|runner [input-file] [32^|64] [tdump-options]^|finder^|test^|tinyparser^|profile [fixture-directory] [iterations]^|relations [fixture]]
+echo Usage: build.bat [build^|run [fixture]^|runner [input-file] [32^|64] [tdump-options]^|finder^|test^|tinyparser^|profile [fixture-file-or-directory] [iterations]^|relations [fixture]^|app]
 echo.
 echo   build  Build the Win32 Debug console harness ^(default^).
 echo   run    Build, then run the console harness with an optional fixture.
@@ -379,4 +410,5 @@ echo   profile Build and profile every *.tdump under fixtures, optionally using 
 echo           fixture directory and positive iteration count.
 echo   relations Build and exercise the cross-reference relation layer against an
 echo             optional TDUMP fixture.
+echo   app    Full rebuild of the Win32 Debug VCL application.
 exit /b 1
