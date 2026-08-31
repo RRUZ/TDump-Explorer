@@ -69,7 +69,7 @@ type
 
   // Declares an exact, parser-confirmed rendering rule for one source span.
   // Consumers must not infer this from raw text alone.
-  TDumpRawSyntaxHint = (rshDefault, rshCppBuilderMethod);
+  TDumpRawSyntaxHint = (rshDefault, rshCppBuilderMethod, rshMachLinker);
 
   // Identifies a contiguous source range from one TDUMP invocation.
   // Raw text remains document-owned; the run provides provenance without copies.
@@ -581,6 +581,18 @@ type
     SourceSpan: TDumpSourceSpan;
   end;
 
+  // Represents a Mach report block whose rows stay in the mapped TDUMP text.
+  // The UI decodes a row only when it is needed for painting or copying.
+  TDumpMachReportSection = class
+  public
+    Caption: string;
+    StartLine: Integer;
+    EndLine: Integer;
+    ItemStartLine: Integer;
+    ItemCount: Integer;
+    SourceSpan: TDumpSourceSpan;
+  end;
+
   // Represents one row in an ELF relocation table.
   TDumpELFRelocation = class
   public
@@ -1080,6 +1092,14 @@ type
     MachSymbols: TObjectList<TDumpMachSymbol>;
     MachDynamicImports: TObjectList<TDumpMachDynamicSymbol>;
     MachIndirectSymbols: TObjectList<TDumpMachDynamicSymbol>;
+    MachDynamicSymbolTable: TDumpMachReportSection;
+    MachRebaseInfo: TDumpMachReportSection;
+    MachBindingInfo: TDumpMachReportSection;
+    MachWeakBindingInfo: TDumpMachReportSection;
+    MachLazyBindingInfo: TDumpMachReportSection;
+    MachExports: TDumpMachReportSection;
+    MachResources: TDumpMachReportSection;
+    MachRawSymbols: TDumpMachReportSection;
     ELFProgramHeaders: TObjectList<TDumpELFProgramHeader>;
     ELFDynamicEntries: TObjectList<TDumpELFDynamicEntry>;
     ELFRelocations: TObjectList<TDumpELFRelocation>;
@@ -1998,6 +2018,14 @@ begin
   MachSymbols := TObjectList<TDumpMachSymbol>.Create(True);
   MachDynamicImports := TObjectList<TDumpMachDynamicSymbol>.Create(True);
   MachIndirectSymbols := TObjectList<TDumpMachDynamicSymbol>.Create(True);
+  MachDynamicSymbolTable := nil;
+  MachRebaseInfo := nil;
+  MachBindingInfo := nil;
+  MachWeakBindingInfo := nil;
+  MachLazyBindingInfo := nil;
+  MachExports := nil;
+  MachResources := nil;
+  MachRawSymbols := nil;
   ELFProgramHeaders := TObjectList<TDumpELFProgramHeader>.Create(True);
   ELFDynamicEntries := TObjectList<TDumpELFDynamicEntry>.Create(True);
   ELFRelocations := TObjectList<TDumpELFRelocation>.Create(True);
@@ -2046,6 +2074,14 @@ begin
   ELFRelocations.Free;
   ELFDynamicEntries.Free;
   ELFProgramHeaders.Free;
+  MachRawSymbols.Free;
+  MachResources.Free;
+  MachExports.Free;
+  MachLazyBindingInfo.Free;
+  MachWeakBindingInfo.Free;
+  MachBindingInfo.Free;
+  MachRebaseInfo.Free;
+  MachDynamicSymbolTable.Free;
   MachIndirectSymbols.Free;
   MachDynamicImports.Free;
   MachSymbols.Free;
@@ -2401,6 +2437,27 @@ begin
 end;
 
 procedure TDumpParser.AttachRunProvenance;
+  procedure AttachMachReportSection(ASection: TDumpMachReportSection;
+    ARun: TDumpRun);
+  begin
+    if ASection = nil then
+      Exit;
+    ASection.SourceSpan.Run := ARun;
+    ASection.SourceSpan.StartLine := ASection.StartLine;
+    ASection.SourceSpan.EndLine := ASection.EndLine;
+  end;
+
+  procedure ApplyMachSymbolSyntaxHints(ASection: TDumpMachReportSection);
+  begin
+    if ASection = nil then
+      Exit;
+    for var LLineIndex := ASection.ItemStartLine to ASection.EndLine do
+      // Mach report blocks combine Itanium C++ names (_ZN...) with ordinary
+      // Mach/Objective-C linker symbols (_NS...).  Use the dedicated Mach
+      // mode so linker names are styled without turning binding opcodes and
+      // regular report labels into method names.
+      FDocument.Lines.SetSyntaxHint(LLineIndex - 1, rshMachLinker);
+  end;
 begin
   var LRun := FDocument.PrimaryRun;
   LRun.ToolKind := FDocument.ToolKind;
@@ -2564,19 +2621,51 @@ begin
     LSymbol.SourceSpan.Run := LRun;
     LSymbol.SourceSpan.StartLine := LSymbol.StartLine;
     LSymbol.SourceSpan.EndLine := LSymbol.EndLine;
+    // Mach Symbol Table entries carry native and C++Builder-style names.  Use
+    // the dedicated Mach linker mode when their original raw row is rendered,
+    // without retaining a second copy of the text.
+    LSymbol.SourceSpan.SyntaxHint := rshMachLinker;
+    if (LSymbol.StartLine >= 1) and
+      (LSymbol.StartLine <= FDocument.Lines.Count) then
+      FDocument.Lines.SetSyntaxHint(LSymbol.StartLine - 1,
+        rshMachLinker);
   end;
   for var LSymbol in FDocument.MachDynamicImports do
   begin
     LSymbol.SourceSpan.Run := LRun;
     LSymbol.SourceSpan.StartLine := LSymbol.StartLine;
     LSymbol.SourceSpan.EndLine := LSymbol.EndLine;
+    LSymbol.SourceSpan.SyntaxHint := rshMachLinker;
+    if (LSymbol.StartLine >= 1) and
+      (LSymbol.StartLine <= FDocument.Lines.Count) then
+      FDocument.Lines.SetSyntaxHint(LSymbol.StartLine - 1,
+        rshMachLinker);
   end;
   for var LSymbol in FDocument.MachIndirectSymbols do
   begin
     LSymbol.SourceSpan.Run := LRun;
     LSymbol.SourceSpan.StartLine := LSymbol.StartLine;
     LSymbol.SourceSpan.EndLine := LSymbol.EndLine;
+    LSymbol.SourceSpan.SyntaxHint := rshMachLinker;
+    if (LSymbol.StartLine >= 1) and
+      (LSymbol.StartLine <= FDocument.Lines.Count) then
+      FDocument.Lines.SetSyntaxHint(LSymbol.StartLine - 1,
+        rshMachLinker);
   end;
+  AttachMachReportSection(FDocument.MachDynamicSymbolTable, LRun);
+  AttachMachReportSection(FDocument.MachRebaseInfo, LRun);
+  AttachMachReportSection(FDocument.MachBindingInfo, LRun);
+  AttachMachReportSection(FDocument.MachWeakBindingInfo, LRun);
+  AttachMachReportSection(FDocument.MachLazyBindingInfo, LRun);
+  AttachMachReportSection(FDocument.MachExports, LRun);
+  AttachMachReportSection(FDocument.MachResources, LRun);
+  AttachMachReportSection(FDocument.MachRawSymbols, LRun);
+  ApplyMachSymbolSyntaxHints(FDocument.MachDynamicSymbolTable);
+  ApplyMachSymbolSyntaxHints(FDocument.MachBindingInfo);
+  ApplyMachSymbolSyntaxHints(FDocument.MachWeakBindingInfo);
+  ApplyMachSymbolSyntaxHints(FDocument.MachLazyBindingInfo);
+  ApplyMachSymbolSyntaxHints(FDocument.MachExports);
+  ApplyMachSymbolSyntaxHints(FDocument.MachRawSymbols);
   for var LRelocation in FDocument.ELFRelocations do
   begin
     LRelocation.SourceSpan.Run := LRun;
@@ -4969,6 +5058,34 @@ begin
 end;
 
 procedure TDumpParser.ParseMach;
+  procedure CreateReportSection(var ATarget: TDumpMachReportSection;
+    const ACaption: string; AStartIndex, AItemStartIndex, AEndIndex: Integer);
+  begin
+    if (AStartIndex < 0) or (AItemStartIndex < AStartIndex) or
+      (AEndIndex < AItemStartIndex) then
+      Exit;
+    ATarget := TDumpMachReportSection.Create;
+    ATarget.Caption := ACaption;
+    ATarget.StartLine := AStartIndex + 1;
+    ATarget.EndLine := AEndIndex + 1;
+    ATarget.ItemStartLine := AItemStartIndex + 1;
+    ATarget.ItemCount := AEndIndex - AItemStartIndex + 1;
+  end;
+
+  procedure CreateBoundedReportSection(var ATarget: TDumpMachReportSection;
+    const ACaption: string; AStartIndex, ANextSectionIndex: Integer);
+  var
+    LEndIndex: Integer;
+  begin
+    if (AStartIndex < 0) or (ANextSectionIndex <= AStartIndex) then
+      Exit;
+    LEndIndex := ANextSectionIndex - 1;
+    while (LEndIndex > AStartIndex) and (Trim(FLines[LEndIndex]) = '') do
+      Dec(LEndIndex);
+    CreateReportSection(ATarget, ACaption, AStartIndex, AStartIndex + 1,
+      LEndIndex);
+  end;
+
   function ValueAfterLabel(const ALine: string): string;
   begin
     var LWork := Trim(ALine);
@@ -5255,8 +5372,88 @@ begin
       end;
     end;
     if LDynamicStart >= 0 then
+    begin
       AddNode(nkSymbols, 'Mach Dynamic Symbol Table', LDynamicStart + 1,
         LDynamicEnd + 1);
+      CreateReportSection(FDocument.MachDynamicSymbolTable,
+        'Dynamic Symbol Table', LSymbolTableEnd, LDynamicStart, LDynamicEnd);
+    end;
+  end;
+
+  var LRebaseHeader := -1;
+  var LBindingHeader := -1;
+  var LWeakBindingHeader := -1;
+  var LLazyBindingHeader := -1;
+  var LExportsHeader := -1;
+  var LResourcesHeader := -1;
+  var LRawSymbolsHeader := -1;
+  for var LIndex := 0 to FLines.Count - 1 do
+  begin
+    var LTrimmed := Trim(FLines[LIndex]);
+    if SameText(LTrimmed, 'Rebase info:') then
+      LRebaseHeader := LIndex
+    else if SameText(LTrimmed, 'Binding info:') then
+      LBindingHeader := LIndex
+    else if SameText(LTrimmed, 'Weak Binding info:') then
+      LWeakBindingHeader := LIndex
+    else if SameText(LTrimmed, 'Lazy Binding info:') then
+      LLazyBindingHeader := LIndex
+    else if SameText(LTrimmed, 'Exports:') then
+      LExportsHeader := LIndex
+    else if StartsWithText(LTrimmed, '----------- Resources') then
+      LResourcesHeader := LIndex
+    else if SameText(LTrimmed, 'Raw Symbols:') then
+      LRawSymbolsHeader := LIndex;
+  end;
+
+  if LRebaseHeader >= 0 then
+  begin
+    var LRebaseEnd := LRebaseHeader;
+    for var LIndex := LRebaseHeader + 1 to FLines.Count - 1 do
+    begin
+      var LTrimmed := Trim(FLines[LIndex]);
+      if SameText(LTrimmed, 'REBASE_OPCODE_DONE') then
+      begin
+        LRebaseEnd := LIndex;
+        Break;
+      end;
+      if SameText(LTrimmed, 'Binding info:') then
+      begin
+        LRebaseEnd := LIndex - 1;
+        Break;
+      end;
+    end;
+    CreateReportSection(FDocument.MachRebaseInfo, 'Rebase Info',
+      LRebaseHeader, LRebaseHeader + 1, LRebaseEnd);
+  end;
+
+  CreateBoundedReportSection(FDocument.MachBindingInfo, 'Binding Info',
+    LBindingHeader, LWeakBindingHeader);
+  CreateBoundedReportSection(FDocument.MachWeakBindingInfo,
+    'Weak Binding Info', LWeakBindingHeader, LLazyBindingHeader);
+  CreateBoundedReportSection(FDocument.MachLazyBindingInfo,
+    'Lazy Binding Info', LLazyBindingHeader, LExportsHeader);
+  CreateBoundedReportSection(FDocument.MachExports, 'Exports', LExportsHeader,
+    LResourcesHeader);
+
+  if (LResourcesHeader >= 0) and (LRawSymbolsHeader > LResourcesHeader) then
+  begin
+    var LResourcesEnd := LRawSymbolsHeader - 1;
+    while (LResourcesEnd > LResourcesHeader) and
+      (Trim(FLines[LResourcesEnd]) = '') do
+      Dec(LResourcesEnd);
+    CreateReportSection(FDocument.MachResources, 'Resources',
+      LResourcesHeader, LResourcesHeader + 1, LResourcesEnd);
+  end;
+
+  if LRawSymbolsHeader >= 0 then
+  begin
+    var LRawSymbolsFirstItem := LRawSymbolsHeader + 1;
+    if (LRawSymbolsFirstItem < FLines.Count) and
+      StartsWithText(Trim(FLines[LRawSymbolsFirstItem]), '#') then
+      Inc(LRawSymbolsFirstItem);
+    CreateReportSection(FDocument.MachRawSymbols, 'Raw Symbols',
+      LRawSymbolsHeader, LRawSymbolsFirstItem, FLines.Count - 1);
   end;
 end;
 

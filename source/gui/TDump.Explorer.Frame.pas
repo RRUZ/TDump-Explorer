@@ -102,7 +102,8 @@ type
     procedure ShowMachSectionDetails(ASection: TDumpMachSection);
     procedure ShowMachSymbolTableDetails;
     procedure ShowMachDynamicSymbolsDetails(ADetailKind: TTreeDetailKind);
-    procedure ShowMachDynamicSymbolMetadataDetails;
+    procedure ShowMachDynamicSymbolTableDetails;
+    procedure ShowMachReportSectionDetails(ADetailKind: TTreeDetailKind);
     procedure ShowDiagnosticsDetails;
     function DetailControlForNode(ANode: PVirtualNode): THighlighterControl;
     procedure SaveActiveDetailItemIndex;
@@ -493,15 +494,6 @@ begin
   cpViews.ActiveCard := FHighlighterCards[ADetailKind];
 end;
 
-procedure TDumpDocumentFrame.ShowMachDynamicSymbolMetadataDetails;
-begin
-  if (FDocument = nil) or (FDocument.MachDynamicSymbolTableCommand = nil) then
-    Exit;
-  TMachView.PopulateDynamicSymbolMetadata(
-    EnsureHighlighterDetailControl(tdkMachDynamicSymbolMetadata), FDocument);
-  cpViews.ActiveCard := FHighlighterCards[tdkMachDynamicSymbolMetadata];
-end;
-
 procedure TDumpDocumentFrame.ShowDataDirectoriesDetails;
 begin
   if FDocument = nil then
@@ -764,6 +756,41 @@ begin
   TBorlandView.PopulateSymbolRecord(EnsureHighlighterDetailControl(ADetailKind),
     ARecord);
   FHighlighterCards[ADetailKind].Caption := TBorlandView.SymbolCaption(ARecord);
+  cpViews.ActiveCard := FHighlighterCards[ADetailKind];
+end;
+
+procedure TDumpDocumentFrame.ShowMachDynamicSymbolTableDetails;
+begin
+  if (FDocument = nil) or (FDocument.MachDynamicSymbolTable = nil) then
+    Exit;
+  TMachView.PopulateReportSection(
+    EnsureHighlighterDetailControl(tdkMachDynamicSymbolTable), FDocument,
+    FDocument.MachDynamicSymbolTable, tdkMachDynamicSymbolTable);
+  cpViews.ActiveCard := FHighlighterCards[tdkMachDynamicSymbolTable];
+end;
+
+procedure TDumpDocumentFrame.ShowMachReportSectionDetails(
+  ADetailKind: TTreeDetailKind);
+var
+  LSection: TDumpMachReportSection;
+begin
+  if FDocument = nil then
+    Exit;
+  case ADetailKind of
+    tdkMachRebaseInfo: LSection := FDocument.MachRebaseInfo;
+    tdkMachBindingInfo: LSection := FDocument.MachBindingInfo;
+    tdkMachWeakBindingInfo: LSection := FDocument.MachWeakBindingInfo;
+    tdkMachLazyBindingInfo: LSection := FDocument.MachLazyBindingInfo;
+    tdkMachExports: LSection := FDocument.MachExports;
+    tdkMachResources: LSection := FDocument.MachResources;
+    tdkMachRawSymbols: LSection := FDocument.MachRawSymbols;
+  else
+    Exit;
+  end;
+  if LSection = nil then
+    Exit;
+  TMachView.PopulateReportSection(EnsureHighlighterDetailControl(ADetailKind),
+    FDocument, LSection, ADetailKind);
   cpViews.ActiveCard := FHighlighterCards[ADetailKind];
 end;
 
@@ -1125,8 +1152,11 @@ begin
       ShowMachSymbolTableDetails;
     tdkMachDynamicImports, tdkMachIndirectSymbols:
       ShowMachDynamicSymbolsDetails(LNodeData.DetailKind);
-    tdkMachDynamicSymbolMetadata:
-      ShowMachDynamicSymbolMetadataDetails;
+    tdkMachDynamicSymbolTable:
+      ShowMachDynamicSymbolTableDetails;
+    tdkMachRebaseInfo, tdkMachBindingInfo, tdkMachWeakBindingInfo,
+    tdkMachLazyBindingInfo, tdkMachExports, tdkMachResources, tdkMachRawSymbols:
+      ShowMachReportSectionDetails(LNodeData.DetailKind);
     tdkDiagnostics:
       ShowDiagnosticsDetails;
   else

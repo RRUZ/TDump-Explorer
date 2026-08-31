@@ -1,0 +1,76 @@
+object ExplorerPopupMenuForm: TExplorerPopupMenuForm
+  Left = 0
+  Top = 0
+  BorderIcons = []
+  BorderStyle = bsNone
+  ClientHeight = 161
+  ClientWidth = 249
+  Color = clBtnFace
+  CustomTitleBar.Control = TitleBarPanel1
+  CustomTitleBar.Enabled = True
+  CustomTitleBar.Height = 4
+  CustomTitleBar.SystemHeight = False
+  CustomTitleBar.ShowCaption = False
+  CustomTitleBar.SystemColors = False
+  CustomTitleBar.BackgroundColor = clWhite
+  CustomTitleBar.ForegroundColor = 65793
+  CustomTitleBar.InactiveBackgroundColor = clWhite
+  CustomTitleBar.InactiveForegroundColor = 10066329
+  CustomTitleBar.ButtonForegroundColor = 65793
+  CustomTitleBar.ButtonBackgroundColor = clWhite
+  CustomTitleBar.ButtonHoverForegroundColor = 65793
+  CustomTitleBar.ButtonHoverBackgroundColor = 16053492
+  CustomTitleBar.ButtonPressedForegroundColor = 65793
+  CustomTitleBar.ButtonPressedBackgroundColor = 15395562
+  CustomTitleBar.ButtonInactiveForegroundColor = 10066329
+  CustomTitleBar.ButtonInactiveBackgroundColor = clWhite
+  DoubleBuffered = True
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -12
+  Font.Name = 'Segoe UI'
+  Font.Style = []
+  GlassFrame.Enabled = True
+  GlassFrame.Top = 4
+  PopupMode = pmExplicit
+  Position = poDesigned
+  RoundedCorners = rcOn
+  StyleElements = [seFont]
+  OnDeactivate = FormDeactivate
+  TextHeight = 15
+  inline MenuItemsControl: THighlighterControl
+    AlignWithMargins = True
+    Left = 8
+    Top = 3
+    Width = 233
+    Height = 158
+    Margins.Left = 8
+    Margins.Top = 0
+    Margins.Right = 8
+    Margins.Bottom = 0
+    Align = alClient
+    TabOrder = 0
+    ExplicitLeft = 8
+    ExplicitTop = 3
+    ExplicitWidth = 233
+    ExplicitHeight = 158
+    inherited ControlList1: TControlList
+      Width = 233
+      Height = 134
+      ItemHeight = 40
+      ExplicitWidth = 233
+      ExplicitHeight = 134
+    end
+    inherited HeaderControl1: THeaderControl
+      Width = 233
+      ExplicitWidth = 233
+    end
+  end
+  object TitleBarPanel1: TTitleBarPanel
+    Left = 0
+    Top = 0
+    Width = 249
+    Height = 3
+    CustomButtons = <>
+  end
+end

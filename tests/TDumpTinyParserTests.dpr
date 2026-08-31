@@ -4,7 +4,11 @@ program TDumpTinyParserTests;
 
 uses
   System.SysUtils,
+  System.StrUtils,
   System.Types,
+  System.IOUtils,
+  System.RegularExpressions,
+  System.Generics.Collections,
   Vcl.Graphics,
   DUnitX.TestFramework,
   DUnitX.Loggers.Xml.NUnit,
@@ -15,6 +19,7 @@ uses
 const
   CTestResultsDirectory = 'C:\dev\TDump-Explorer\tests\test-results';
   CTestResultsFile = CTestResultsDirectory + '\TDumpTinyParserTests.nunit.xml';
+  CMachFixture = 'C:\dev\TDump-Explorer\fixtures\generated\Mach.Universal.Rad37.tdump';
 
 type
   [TestFixture]
@@ -23,6 +28,7 @@ type
     [Test] procedure TDumpValueTokenization;
     [Test] procedure HighlightThemes;
     [Test] procedure CppBuilderMethodTokenization;
+    [Test] procedure MachFixtureLinkerTokenization;
     [Test] procedure TextFormatDrawing;
   end;
 
@@ -114,6 +120,8 @@ procedure TestCppBuilderMethodTokenization;
 const
   CMethod = 'System::__linkproc__ __fastcall PackageLoad(' +
     'System::PackageInfoTable * const, System::TLibModule *)';
+  CGenericMethod = 'System::Generics::Collections::TDictionary__2<' +
+    'System::UnicodeString, System::Variant>::TKeyEnumerator::MoveNext()';
 begin
   var LParser := TTinyParser.Create;
   try
@@ -131,6 +139,26 @@ begin
         'C++Builder T-prefixed classes must be classified as types.');
       Require(HasToken(LTokens, ttkKeyword, 'const'),
         'C++ type qualifiers must be classified as keywords.');
+      var LDemangledGenericTokens := LParser.Tokenize(CGenericMethod,
+        tpmCppBuilderMethod);
+      try
+        Require(HasToken(LDemangledGenericTokens, ttkTypeName,
+          'UnicodeString') and HasToken(LDemangledGenericTokens, ttkTypeName,
+          'Variant'),
+          'Demangled Delphi generic arguments must use their shared semantic type tokens.');
+      finally
+        LDemangledGenericTokens.Free;
+      end;
+      var LMachDemangledGenericTokens := LParser.Tokenize(
+        'symbol: ' + CGenericMethod, tpmMachLinker);
+      try
+        Require(HasToken(LMachDemangledGenericTokens, ttkTypeName,
+          'UnicodeString') and HasToken(LMachDemangledGenericTokens,
+          ttkTypeName, 'Variant'),
+          'Mach demangled generic arguments must match the Itanium type coloring.');
+      finally
+        LMachDemangledGenericTokens.Free;
+      end;
       var LBorlandMethodTokens := LParser.Tokenize(
         '@Sysinit@InterlockedExchange$qqsrii', tpmCppBuilderMethod);
       try
@@ -316,6 +344,113 @@ begin
       finally
         LMachOItaniumTokens.Free;
       end;
+      var LVTableTokens := LParser.Tokenize(
+        'symbol: __ZTVN3Fmx8Treeview9TTreeViewE (flags = 0x0)',
+        tpmMachLinker);
+      try
+        Require(HasToken(LVTableTokens, ttkNamespace, 'Fmx') and
+          HasToken(LVTableTokens, ttkNamespace, 'Treeview'),
+          'Itanium vtable names must preserve each owner namespace.');
+        Require(HasToken(LVTableTokens, ttkTypeName, 'TTreeView'),
+          'Itanium vtable names must classify the described class as a type.');
+        Require(HasToken(LVTableTokens, ttkKeyword, 'symbol') and
+          HasToken(LVTableTokens, ttkKeyword, 'flags'),
+          'Mach symbol labels must be semantic keywords, not method names.');
+        Require(not HasToken(LVTableTokens, ttkMethodName,
+          '__ZTVN3Fmx8Treeview9TTreeViewE'),
+          'An Itanium vtable name must not be rendered as one unparsed method.');
+      finally
+        LVTableTokens.Free;
+      end;
+      var LBindingTokens := LParser.Tokenize(
+        'BIND_OPCODE_SET_SYMBOL_TRAILING_FLAGS_IMM'#13#10 +
+        '  symbol: dyld_stub_binder (flags = 0x0)', tpmMachLinker);
+      try
+        Require(HasToken(LBindingTokens, ttkKeyword,
+          'BIND_OPCODE_SET_SYMBOL_TRAILING_FLAGS_IMM'),
+          'Mach bind opcodes must be semantic keywords, not method names.');
+        Require(HasToken(LBindingTokens, ttkMethodName, 'dyld_stub_binder'),
+          'A plain Mach linker symbol following symbol: must be highlighted as a method.');
+      finally
+        LBindingTokens.Free;
+      end;
+      var LMachDemangledTokens := LParser.Tokenize(
+        '518 Fmx::Fontglyphs::Mac::Finalization()', tpmMachLinker);
+      try
+        Require(HasToken(LMachDemangledTokens, ttkNamespace, 'Fmx') and
+          HasToken(LMachDemangledTokens, ttkNamespace, 'Fontglyphs') and
+          HasToken(LMachDemangledTokens, ttkNamespace, 'Mac'),
+          'Mach demangled qualified names must keep every owner as a namespace.');
+        Require(HasToken(LMachDemangledTokens, ttkMethodName, 'Finalization'),
+          'The terminal call in a Mach demangled qualified name must be a method.');
+      finally
+        LMachDemangledTokens.Free;
+      end;
+      var LMachNestedSignatureTokens := LParser.Tokenize(
+        'symbol: __ZN3Fmx5Forms17TCommonCustomForm12DoMouseWheelEN6System3SetINS2_7Classes15TShiftStateItemELS5_0ELS5_10EEEiRb (flags = 0x0)',
+        tpmMachLinker);
+      try
+        Require(HasToken(LMachNestedSignatureTokens, ttkNamespace, 'Fmx') and
+          HasToken(LMachNestedSignatureTokens, ttkNamespace, 'Forms') and
+          HasToken(LMachNestedSignatureTokens, ttkNamespace, 'System') and
+          HasToken(LMachNestedSignatureTokens, ttkNamespace, 'Classes'),
+          'Nested Mach signatures must preserve owner namespaces.');
+        Require(HasToken(LMachNestedSignatureTokens, ttkTypeName,
+          'TCommonCustomForm') and HasToken(LMachNestedSignatureTokens,
+          ttkTypeName, 'Set') and HasToken(LMachNestedSignatureTokens,
+          ttkTypeName, 'TShiftStateItem'),
+          'Nested Mach signatures must preserve owner and generic argument types.');
+        Require(HasToken(LMachNestedSignatureTokens, ttkMethodName,
+          'DoMouseWheel'),
+          'Nested Mach signatures must preserve the terminal method name.');
+      finally
+        LMachNestedSignatureTokens.Free;
+      end;
+      var LMachObjectiveCSymbolTokens := LParser.Tokenize(
+        'symbol: _NSAccessibilityActionDescription (flags = 0x0)',
+        tpmMachLinker);
+      try
+        Require(HasToken(LMachObjectiveCSymbolTokens, ttkMethodName,
+          '_NSAccessibilityActionDescription'),
+          'Ordinary Mach and Objective-C linker symbols must receive method highlighting.');
+      finally
+        LMachObjectiveCSymbolTokens.Free;
+      end;
+      var LMachGenericConstructorTokens := LParser.Tokenize(
+        '__ZN6Macapi10Objectivec19TOCGenericImport__2IN6System15DelphiInterfaceINS_6Appkit17NSPageLayoutClassEEENS3_INS4_12NSPageLayoutEEEEv04cctrEv',
+        tpmCppBuilderMethod);
+      try
+        Require(HasToken(LMachGenericConstructorTokens, ttkNamespace, 'Macapi'),
+          'Mach generic linker names must retain their namespace components.');
+        Require(HasToken(LMachGenericConstructorTokens, ttkTypeName,
+          'TOCGenericImport__2'),
+          'Delphi cctr generic linker names must classify the outer generic class as a type.');
+        Require(HasToken(LMachGenericConstructorTokens, ttkTypeName,
+          'NSPageLayoutClass'),
+          'Mach generic linker names must tokenize embedded template types.');
+        Require(HasToken(LMachGenericConstructorTokens, ttkKeyword, 'cctr'),
+          'Delphi cctr must remain a visibly highlighted generated-member marker.');
+      finally
+        LMachGenericConstructorTokens.Free;
+      end;
+      var LMachGenericDestructorTokens := LParser.Tokenize(
+        'symbol: __ZN6Macapi10Objectivec19TOCGenericImport__2IN6System15DelphiInterfaceINS_10Foundation19NSOutputStreamClassEEENS3_INS4_14NSOutputStreamEEEEv04cdtrEv (flags = 0x0)',
+        tpmMachLinker);
+      try
+        Require(HasToken(LMachGenericDestructorTokens, ttkNamespace,
+          'Foundation') and HasToken(LMachGenericDestructorTokens,
+          ttkTypeName, 'NSOutputStreamClass') and
+          HasToken(LMachGenericDestructorTokens, ttkTypeName,
+          'NSOutputStream'),
+          'Delphi cdtr generic linker names must preserve Objective-C nested template types.');
+        Require(not HasToken(LMachGenericDestructorTokens, ttkMethodName,
+          'cdtr'),
+          'Delphi cdtr is generated mangling, not a user-facing method name.');
+        Require(HasToken(LMachGenericDestructorTokens, ttkKeyword, 'cdtr'),
+          'Delphi cdtr must remain a visibly highlighted generated-member marker.');
+      finally
+        LMachGenericDestructorTokens.Free;
+      end;
       var LMalformedItaniumTokens := LParser.Tokenize(
         'S_UDT  _ZTRN6System12DynamicArrayIhE [4BA]', tpmCppBuilderMethod);
       try
@@ -386,6 +521,65 @@ begin
   end;
 end;
 
+procedure TestMachFixtureLinkerTokenization;
+const
+  CItaniumSymbolPattern = '_{1,2}Z(?:N|TRN|TVN|TIN|TSN)[A-Za-z0-9_]+';
+begin
+  Require(TFile.Exists(CMachFixture),
+    'The generated Mach fixture must be available for linker-tokenization coverage.');
+
+  var LNames := TDictionary<string, Byte>.Create;
+  var LParser := TTinyParser.Create;
+  var LSpecialMemberCount := 0;
+  try
+    for var LMatch in TRegEx.Matches(TFile.ReadAllText(CMachFixture),
+      CItaniumSymbolPattern) do
+      LNames.TryAdd(LMatch.Value, 0);
+    Require(LNames.Count > 1000,
+      'The Mach fixture must provide broad Itanium linker-name coverage.');
+
+    for var LName in LNames.Keys do
+    begin
+      var LTokens := LParser.Tokenize(LName, tpmMachLinker);
+      try
+        var LHasStructure := False;
+        for var LToken in LTokens do
+        begin
+          LHasStructure := LHasStructure or
+            (LToken.Kind in [ttkNamespace, ttkTypeName, ttkMethodName]);
+          Require(not ((LToken.Kind in [ttkNamespace, ttkTypeName]) and
+            (Length(LToken.Text) > 1) and (LToken.Text[1] = '_') and
+            CharInSet(LToken.Text[2], ['0'..'9'])),
+            'Itanium substitutions must not become pseudo type/namespace tokens: ' + LName);
+        end;
+        Require(LHasStructure,
+          'Every supported Mach Itanium linker name must expose semantic structure: ' + LName);
+        Require(not HasToken(LTokens, ttkMethodName, LName),
+          'A supported Mach Itanium linker name must not collapse into one method token: ' + LName);
+        if ContainsText(LName, 'cctr') then
+        begin
+          Inc(LSpecialMemberCount);
+          Require(HasToken(LTokens, ttkKeyword, 'cctr'),
+            'Every Mach cctr marker must remain visibly highlighted: ' + LName);
+        end;
+        if ContainsText(LName, 'cdtr') then
+        begin
+          Inc(LSpecialMemberCount);
+          Require(HasToken(LTokens, ttkKeyword, 'cdtr'),
+            'Every Mach cdtr marker must remain visibly highlighted: ' + LName);
+        end;
+      finally
+        LTokens.Free;
+      end;
+    end;
+    Require(LSpecialMemberCount > 0,
+      'The Mach fixture must contain generated constructor/destructor markers.');
+  finally
+    LParser.Free;
+    LNames.Free;
+  end;
+end;
+
 procedure TestTextFormatDrawing;
 begin
   var LBitmap := TBitmap.Create;
@@ -422,6 +616,11 @@ end;
 procedure TTinyParserFixture.CppBuilderMethodTokenization;
 begin
   TestCppBuilderMethodTokenization;
+end;
+
+procedure TTinyParserFixture.MachFixtureLinkerTokenization;
+begin
+  TestMachFixtureLinkerTokenization;
 end;
 
 procedure TTinyParserFixture.TextFormatDrawing;

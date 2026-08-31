@@ -159,7 +159,7 @@ implementation
 
 uses
   TDump.Explorer.UI, TDump.Explorer.Utils, TDump.Explorer.Resources,
-  Vcl.GraphUtil, Vcl.Menus, Vcl.Themes;
+  TDump.Explorer.Settings, Vcl.GraphUtil, Vcl.Menus, Vcl.Themes;
 
 {$R *.dfm}
 
@@ -822,7 +822,12 @@ end;
 
 procedure TFrmMain.PopupMenuSettingsClick(Sender: TObject);
 begin
-  // Settings action stub.
+  var LSettingsForm := TFrmSettings.Create(Self);
+  try
+    LSettingsForm.ShowModal;
+  finally
+    LSettingsForm.Free;
+  end;
 end;
 
 procedure TFrmMain.PopupMenuChangeThemeClick(Sender: TObject);

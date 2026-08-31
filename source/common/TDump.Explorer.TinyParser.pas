@@ -20,7 +20,7 @@ uses
   System.Generics.Collections;
 
 type
-  TTinyParserMode = (tpmTDumpValues, tpmCppBuilderMethod);
+  TTinyParserMode = (tpmTDumpValues, tpmCppBuilderMethod, tpmMachLinker);
 
   TTinyTokenKind = (
     ttkWhitespace,
@@ -59,6 +59,7 @@ type
     class function IsIdentifierStart(ACharacter: Char): Boolean; static;
     class function IsItaniumSpecialMember(const AText: string;
       AStartIndex: Integer): Boolean; static;
+    class function IsMachLinkerKeyword(const AText: string): Boolean; static;
     class function IsTextInRange(const AText: string; AStartIndex,
       ACount: Integer): Boolean; static;
     class function TryReadDate(const AText: string; AStartIndex: Integer;
@@ -83,6 +84,8 @@ type
       const AText: string; AStartIndex, ANameStartIndex: Integer);
     procedure AddItaniumSignatureTokens(AResult: TTinyTokenList;
       const AText: string; AStartIndex, AEndIndex: Integer);
+    procedure ApplyMachLinkerMode(AResult: TTinyTokenList);
+    procedure PromoteItaniumGeneratedOwners(AResult: TTinyTokenList);
     class function TryReadHexadecimal(const AText: string; AStartIndex: Integer;
       out AEndIndex: Integer): Boolean; static;
     class function TryReadNumber(const AText: string; AStartIndex: Integer;
@@ -146,6 +149,7 @@ end;
 
 procedure TTinyParser.ApplyCppBuilderMethodMode(AResult: TTinyTokenList);
 begin
+  PromoteItaniumGeneratedOwners(AResult);
   for var LIndex := 0 to AResult.Count - 1 do
   begin
     var LToken := AResult[LIndex];
@@ -192,6 +196,102 @@ begin
   end;
 end;
 
+procedure TTinyParser.ApplyMachLinkerMode(AResult: TTinyTokenList);
+begin
+  PromoteItaniumGeneratedOwners(AResult);
+  for var LIndex := 0 to AResult.Count - 1 do
+  begin
+    var LToken := AResult[LIndex];
+    if LToken.Kind <> ttkString then
+      Continue;
+
+    if IsMachLinkerKeyword(LToken.Text) then
+      LToken.Kind := ttkKeyword
+    else if StartsText('_', LToken.Text) then
+      LToken.Kind := ttkMethodName
+    else
+    begin
+      var LPreviousIndex := LIndex - 1;
+      while (LPreviousIndex >= 0) and
+        (AResult[LPreviousIndex].Kind = ttkWhitespace) do
+        Dec(LPreviousIndex);
+      if (LPreviousIndex >= 0) and (AResult[LPreviousIndex].Text = ':') then
+      begin
+        Dec(LPreviousIndex);
+        while (LPreviousIndex >= 0) and
+          (AResult[LPreviousIndex].Kind = ttkWhitespace) do
+          Dec(LPreviousIndex);
+        if (LPreviousIndex >= 0) and
+          SameText(AResult[LPreviousIndex].Text, 'symbol') then
+          LToken.Kind := ttkMethodName;
+      end;
+      if LToken.Kind = ttkString then
+      begin
+        var LNextIndex := LIndex + 1;
+        while (LNextIndex < AResult.Count) and
+          (AResult[LNextIndex].Kind = ttkWhitespace) do
+          Inc(LNextIndex);
+        if (LNextIndex < AResult.Count) and
+          (AResult[LNextIndex].Text = '(') then
+          LToken.Kind := ttkMethodName
+        else if (LNextIndex + 1 < AResult.Count) and
+          (AResult[LNextIndex].Text = ':') and
+          (AResult[LNextIndex + 1].Text = ':') then
+          LToken.Kind := ttkNamespace
+        else if IsCppBuilderTypeName(LToken.Text) then
+          LToken.Kind := ttkTypeName;
+      end;
+    end;
+    AResult[LIndex] := LToken;
+  end;
+end;
+
+procedure TTinyParser.PromoteItaniumGeneratedOwners(AResult: TTinyTokenList);
+begin
+  for var LIndex := 0 to AResult.Count - 1 do
+  begin
+    var LToken := AResult[LIndex];
+    if (LToken.Kind <> ttkMethodName) or
+      not MatchText(LToken.Text, ['cctr', 'cdtr']) then
+      Continue;
+
+    // These are Delphi compiler member markers, not source-level methods.
+    // Give them a semantic color even when there is no generic owner to
+    // promote below.
+    LToken.Kind := ttkKeyword;
+    AResult[LIndex] := LToken;
+
+    // Delphi's Mach-O generic constructor/destructor encoding makes
+    // cctr/cdtr look like the final Itanium component.  The actual user
+    // facing symbol is the preceding generic owner, whose compiler suffix
+    // ends in __2.  Promote that owner and its recognisable template types.
+    for var LOwnerIndex := LIndex - 1 downto 0 do
+    begin
+      var LOwnerToken := AResult[LOwnerIndex];
+      if (LOwnerToken.Kind in [ttkNamespace, ttkTypeName]) and
+        ContainsText(LOwnerToken.Text, '__') then
+      begin
+        LOwnerToken.Kind := ttkTypeName;
+        AResult[LOwnerIndex] := LOwnerToken;
+        for var LTemplateIndex := LOwnerIndex + 1 to LIndex - 1 do
+        begin
+          var LTemplateToken := AResult[LTemplateIndex];
+          if (LTemplateToken.Kind = ttkNamespace) and
+            (IsCppBuilderTypeName(LTemplateToken.Text) or
+             StartsText('NS', LTemplateToken.Text) or
+             EndsText('Class', LTemplateToken.Text) or
+             EndsText('Interface', LTemplateToken.Text)) then
+          begin
+            LTemplateToken.Kind := ttkTypeName;
+            AResult[LTemplateIndex] := LTemplateToken;
+          end;
+        end;
+        Break;
+      end;
+    end;
+  end;
+end;
+
 class function TTinyParser.IsDateSeparator(ACharacter: Char): Boolean;
 begin
   Result := CharInSet(ACharacter, ['-', '/', '.']);
@@ -206,7 +306,15 @@ end;
 class function TTinyParser.IsCppBuilderTypeName(const AText: string): Boolean;
 begin
   Result := MatchText(AText, ['signed', 'unsigned', 'short', 'long', 'void',
-    'char', 'int', 'float', 'double', 'bool', 'wchar_t']) or
+    'char', 'int', 'float', 'double', 'bool', 'wchar_t',
+    // Delphi system types also appear verbatim in the demangled Mach report.
+    // Keep their classification independent of whether the same type was
+    // recovered from an Itanium source-name component.
+    'AnsiString', 'RawByteString', 'ShortString', 'UnicodeString',
+    'WideString', 'Variant', 'OleVariant', 'Currency', 'Extended', 'Real',
+    'Single', 'NativeInt', 'NativeUInt', 'Integer', 'Cardinal', 'Int64',
+    'UInt64', 'Byte', 'Word', 'LongWord', 'LongInt', 'SmallInt', 'Boolean',
+    'Char', 'PChar', 'PWideChar', 'Pointer']) or
     ((Length(AText) >= 2) and (AText[1] = 'T') and
       CharInSet(AText[2], ['A'..'Z']));
 end;
@@ -235,6 +343,13 @@ begin
       CharInSet(AText[AStartIndex + 1], ['1'..'3'])) or
      ((AText[AStartIndex] = 'D') and
       CharInSet(AText[AStartIndex + 1], ['0'..'2'])));
+end;
+
+class function TTinyParser.IsMachLinkerKeyword(const AText: string): Boolean;
+begin
+  Result := StartsText('BIND_OPCODE_', AText) or
+    StartsText('REBASE_OPCODE_', AText) or
+    MatchText(AText, ['symbol', 'flags', 'addr', 'seg', 'ordinal', 'dylib']);
 end;
 
 class function TTinyParser.IsTextInRange(const AText: string; AStartIndex,
@@ -373,8 +488,12 @@ begin
     Inc(LIndex);
     AddToken(AResult, ttkSymbol, AText, LStartIndex, LIndex);
   end;
-  if AMode = tpmCppBuilderMethod then
-    ApplyCppBuilderMethodMode(AResult);
+  case AMode of
+    tpmCppBuilderMethod:
+      ApplyCppBuilderMethodMode(AResult);
+    tpmMachLinker:
+      ApplyMachLinkerMode(AResult);
+  end;
 end;
 
 procedure TTinyParser.AddItaniumNestedNameTokens(AResult: TTinyTokenList;
@@ -396,6 +515,19 @@ begin
   var LCursor := AStartIndex;
   while LIndex < ANameStartIndex do
   begin
+    // A substitution can include digits (S3_, S4_, ...).  It is not a
+    // length-prefixed source name, so consume it before looking for the next
+    // actual component in a nested generic linker name.
+    if AText[LIndex] = 'S' then
+    begin
+      Inc(LIndex);
+      while (LIndex < ANameStartIndex) and
+        CharInSet(AText[LIndex], ['0'..'9', 'A'..'Z']) do
+        Inc(LIndex);
+      if (LIndex < ANameStartIndex) and (AText[LIndex] = '_') then
+        Inc(LIndex);
+      Continue;
+    end;
     if not CharInSet(AText[LIndex], ['0'..'9']) then
     begin
       Inc(LIndex);
@@ -415,8 +547,16 @@ begin
 
     if LCursor < LIndex then
       AddToken(AResult, ttkMangledSignature, AText, LCursor, LIndex);
-    AddToken(AResult, ttkNamespace, AText, LIndex,
-      LIndex + LComponentLength);
+    var LComponentText := Copy(AText, LIndex, LComponentLength);
+    if IsCppBuilderTypeName(LComponentText) or
+      StartsText('NS', LComponentText) or
+      EndsText('Class', LComponentText) or
+      EndsText('Interface', LComponentText) then
+      AddToken(AResult, ttkTypeName, AText, LIndex,
+        LIndex + LComponentLength)
+    else
+      AddToken(AResult, ttkNamespace, AText, LIndex,
+        LIndex + LComponentLength);
     Inc(LIndex, LComponentLength);
     LCursor := LIndex;
   end;
@@ -431,6 +571,19 @@ begin
   var LIndex := AStartIndex;
   while LIndex < AEndIndex do
   begin
+    // Itanium substitutions use S..._ and can contain digits.  Consume the
+    // complete substitution before scanning length-prefixed source names, so
+    // S2_7Classes is tokenized as the substitution plus Classes—not _7.
+    if AText[LIndex] = 'S' then
+    begin
+      Inc(LIndex);
+      while (LIndex < AEndIndex) and
+        CharInSet(AText[LIndex], ['0'..'9', 'A'..'Z']) do
+        Inc(LIndex);
+      if (LIndex < AEndIndex) and (AText[LIndex] = '_') then
+        Inc(LIndex);
+      Continue;
+    end;
     if not CharInSet(AText[LIndex], ['0'..'9']) then
     begin
       Inc(LIndex);
@@ -449,8 +602,15 @@ begin
 
     if LCursor < LIndex then
       AddToken(AResult, ttkMangledSignature, AText, LCursor, LIndex);
-    AddToken(AResult, ttkTypeName, AText, LIndex,
-      LIndex + LComponentLength);
+    var LComponentEndIndex := LIndex + LComponentLength;
+    // In an N...E nested name, consecutive source names are owners.  The
+    // final source name (before I/E) is the type; previous components remain
+    // namespaces.  This preserves System::Set<Classes::TShiftStateItem>.
+    if (LComponentEndIndex < AEndIndex) and
+      CharInSet(AText[LComponentEndIndex], ['0'..'9']) then
+      AddToken(AResult, ttkNamespace, AText, LIndex, LComponentEndIndex)
+    else
+      AddToken(AResult, ttkTypeName, AText, LIndex, LComponentEndIndex);
     Inc(LIndex, LComponentLength);
     LCursor := LIndex;
   end;
@@ -592,6 +752,15 @@ class function TTinyParser.TryReadItaniumType(const AText: string;
 begin
   Result := TryReadItaniumNestedName(AText, AStartIndex, 'ZTRN',
     ATypeStartIndex, ATypeEndIndex, AEndIndex);
+  if not Result then
+    Result := TryReadItaniumNestedName(AText, AStartIndex, 'ZTVN',
+      ATypeStartIndex, ATypeEndIndex, AEndIndex);
+  if not Result then
+    Result := TryReadItaniumNestedName(AText, AStartIndex, 'ZTIN',
+      ATypeStartIndex, ATypeEndIndex, AEndIndex);
+  if not Result then
+    Result := TryReadItaniumNestedName(AText, AStartIndex, 'ZTSN',
+      ATypeStartIndex, ATypeEndIndex, AEndIndex);
 end;
 
 class function TTinyParser.TryReadItaniumNestedName(const AText: string;

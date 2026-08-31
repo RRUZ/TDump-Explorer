@@ -200,9 +200,12 @@ function TDocumentLineRowProvider.GetParserMode(AIndex: Integer): Integer;
 begin
   Result := -1;
   var LSourceIndex := SourceIndex(AIndex);
-  if FDocument.Lines[LSourceIndex].SourceSpan.SyntaxHint =
-    rshCppBuilderMethod then
-    Result := Ord(tpmCppBuilderMethod);
+  case FDocument.Lines[LSourceIndex].SourceSpan.SyntaxHint of
+    rshCppBuilderMethod:
+      Result := Ord(tpmCppBuilderMethod);
+    rshMachLinker:
+      Result := Ord(tpmMachLinker);
+  end;
 end;
 
 function TDocumentLineRowProvider.GetLineNumber(AIndex: Integer): Integer;

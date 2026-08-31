@@ -32,6 +32,10 @@ type
     FTokens: TTinyTokenList;
     function FitText(ACanvas: TCanvas; const AText: string; AMaximumWidth: Integer;
       ATextFormat: TTextFormat): string;
+    procedure DrawTokenizedText(ACanvas: TCanvas; const ARect: TRect;
+      AX, AY: Integer; const AText, ADisplayedText: string;
+      const ATheme: TExplorerTheme; ATextFormat: TTextFormat;
+      AParserMode: TTinyParserMode; ADataType: TTinyHighlightDataType);
     function TokenColor(ATokenKind: TTinyTokenKind;
       const ATheme: TExplorerTheme): TColor;
   public
@@ -63,6 +67,9 @@ implementation
 
 uses
   Vcl.Themes;
+
+const
+  CTruncationEllipsis = '...';
 
 constructor TTinyHighlighter.Create;
 begin
@@ -107,21 +114,34 @@ begin
   Result := Copy(AText, 1, LLow) + CEllipsis;
 end;
 
-procedure TTinyHighlighter.TextRect(ACanvas: TCanvas; const ARect: TRect;
-  AX, AY: Integer; const AText: string; const ATheme: TExplorerTheme;
-  ATextFormat: TTextFormat; AParserMode: TTinyParserMode;
-  ADataType: TTinyHighlightDataType);
+procedure TTinyHighlighter.DrawTokenizedText(ACanvas: TCanvas;
+  const ARect: TRect; AX, AY: Integer; const AText, ADisplayedText: string;
+  const ATheme: TExplorerTheme; ATextFormat: TTextFormat;
+  AParserMode: TTinyParserMode; ADataType: TTinyHighlightDataType);
 begin
-  var LText := FitText(ACanvas, AText, ARect.Right - AX, ATextFormat);
+  var LVisibleLength := Length(AText);
+  var LHasEllipsis := (ADisplayedText <> AText) and
+    (Length(ADisplayedText) >= Length(CTruncationEllipsis)) and
+    (Copy(ADisplayedText,
+      Length(ADisplayedText) - Length(CTruncationEllipsis) + 1,
+      Length(CTruncationEllipsis)) = CTruncationEllipsis);
+  if LHasEllipsis then
+    LVisibleLength := Length(ADisplayedText) - Length(CTruncationEllipsis)
+  else if ADisplayedText <> AText then
+    LVisibleLength := Length(ADisplayedText);
+
   FTokens.Clear;
   if ADataType = thdtAuto then
-    FParser.Tokenize(LText, AParserMode, FTokens)
+    // Parse the complete source before applying display ellipsis.  Truncating
+    // an Itanium name first can remove its terminating E and change its token
+    // kinds depending on the width of the current view.
+    FParser.Tokenize(AText, AParserMode, FTokens)
   else
   begin
     var LToken: TTinyToken;
     LToken.StartIndex := 1;
-    LToken.Length := Length(LText);
-    LToken.Text := LText;
+    LToken.Length := Length(AText);
+    LToken.Text := AText;
     case ADataType of
       thdtStringLiteral: LToken.Kind := ttkStringLiteral;
       thdtInteger: LToken.Kind := ttkInteger;
@@ -146,11 +166,23 @@ begin
         ARect.Bottom);
     ACanvas.Brush.Style := bsClear;
     var LX := AX;
+    var LConsumedLength := 0;
     for var LToken in FTokens do
     begin
+      if LConsumedLength >= LVisibleLength then
+        Break;
+      var LTokenText := LToken.Text;
+      if Length(LTokenText) > LVisibleLength - LConsumedLength then
+        LTokenText := Copy(LTokenText, 1, LVisibleLength - LConsumedLength);
       ACanvas.Font.Color := TokenColor(LToken.Kind, ATheme);
-      ACanvas.TextOut(LX, AY, LToken.Text);
-      Inc(LX, ACanvas.TextWidth(LToken.Text));
+      ACanvas.TextOut(LX, AY, LTokenText);
+      Inc(LX, ACanvas.TextWidth(LTokenText));
+      Inc(LConsumedLength, Length(LToken.Text));
+    end;
+    if LHasEllipsis then
+    begin
+      ACanvas.Font.Color := ATheme.TextColor;
+      ACanvas.TextOut(LX, AY, CTruncationEllipsis);
     end;
   finally
     if LSavedDeviceContext <> 0 then
@@ -158,6 +190,16 @@ begin
     ACanvas.Font.Color := LOriginalFontColor;
     ACanvas.Brush.Style := LOriginalBrushStyle;
   end;
+end;
+
+procedure TTinyHighlighter.TextRect(ACanvas: TCanvas; const ARect: TRect;
+  AX, AY: Integer; const AText: string; const ATheme: TExplorerTheme;
+  ATextFormat: TTextFormat; AParserMode: TTinyParserMode;
+  ADataType: TTinyHighlightDataType);
+begin
+  DrawTokenizedText(ACanvas, ARect, AX, AY, AText,
+    FitText(ACanvas, AText, ARect.Right - AX, ATextFormat), ATheme,
+    ATextFormat, AParserMode, ADataType);
 end;
 
 procedure TTinyHighlighter.TextRect(ACanvas: TCanvas; const ARect: TRect;
@@ -174,18 +216,19 @@ procedure TTinyHighlighter.TextRect(ACanvas: TCanvas; const ARect: TRect;
   ATextFormat: TTextFormat; AParserMode: TTinyParserMode;
   ADataType: TTinyHighlightDataType);
 begin
-  var LText := FitText(ACanvas, AText, ARect.Width, ATextFormat);
+  var LDisplayedText := FitText(ACanvas, AText, ARect.Width, ATextFormat);
   var LX := ARect.Left;
   if tfRight in ATextFormat then
-    LX := ARect.Right - ACanvas.TextWidth(LText)
+    LX := ARect.Right - ACanvas.TextWidth(LDisplayedText)
   else if tfCenter in ATextFormat then
-    LX := ARect.Left + ((ARect.Width - ACanvas.TextWidth(LText)) div 2);
+    LX := ARect.Left + ((ARect.Width - ACanvas.TextWidth(LDisplayedText)) div 2);
   var LY := ARect.Top;
   if tfBottom in ATextFormat then
-    LY := ARect.Bottom - ACanvas.TextHeight(LText)
+    LY := ARect.Bottom - ACanvas.TextHeight(LDisplayedText)
   else if tfVerticalCenter in ATextFormat then
-    LY := ARect.Top + ((ARect.Height - ACanvas.TextHeight(LText)) div 2);
-  TextRect(ACanvas, ARect, LX, LY, LText, ATheme, ATextFormat, AParserMode, ADataType);
+    LY := ARect.Top + ((ARect.Height - ACanvas.TextHeight(LDisplayedText)) div 2);
+  DrawTokenizedText(ACanvas, ARect, LX, LY, AText, LDisplayedText, ATheme,
+    ATextFormat, AParserMode, ADataType);
 end;
 
 procedure TTinyHighlighter.TextRect(ACanvas: TCanvas; const ARect: TRect;

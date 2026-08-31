@@ -39,7 +39,9 @@ type
     tdkELFRelocations, tdkOMFRecords, tdkOMFRecord,
     tdkOMFLibraryMembers, tdkOMFLibraryIndex, tdkRelocations,
     tdkRelocationBlock, tdkStrings, tdkMachDynamicImports,
-    tdkMachIndirectSymbols, tdkMachDynamicSymbolMetadata,
+    tdkMachIndirectSymbols, tdkMachDynamicSymbolTable,
+    tdkMachRebaseInfo, tdkMachBindingInfo, tdkMachWeakBindingInfo,
+    tdkMachLazyBindingInfo, tdkMachExports, tdkMachResources, tdkMachRawSymbols,
     tdkArchiveMembers, tdkArchiveSymbols, tdkDiagnostics);
 
   TTreeTextColorKind = (ttckDefault, ttckHighlighted, ttckMethod, ttckType);
@@ -94,6 +96,13 @@ const
     (Caption: 'Mach Dynamic Imports'; ImageName: ''; TextColorKind: ttckHighlighted),
     (Caption: 'Mach Indirect Symbols'; ImageName: ''; TextColorKind: ttckHighlighted),
     (Caption: 'Mach Dynamic Symbol Table'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'Rebase Info'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'Binding Info'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'Weak Binding Info'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'Lazy Binding Info'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'Exports'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'Resources'; ImageName: ''; TextColorKind: ttckHighlighted),
+    (Caption: 'Raw Symbols'; ImageName: ''; TextColorKind: ttckHighlighted),
     (Caption: 'AR Archive Members'; ImageName: ''; TextColorKind: ttckHighlighted),
     (Caption: 'AR Archive Symbols'; ImageName: ''; TextColorKind: ttckHighlighted),
     (Caption: 'Diagnostics'; ImageName: 'warning'; TextColorKind: ttckHighlighted));
@@ -656,10 +665,13 @@ begin
   if ADocument.MachSymbols.Count > 0 then
     AddNode(AParent, Format('Symbol Table [%d symbols]',
       [ADocument.MachSymbols.Count]), tdkMachSymbolTable);
-  if ADocument.MachDynamicSymbolTableCommand <> nil then
+  if ADocument.MachDynamicSymbolTable <> nil then
   begin
-    var LDynamicNode := AddNode(AParent, 'Dynamic Symbol Table');
-    AddNode(LDynamicNode, 'Metadata', tdkMachDynamicSymbolMetadata);
+    var LDynamicNode := AddNode(AParent, 'Dynamic Symbol Table',
+      tdkMachDynamicSymbolTable);
+    var LNodeData := PTreeItemData(FTree.GetNodeData(LDynamicNode));
+    LNodeData.SourceStartLine := ADocument.MachDynamicSymbolTable.StartLine;
+    LNodeData.SourceEndLine := ADocument.MachDynamicSymbolTable.EndLine;
     if ADocument.MachDynamicImports.Count > 0 then
       AddNode(LDynamicNode, Format('Dynamic Imports [%d symbols]',
         [ADocument.MachDynamicImports.Count]), tdkMachDynamicImports);
@@ -675,6 +687,62 @@ begin
     if ADocument.MachIndirectSymbols.Count > 0 then
       AddNode(AParent, Format('Indirect Symbols [%d symbols]',
         [ADocument.MachIndirectSymbols.Count]), tdkMachIndirectSymbols);
+  end;
+  if ADocument.MachRebaseInfo <> nil then
+  begin
+    var LRebaseNode := AddNode(AParent, Format('Rebase Info [%d opcodes]',
+      [ADocument.MachRebaseInfo.ItemCount]), tdkMachRebaseInfo);
+    var LNodeData := PTreeItemData(FTree.GetNodeData(LRebaseNode));
+    LNodeData.SourceStartLine := ADocument.MachRebaseInfo.StartLine;
+    LNodeData.SourceEndLine := ADocument.MachRebaseInfo.EndLine;
+  end;
+  if ADocument.MachBindingInfo <> nil then
+  begin
+    var LBindingNode := AddNode(AParent, Format('Binding Info [%d lines]',
+      [ADocument.MachBindingInfo.ItemCount]), tdkMachBindingInfo);
+    var LNodeData := PTreeItemData(FTree.GetNodeData(LBindingNode));
+    LNodeData.SourceStartLine := ADocument.MachBindingInfo.StartLine;
+    LNodeData.SourceEndLine := ADocument.MachBindingInfo.EndLine;
+  end;
+  if ADocument.MachWeakBindingInfo <> nil then
+  begin
+    var LWeakBindingNode := AddNode(AParent, Format('Weak Binding Info [%d lines]',
+      [ADocument.MachWeakBindingInfo.ItemCount]), tdkMachWeakBindingInfo);
+    var LNodeData := PTreeItemData(FTree.GetNodeData(LWeakBindingNode));
+    LNodeData.SourceStartLine := ADocument.MachWeakBindingInfo.StartLine;
+    LNodeData.SourceEndLine := ADocument.MachWeakBindingInfo.EndLine;
+  end;
+  if ADocument.MachLazyBindingInfo <> nil then
+  begin
+    var LLazyBindingNode := AddNode(AParent, Format('Lazy Binding Info [%d lines]',
+      [ADocument.MachLazyBindingInfo.ItemCount]), tdkMachLazyBindingInfo);
+    var LNodeData := PTreeItemData(FTree.GetNodeData(LLazyBindingNode));
+    LNodeData.SourceStartLine := ADocument.MachLazyBindingInfo.StartLine;
+    LNodeData.SourceEndLine := ADocument.MachLazyBindingInfo.EndLine;
+  end;
+  if ADocument.MachExports <> nil then
+  begin
+    var LExportsNode := AddNode(AParent, Format('Exports [%d lines]',
+      [ADocument.MachExports.ItemCount]), tdkMachExports);
+    var LNodeData := PTreeItemData(FTree.GetNodeData(LExportsNode));
+    LNodeData.SourceStartLine := ADocument.MachExports.StartLine;
+    LNodeData.SourceEndLine := ADocument.MachExports.EndLine;
+  end;
+  if ADocument.MachResources <> nil then
+  begin
+    var LResourcesNode := AddNode(AParent, Format('Resources [%d entries]',
+      [ADocument.MachResources.ItemCount]), tdkMachResources);
+    var LNodeData := PTreeItemData(FTree.GetNodeData(LResourcesNode));
+    LNodeData.SourceStartLine := ADocument.MachResources.StartLine;
+    LNodeData.SourceEndLine := ADocument.MachResources.EndLine;
+  end;
+  if ADocument.MachRawSymbols <> nil then
+  begin
+    var LRawSymbolsNode := AddNode(AParent, Format('Raw Symbols [%d entries]',
+      [ADocument.MachRawSymbols.ItemCount]), tdkMachRawSymbols);
+    var LNodeData := PTreeItemData(FTree.GetNodeData(LRawSymbolsNode));
+    LNodeData.SourceStartLine := ADocument.MachRawSymbols.StartLine;
+    LNodeData.SourceEndLine := ADocument.MachRawSymbols.EndLine;
   end;
 end;
 
@@ -869,10 +937,6 @@ class procedure TDocumentSourceNavigation.Resolve(ADocument: TDumpDocument;
             ExtendRange(LFirst, LLast, LItem.StartLine, LItem.EndLine);
           UseSpan(LFirst, LLast);
         end;
-      tdkMachDynamicSymbolMetadata:
-        if ADocument.MachDynamicSymbolTableCommand <> nil then
-          UseSpan(ADocument.MachDynamicSymbolTableCommand.StartLine,
-            ADocument.MachDynamicSymbolTableCommand.EndLine);
       tdkELFSymbolTable:
         begin
           var LFirst := MaxInt; var LLast := 0;

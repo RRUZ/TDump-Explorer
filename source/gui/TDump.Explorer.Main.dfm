@@ -57,7 +57,7 @@ object FrmMain: TFrmMain
     Align = alBottom
     TabOrder = 0
     ExplicitLeft = 4
-    ExplicitTop = 580
+    ExplicitTop = 576
     ExplicitWidth = 1064
     ExplicitHeight = 127
     inherited ControlList1: TControlList
@@ -88,6 +88,7 @@ object FrmMain: TFrmMain
     Width = 1072
     Height = 39
     CustomButtons = <>
+    ExplicitTop = -6
   end
   object CardPanel1: TCardPanel
     Left = 0
@@ -99,7 +100,6 @@ object FrmMain: TFrmMain
     Caption = 'CardPanel1'
     ParentBackground = False
     TabOrder = 2
-    ExplicitHeight = 537
   end
   object ProgressBar1: TProgressBar
     Left = 0

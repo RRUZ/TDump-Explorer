@@ -35,8 +35,9 @@ type
       ADocument: TDumpDocument); static;
     class procedure PopulateDynamicSymbols(AControl: THighlighterControl;
       ADocument: TDumpDocument; ADetailKind: TTreeDetailKind); static;
-    class procedure PopulateDynamicSymbolMetadata(AControl: THighlighterControl;
-      ADocument: TDumpDocument); static;
+    class procedure PopulateReportSection(AControl: THighlighterControl;
+      ADocument: TDumpDocument; ASection: TDumpMachReportSection;
+      ADetailKind: TTreeDetailKind); static;
     class function ArchitectureCaption(AArchitecture: TDumpMachArchitecture): string; static;
     class function LoadCommandCaption(ACommand: TDumpMachLoadCommand): string; static;
   end;
@@ -48,6 +49,56 @@ uses
   TDump.Explorer.Highlighter,
   TDump.Explorer.HighlighterProviders,
   TDump.Explorer.TinyParser;
+
+function FirstMachReportField(var AText: string): string;
+var
+  LIndex: Integer;
+begin
+  AText := Trim(AText);
+  LIndex := 1;
+  while (LIndex <= Length(AText)) and not CharInSet(AText[LIndex], [' ', #9]) do
+    Inc(LIndex);
+  Result := Copy(AText, 1, LIndex - 1);
+  Delete(AText, 1, LIndex - 1);
+  AText := Trim(AText);
+end;
+
+function MachPropertyColumns(const ALine: string): string;
+var
+  LIndex: Integer;
+  LLine: string;
+begin
+  LLine := Trim(ALine);
+  for LIndex := 1 to Length(LLine) - 1 do
+    if CharInSet(LLine[LIndex], [' ', #9]) and
+      CharInSet(LLine[LIndex + 1], [' ', #9]) then
+      Exit(Trim(Copy(LLine, 1, LIndex - 1)) + #9 +
+        Trim(Copy(LLine, LIndex + 1, MaxInt)));
+  Result := LLine + #9;
+end;
+
+function MachRebaseColumns(const ALine: string): string;
+var
+  LColon: Integer;
+  LLine: string;
+begin
+  LLine := Trim(ALine);
+  LColon := Pos(':', LLine);
+  if LColon > 0 then
+    Result := Trim(Copy(LLine, 1, LColon - 1)) + #9 +
+      Trim(Copy(LLine, LColon + 1, MaxInt))
+  else
+    Result := LLine + #9;
+end;
+
+function MachRawSymbolColumns(const ALine: string): string;
+var
+  LWork: string;
+begin
+  LWork := ALine;
+  Result := FirstMachReportField(LWork) + #9 + FirstMachReportField(LWork) +
+    #9 + FirstMachReportField(LWork) + #9 + FirstMachReportField(LWork);
+end;
 
 class function TMachView.ArchitectureCaption(
   AArchitecture: TDumpMachArchitecture): string;
@@ -233,25 +284,65 @@ begin
   end;
 end;
 
-class procedure TMachView.PopulateDynamicSymbolMetadata(
-  AControl: THighlighterControl; ADocument: TDumpDocument);
+class procedure TMachView.PopulateReportSection(AControl: THighlighterControl;
+  ADocument: TDumpDocument; ASection: TDumpMachReportSection;
+  ADetailKind: TTreeDetailKind);
 begin
-  if (AControl = nil) or (ADocument = nil) or
-    (ADocument.MachDynamicSymbolTableCommand = nil) then
+  if (AControl = nil) or (ADocument = nil) or (ASection = nil) or
+    (ADocument.TextSource = nil) then
     Exit;
-  var LCommand := ADocument.MachDynamicSymbolTableCommand;
-  AControl.ParserMode := tpmTDumpValues;
+  if ADetailKind in [tdkMachDynamicSymbolTable, tdkMachBindingInfo,
+    tdkMachWeakBindingInfo, tdkMachLazyBindingInfo, tdkMachExports,
+    tdkMachRawSymbols] then
+    AControl.ParserMode := tpmMachLinker
+  else
+    AControl.ParserMode := tpmTDumpValues;
   AControl.BeginUpdate;
   try
     AControl.Clear;
-    AControl.SetColumnHeaders(['Property', 'Value']);
-    AControl.AddColumns(['Load command', LoadCommandCaption(LCommand)]);
-    AControl.AddColumns(['Dynamic imports',
-      ADocument.MachDynamicImports.Count.ToString]);
-    AControl.AddColumns(['Indirect symbols',
-      ADocument.MachIndirectSymbols.Count.ToString]);
-    for var LProperty in LCommand.Properties do
-      AControl.AddColumns([LProperty.Name, LProperty.RawValue]);
+    case ADetailKind of
+      tdkMachRebaseInfo:
+        begin
+          AControl.SetColumnHeaders(['Opcode', 'Operand']);
+          AControl.SetColumnDataTypes([thdtSymbol, thdtAuto]);
+        end;
+      tdkMachResources:
+        AControl.SetColumnHeaders(['Property', 'Value']);
+      tdkMachRawSymbols:
+        begin
+          AControl.SetColumnHeaders(['#', 'Name Offset', 'Data Offset', 'Size']);
+          AControl.SetColumnDataTypes([thdtInteger, thdtHexadecimal,
+            thdtHexadecimal, thdtHexadecimal]);
+        end;
+    else
+      begin
+        AControl.SetColumnHeaders(['Instruction']);
+        // The Mach report sections are source-backed text, not a fixed text
+        // field.  Keep the detail view on the same semantic tokenizer as Raw
+        // Output so linker symbols (including _ZN and _NS names) render the
+        // same way in both directions.
+        AControl.SetColumnDataTypes([thdtAuto]);
+      end;
+    end;
+    AControl.SetItemProvider(TCallbackHighlighterRowProvider.Create(
+      ASection.ItemCount,
+      function(AIndex: Integer): string
+      begin
+        var LSourceLine := ADocument.TextSource[
+          ASection.ItemStartLine - 1 + AIndex];
+        case ADetailKind of
+          tdkMachRebaseInfo: Result := MachRebaseColumns(LSourceLine);
+          tdkMachResources: Result := MachPropertyColumns(LSourceLine);
+          tdkMachRawSymbols: Result := MachRawSymbolColumns(LSourceLine);
+        else
+          Result := LSourceLine;
+        end;
+      end,
+      nil, nil,
+      function(AIndex: Integer): Integer
+      begin
+        Result := ASection.ItemStartLine - 1 + AIndex;
+      end));
   finally
     AControl.EndUpdate;
   end;

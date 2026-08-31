@@ -16,18 +16,20 @@ interface
 
 uses
   Winapi.Messages, System.Classes, System.Types, Vcl.Controls, Vcl.Forms,
-  Vcl.Themes, TDump.Explorer.HighlighterControl;
+  Vcl.Themes, Vcl.TitleBarCtrls, TDump.Explorer.HighlighterControl;
 
 type
   TExplorerPopupMenuItemClick = procedure(Sender: TObject;
     AItemIndex: Integer) of object;
 
   TExplorerPopupMenuForm = class(TForm)
+  published
+    MenuItemsControl: THighlighterControl;
+    TitleBarPanel1: TTitleBarPanel;
+    procedure FormDeactivate(Sender: TObject);
   private
-    FMenuItems: THighlighterControl;
     FOnItemClick: TExplorerPopupMenuItemClick;
     procedure MenuItemsClick(Sender: TObject);
-    procedure FormDeactivate(Sender: TObject);
     procedure WMNCHitTest(var AMessage: TWMNCHitTest); message WM_NCHITTEST;
     procedure CMStyleChanged(var AMessage: TMessage); message CM_STYLECHANGED;
     procedure ApplyTheme;
@@ -37,7 +39,7 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     procedure ShowAt(const APoint: TPoint);
-    property MenuItems: THighlighterControl read FMenuItems;
+    property MenuItems: THighlighterControl read MenuItemsControl;
     property OnItemClick: TExplorerPopupMenuItemClick read FOnItemClick
       write FOnItemClick;
   end;
@@ -45,7 +47,9 @@ type
 implementation
 
 uses
-  System.Math, Winapi.Windows, TDump.Explorer.UI, Vcl.Graphics, Vcl.TitleBarCtrls;
+  System.Math, Winapi.Windows, TDump.Explorer.UI, Vcl.Graphics;
+
+{$R *.dfm}
 
 procedure TExplorerPopupMenuForm.ApplyTheme;
 begin
@@ -61,42 +65,15 @@ end;
 
 constructor TExplorerPopupMenuForm.Create(AOwner: TComponent);
 begin
-  inherited CreateNew(AOwner);
-  BorderStyle := bsNone;
-  BorderIcons := [];
-  Caption := '';
-  StyleElements := StyleElements - [seClient, seBorder];
-  RoundedCorners := rcOn;
-  Position := poDesigned;
-  PopupMode := pmExplicit;
-  DoubleBuffered := True;
-  OnDeactivate := FormDeactivate;
+  inherited Create(AOwner);
 
-  FMenuItems := THighlighterControl.Create(Self);
-  FMenuItems.Parent := Self;
-
-  FMenuItems.Margins.Top := 0;
-  FMenuItems.Margins.Bottom := 0;
-  FMenuItems.Margins.Left := 8;
-  FMenuItems.Margins.Right := 8;
-
-  FMenuItems.AlignWithMargins := True;
-  FMenuItems.Align := alClient;
-
-  FMenuItems.UseColumnMode := False;
-  FMenuItems.AutoSizeColumns := False;
-  FMenuItems.ControlList1.ItemHeight := ScaleValue(40);
-  FMenuItems.OnItemClick := MenuItemsClick;
-
-  CustomTitleBar.ShowCaption := False;
-  CustomTitleBar.SystemHeight := False;
-  CustomTitleBar.Height := 4;
-  CustomTitleBar.SystemColors := False;
-
-  var LTitleBarPanel := TTitleBarPanel.Create(Self);
-  LTitleBarPanel.Parent := Self;
-  CustomTitleBar.Enabled := True;
-  CustomTitleBar.Control := LTitleBarPanel;
+  // These settings are not published by THighlighterControl, so they cannot
+  // be streamed from the DFM.  The visual frame itself and its static layout
+  // are design-time components.
+  MenuItemsControl.UseColumnMode := False;
+  MenuItemsControl.AutoSizeColumns := False;
+  MenuItemsControl.ControlList1.ItemHeight := ScaleValue(40);
+  MenuItemsControl.OnItemClick := MenuItemsClick;
 
   ApplyTheme;
 end;
@@ -124,14 +101,14 @@ begin
   SetBounds(LLeft, LTop, LPopupWidth, LPopupHeight);
   Show;
   BringToFront;
-  FMenuItems.SetFocus;
+  MenuItemsControl.SetFocus;
 end;
 
 procedure TExplorerPopupMenuForm.MenuItemsClick(Sender: TObject);
 begin
-  if Assigned(FOnItemClick) then
-    FOnItemClick(Self, FMenuItems.ControlList1.ItemIndex);
   Hide;
+  if Assigned(FOnItemClick) then
+    FOnItemClick(Self, MenuItemsControl.ControlList1.ItemIndex);
 end;
 
 procedure TExplorerPopupMenuForm.FormDeactivate(Sender: TObject);

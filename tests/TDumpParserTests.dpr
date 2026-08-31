@@ -47,6 +47,8 @@ type
     [Test] procedure InvalidFixtureFallback;
     [Test] procedure DebugInformationProjection;
     [Test] procedure P2ProjectionsAndMerge;
+    [Test] procedure MachRawSyntaxHints;
+    [Test] procedure MachReportSections;
     [Test] procedure GeneratedDocumentIntegrity;
     [Test] procedure GeneratedNativeFormatCoverage;
     [Test] procedure GeneratedBorlandDebugCoverage;
@@ -794,6 +796,116 @@ begin
   end;
 end;
 
+procedure TestMachRawSyntaxHints;
+begin
+  var LDocument := ParseGeneratedFixture('Mach.Universal.Rad37.tdump');
+  try
+    Require(LDocument.MachSymbols.Count > 1000,
+      'The Mach Rad37 fixture must provide Symbol Table rows for raw rendering.');
+    for var LSymbol in LDocument.MachSymbols do
+    begin
+      Require(LSymbol.SourceSpan.SyntaxHint = rshMachLinker,
+        'Every Mach Symbol Table row must request Mach linker syntax.');
+      Require(LDocument.Lines[LSymbol.StartLine - 1].SourceSpan.SyntaxHint =
+        rshMachLinker,
+        'Each Mach Symbol Table source line must retain its raw syntax hint.');
+    end;
+    Require(LDocument.MachDynamicImports.Count > 1000,
+      'The Mach Rad37 fixture must provide dynamic-import rows for raw rendering.');
+    for var LSymbol in LDocument.MachDynamicImports do
+    begin
+      Require(LSymbol.SourceSpan.SyntaxHint = rshMachLinker,
+        'Every Mach dynamic-import row must request Mach linker syntax.');
+      Require(LDocument.Lines[LSymbol.StartLine - 1].SourceSpan.SyntaxHint =
+        rshMachLinker,
+        'Each Mach dynamic-import source line must retain its raw syntax hint.');
+    end;
+    Require(LDocument.MachIndirectSymbols.Count > 100,
+      'The Mach Rad37 fixture must provide indirect-symbol rows for raw rendering.');
+    for var LSymbol in LDocument.MachIndirectSymbols do
+    begin
+      Require(LSymbol.SourceSpan.SyntaxHint = rshMachLinker,
+        'Every Mach indirect-symbol row must request Mach linker syntax.');
+      Require(LDocument.Lines[LSymbol.StartLine - 1].SourceSpan.SyntaxHint =
+        rshMachLinker,
+        'Each Mach indirect-symbol source line must retain its raw syntax hint.');
+    end;
+  finally
+    LDocument.Free;
+  end;
+end;
+
+procedure TestMachReportSections;
+var
+  LDocument: TDumpDocument;
+  procedure RequireMachSymbolSyntaxHints(ASection: TDumpMachReportSection;
+    const ASectionCaption: string);
+  begin
+    Require(ASection <> nil,
+      ASectionCaption + ' must exist before its raw syntax hints are checked.');
+    for var LLineIndex := ASection.ItemStartLine to ASection.EndLine do
+      Require(LDocument.Lines[LLineIndex - 1].SourceSpan.SyntaxHint =
+        rshMachLinker,
+        ASectionCaption + ' must keep its semantic linker-name syntax in Raw Output.');
+  end;
+begin
+  LDocument := ParseGeneratedFixture('Mach.Universal.Rad37.tdump');
+  try
+    Require((LDocument.MachRebaseInfo <> nil) and
+      (LDocument.MachRebaseInfo.StartLine = 5216) and
+      (LDocument.MachRebaseInfo.EndLine = 6855) and
+      (LDocument.MachRebaseInfo.ItemCount = 1639) and
+      LDocument.MachRebaseInfo.SourceSpan.IsValid,
+      'Mach Rebase Info must preserve its complete source-backed opcode range.');
+    Require((LDocument.MachBindingInfo <> nil) and
+      (LDocument.MachBindingInfo.StartLine = 6857) and
+      (LDocument.MachBindingInfo.EndLine = 15045) and
+      (LDocument.MachBindingInfo.ItemCount > 0) and
+      LDocument.MachBindingInfo.SourceSpan.IsValid and
+      (LDocument.MachWeakBindingInfo <> nil) and
+      (LDocument.MachWeakBindingInfo.StartLine = 15047) and
+      (LDocument.MachWeakBindingInfo.ItemCount > 0) and
+      LDocument.MachWeakBindingInfo.SourceSpan.IsValid and
+      (LDocument.MachLazyBindingInfo <> nil) and
+      (LDocument.MachLazyBindingInfo.StartLine = 27335) and
+      (LDocument.MachLazyBindingInfo.ItemCount > 0) and
+      LDocument.MachLazyBindingInfo.SourceSpan.IsValid and
+      (LDocument.MachExports <> nil) and
+      (LDocument.MachExports.StartLine = 27468) and
+      (LDocument.MachExports.ItemCount > 0) and
+      LDocument.MachExports.SourceSpan.IsValid,
+      'Mach binding and export blocks must each retain a source-backed structure.');
+    Require((LDocument.MachDynamicSymbolTable <> nil) and
+      (LDocument.MachDynamicSymbolTable.StartLine = 2734) and
+      (LDocument.MachDynamicSymbolTable.EndLine = 5214) and
+      LDocument.MachDynamicSymbolTable.SourceSpan.IsValid,
+      'Mach Dynamic Symbol Table must retain its TDUMP report block, separately from LC_DYSYMTAB.');
+    RequireMachSymbolSyntaxHints(LDocument.MachDynamicSymbolTable,
+      'Mach Dynamic Symbol Table');
+    RequireMachSymbolSyntaxHints(LDocument.MachBindingInfo,
+      'Mach Binding Info');
+    RequireMachSymbolSyntaxHints(LDocument.MachWeakBindingInfo,
+      'Mach Weak Binding Info');
+    RequireMachSymbolSyntaxHints(LDocument.MachLazyBindingInfo,
+      'Mach Lazy Binding Info');
+    RequireMachSymbolSyntaxHints(LDocument.MachExports,
+      'Mach Exports');
+    Require((LDocument.MachResources <> nil) and
+      (LDocument.MachResources.StartLine = 28513) and
+      (LDocument.MachResources.ItemCount = 4) and
+      LDocument.MachResources.SourceSpan.IsValid,
+      'Mach Resources must retain its property block and source provenance.');
+    Require((LDocument.MachRawSymbols <> nil) and
+      (LDocument.MachRawSymbols.StartLine = 28519) and
+      (LDocument.MachRawSymbols.ItemCount > 68000) and
+      LDocument.MachRawSymbols.SourceSpan.IsValid,
+      'Mach Raw Symbols must remain a source-backed section instead of a lost report tail.');
+    RequireMachSymbolSyntaxHints(LDocument.MachRawSymbols, 'Mach Raw Symbols');
+  finally
+    LDocument.Free;
+  end;
+end;
+
 procedure TestLargeReportStructuredProjection;
 begin
   Require(TFile.Exists(CLargeVCLFixture),
@@ -1192,6 +1304,16 @@ end;
 procedure TParserFixture.P2ProjectionsAndMerge;
 begin
   TestP2ProjectionsAndMerge;
+end;
+
+procedure TParserFixture.MachRawSyntaxHints;
+begin
+  TestMachRawSyntaxHints;
+end;
+
+procedure TParserFixture.MachReportSections;
+begin
+  TestMachReportSections;
 end;
 
 procedure TParserFixture.GeneratedDocumentIntegrity;
