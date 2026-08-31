@@ -1,12 +1,35 @@
 ﻿<p align="center">
-  <img src="https://github.com/RRUZ/TDump-Explorer/blob/main/images/banner.png?raw=true" alt="TDump-Explorer"/>
+  <img src="https://github.com/RRUZ/TDump-Explorer/blob/main/images/banner.png?raw=true" alt="TDump-Explorer banner"/>
 </p>
 
 # TDump Explorer
 
 **TDump Explorer** is a native Windows GUI for exploring the reports produced by Embarcadero's `TDUMP` and `TDUMP64` utilities. It turns textual dump output into a navigable, source-linked document model while retaining fast access to the original report.
 
+
+<p align="center">
+  <img src="https://github.com/RRUZ/TDump-Explorer/blob/main/images/1.png?raw=true" alt="TDump-Explorer preview 1"/>
+</p>
+
+<p align="center">
+  <img src="https://github.com/RRUZ/TDump-Explorer/blob/main/images/2.png?raw=true" alt="TDump-Explorer preview 2"/>
+</p>
+
+<p align="center">
+  <img src="https://github.com/RRUZ/TDump-Explorer/blob/main/images/3.png?raw=true" alt="TDump-Explorer preview 3"/>
+</p>
+
+<p align="center">
+  <img src="https://github.com/RRUZ/TDump-Explorer/blob/main/images/4.png?raw=true" alt="TDump-Explorer preview 4"/>
+</p>
+
+<p align="center">
+  <img src="https://github.com/RRUZ/TDump-Explorer/blob/main/images/5.png?raw=true" alt="TDump-Explorer preview 5"/>
+</p>
+
 Open a generated `.tdump` report directly, or open a supported binary and let the application run the most appropriate installed TDUMP tool. 
+
+
 
 ## Highlights
 
