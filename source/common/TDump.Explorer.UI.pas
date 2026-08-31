@@ -43,15 +43,12 @@ type
     NamespaceColor: TColor;
     TypeColor: TColor;
     MethodColor: TColor;
-
-    //
-
     class function DarkTheme: TExplorerTheme; static;
     class function LightTheme: TExplorerTheme; static;
     class function ActiveTheme: TExplorerTheme; static;
   end;
 
-procedure DrawRoundedBar(const Canvas: TCanvas; const ARect: TRect; FillColor, BorderColor: TColor);
+procedure DrawRoundedBar(const Canvas: TCanvas; const ARect: TRect; FillColor, BorderColor: TColor; const Radius: Single = 2.0);
 procedure DrawDashedRoundedRectangle(const ACanvas: TCanvas;
   const ARect: TRect; ABorderColor: TColor; ARadius: Integer);
 procedure DrawSelectionBar(const Canvas: TCanvas; const ARect: TRect; FillColor, BorderColor: TColor);
@@ -63,7 +60,24 @@ function FormatByteSize(AByteCount: Int64): string;
 implementation
 
 uses
-  Winapi.Windows, Vcl.GraphUtil, Winapi.GDIPAPI, Winapi.GDIPOBJ, System.SysUtils, Vcl.Themes;
+  Winapi.Windows, System.Win.Registry, Vcl.GraphUtil, Winapi.GDIPAPI, Winapi.GDIPOBJ,
+  System.SysUtils, Vcl.Themes;
+
+function IsWindowsLightTheme: Boolean;
+const
+  PersonalizeKey = '\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize';
+begin
+  Result := True;
+  with TRegistry.Create(KEY_READ) do
+  try
+    RootKey := HKEY_CURRENT_USER;
+    if OpenKeyReadOnly(PersonalizeKey) and ValueExists('SystemUsesLightTheme') then
+      Result := ReadInteger('SystemUsesLightTheme') <> 0;
+  finally
+    Free;
+  end;
+end;
+
 
 function FormatByteSize(AByteCount: Int64): string;
 const
@@ -138,7 +152,7 @@ begin
   Result := TOSVersion.Check(10) and (TOSVersion.Build >= 22000);
 end;
 
-procedure DrawRoundedBar(const Canvas: TCanvas; const ARect: TRect; FillColor, BorderColor: TColor);
+procedure DrawRoundedBar(const Canvas: TCanvas; const ARect: TRect; FillColor, BorderColor: TColor; const Radius: Single = 2.0);
 begin
   var LGPGraphics := TGPGraphics.Create(Canvas.Handle);
   try
@@ -148,7 +162,7 @@ begin
     var LColor := MakeColor(GetRValue(LRGBColor), GetGValue(LRGBColor), GetBValue(LRGBColor));
     var LGPPen := TGPPen.Create(LColor, 1.0);
     try
-      const Radius: Single = 2.0;
+      //const Radius: Single = 2.0;
       var d, L, T, R, B: Single;
       var LGPRect := MakeRect(ARect.Left * 1.0, ARect.Top* 1.0, ARect.Width* 1.0, ARect.Height* 1.0);
       d := Radius * 2.0;

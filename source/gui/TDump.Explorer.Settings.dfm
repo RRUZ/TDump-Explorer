@@ -3,7 +3,7 @@ object FrmSettings: TFrmSettings
   Top = 0
   BorderStyle = bsDialog
   Caption = 'Settings'
-  ClientHeight = 551
+  ClientHeight = 560
   ClientWidth = 585
   Color = clWindow
   CustomTitleBar.Control = TitleBarPanel1
@@ -38,7 +38,7 @@ object FrmSettings: TFrmSettings
     Left = 0
     Top = 37
     Width = 585
-    Height = 514
+    Height = 523
     Align = alClient
     BevelOuter = bvNone
     Color = clWindow
@@ -51,10 +51,10 @@ object FrmSettings: TFrmSettings
     StyleElements = [seFont, seBorder]
     object pnFooter: TPanel
       Left = 20
-      Top = 450
+      Top = 459
       Width = 545
       Height = 50
-      Align = alBottom
+      Align = alClient
       BevelOuter = bvNone
       Color = clWindow
       ParentBackground = False
@@ -214,9 +214,10 @@ object FrmSettings: TFrmSettings
       StyleElements = [seFont, seBorder]
       object lblAppearance: TLabel
         Left = 0
-        Top = 3
-        Width = 72
+        Top = 0
+        Width = 545
         Height = 17
+        Align = alTop
         Caption = 'Appearance'
         Font.Charset = DEFAULT_CHARSET
         Font.Color = clWindowText
@@ -224,185 +225,33 @@ object FrmSettings: TFrmSettings
         Font.Name = 'Segoe UI'
         Font.Style = [fsBold]
         ParentFont = False
+        ExplicitWidth = 72
       end
       object lblPreferredTheme: TLabel
         Left = 0
-        Top = 26
-        Width = 85
+        Top = 17
+        Width = 545
         Height = 15
+        Align = alTop
         Caption = 'Preferred theme'
+        ExplicitWidth = 85
       end
-      object pnlSystemTheme: TPanel
-        AlignWithMargins = True
+      object ControlList1: TControlList
         Left = 0
-        Top = 50
-        Width = 160
-        Height = 56
-        Margins.Left = 0
-        Margins.Top = 50
-        Margins.Right = 0
-        Margins.Bottom = 0
-        Align = alLeft
-        BevelOuter = bvNone
-        Color = clWindow
-        ParentBackground = False
+        Top = 32
+        Width = 545
+        Height = 74
+        Align = alClient
+        BorderStyle = bsNone
+        ItemCount = 5
+        ItemWidth = 50
+        ItemMargins.Left = 0
+        ItemMargins.Top = 0
+        ItemMargins.Right = 0
+        ItemMargins.Bottom = 0
+        ColumnLayout = cltMultiLeftToRight
+        ParentColor = False
         TabOrder = 0
-        StyleElements = [seFont, seBorder]
-        ExplicitLeft = 2
-        object imgSystemTheme: TVirtualImage
-          AlignWithMargins = True
-          Left = 0
-          Top = 30
-          Width = 30
-          Height = 26
-          Margins.Left = 0
-          Margins.Top = 30
-          Margins.Right = 0
-          Margins.Bottom = 0
-          Align = alLeft
-          ImageCollection = DataModule1.ImageCollection1
-          ImageWidth = 24
-          ImageHeight = 24
-          ImageIndex = 18
-          ImageName = 'cpu_dark'
-          ExplicitTop = 24
-        end
-        object lblSystemTheme: TLabel
-          Left = 45
-          Top = 30
-          Width = 38
-          Height = 15
-          Caption = 'System'
-        end
-        object rbSystemTheme: TRadioButton
-          AlignWithMargins = True
-          Left = 140
-          Top = 20
-          Width = 20
-          Height = 36
-          Margins.Left = 0
-          Margins.Top = 20
-          Margins.Right = 0
-          Margins.Bottom = 0
-          Align = alRight
-          TabOrder = 0
-        end
-      end
-      object pnlLightTheme: TPanel
-        AlignWithMargins = True
-        Left = 160
-        Top = 50
-        Width = 160
-        Height = 56
-        Margins.Left = 0
-        Margins.Top = 50
-        Margins.Right = 0
-        Margins.Bottom = 0
-        Align = alLeft
-        BevelOuter = bvNone
-        Color = clWindow
-        ParentBackground = False
-        TabOrder = 1
-        StyleElements = [seFont, seBorder]
-        object imgLightTheme: TVirtualImage
-          AlignWithMargins = True
-          Left = 0
-          Top = 30
-          Width = 30
-          Height = 26
-          Margins.Left = 0
-          Margins.Top = 30
-          Margins.Right = 0
-          Margins.Bottom = 0
-          Align = alLeft
-          ImageCollection = DataModule1.ImageCollection1
-          ImageWidth = 24
-          ImageHeight = 24
-          ImageIndex = 100
-          ImageName = 'sun_dark'
-          ExplicitLeft = 14
-          ExplicitTop = 24
-          ExplicitHeight = 30
-        end
-        object lblLightTheme: TLabel
-          Left = 82
-          Top = 30
-          Width = 27
-          Height = 15
-          Caption = 'Light'
-        end
-        object rbLightTheme: TRadioButton
-          AlignWithMargins = True
-          Left = 140
-          Top = 20
-          Width = 20
-          Height = 36
-          Margins.Left = 0
-          Margins.Top = 20
-          Margins.Right = 0
-          Margins.Bottom = 0
-          Align = alRight
-          Checked = True
-          TabOrder = 0
-          TabStop = True
-        end
-      end
-      object pnlDarkTheme: TPanel
-        AlignWithMargins = True
-        Left = 320
-        Top = 50
-        Width = 160
-        Height = 56
-        Margins.Left = 0
-        Margins.Top = 50
-        Margins.Right = 0
-        Margins.Bottom = 0
-        Align = alLeft
-        BevelOuter = bvNone
-        Color = clWindow
-        ParentBackground = False
-        TabOrder = 2
-        StyleElements = [seFont, seBorder]
-        object imgDarkTheme: TVirtualImage
-          AlignWithMargins = True
-          Left = 0
-          Top = 30
-          Width = 30
-          Height = 26
-          Margins.Left = 0
-          Margins.Top = 30
-          Margins.Right = 0
-          Margins.Bottom = 0
-          Align = alLeft
-          ImageCollection = DataModule1.ImageCollection1
-          ImageWidth = 24
-          ImageHeight = 24
-          ImageIndex = 98
-          ImageName = 'moon_dark'
-          ExplicitLeft = 30
-          ExplicitTop = 24
-          ExplicitHeight = 30
-        end
-        object lblDarkTheme: TLabel
-          Left = 82
-          Top = 30
-          Width = 24
-          Height = 15
-          Caption = 'Dark'
-        end
-        object rbDarkTheme: TRadioButton
-          AlignWithMargins = True
-          Left = 140
-          Top = 20
-          Width = 20
-          Height = 36
-          Margins.Left = 0
-          Margins.Top = 20
-          Margins.Right = 0
-          Margins.Bottom = 0
-          Align = alRight
-          TabOrder = 0
-        end
       end
     end
     object pnlGeneral: TPanel
@@ -484,6 +333,5 @@ object FrmSettings: TFrmSettings
     Width = 585
     Height = 37
     CustomButtons = <>
-    ExplicitTop = -6
   end
 end

@@ -17,6 +17,8 @@ interface
 uses
   Winapi.Messages,
   System.Classes,
+  System.Math,
+  System.Types,
   Vcl.Controls,
   Vcl.ExtCtrls,
   Vcl.Forms,
@@ -27,9 +29,35 @@ uses
   Vcl.VirtualImageList,
   Vcl.WinXCtrls,
   Vcl.TitleBarCtrls,
-  TDump.Explorer.GlassTabs;
+  TDump.Explorer.GlassTabs, Vcl.ControlList;
 
 type
+  TSettings = class
+  private
+    class var FInstance: TSettings;
+  private
+    FTDumpPath: string;
+    FRecentItems: Integer;
+    FThemeOption: Integer;
+    FShowLogPanel: Boolean;
+    FShowRawPanel: Boolean;
+    FFollowRawSelection: Boolean;
+    function SettingsFolder: string;
+    function SettingsFileName: string;
+    constructor Create;
+  public
+    class function Instance: TSettings; static;
+    procedure Load;
+    procedure Save;
+    property TDumpPath: string read FTDumpPath write FTDumpPath;
+    property RecentItems: Integer read FRecentItems write FRecentItems;
+    property ThemeOption: Integer read FThemeOption write FThemeOption;
+    property ShowLogPanel: Boolean read FShowLogPanel write FShowLogPanel;
+    property ShowRawPanel: Boolean read FShowRawPanel write FShowRawPanel;
+    property FollowRawSelection: Boolean read FFollowRawSelection
+      write FFollowRawSelection;
+  end;
+
   TFrmSettings = class(TForm)
     TitleBarPanel1: TTitleBarPanel;
     pnContent: TPanel;
@@ -48,18 +76,6 @@ type
     pnlAppearance: TPanel;
     lblAppearance: TLabel;
     lblPreferredTheme: TLabel;
-    pnlSystemTheme: TPanel;
-    pnlLightTheme: TPanel;
-    pnlDarkTheme: TPanel;
-    imgSystemTheme: TVirtualImage;
-    imgLightTheme: TVirtualImage;
-    imgDarkTheme: TVirtualImage;
-    lblSystemTheme: TLabel;
-    lblLightTheme: TLabel;
-    lblDarkTheme: TLabel;
-    rbSystemTheme: TRadioButton;
-    rbLightTheme: TRadioButton;
-    rbDarkTheme: TRadioButton;
     pnlWorkspace: TPanel;
     lblWorkspace: TLabel;
     lblShowLogPanel: TLabel;
@@ -68,14 +84,23 @@ type
     swShowLogPanel: TToggleSwitch;
     swShowRawPanel: TToggleSwitch;
     swFollowRawSelection: TToggleSwitch;
+    ControlList1: TControlList;
     procedure FormShow(Sender: TObject);
+    procedure btnSaveClick(Sender: TObject);
   private
     FSettingsTabs: TGlassTabStrip;
     FSettingsTabImages: TVirtualImageList;
+    FSelectedThemeOption: Integer;
 
     procedure CreateSettingsTabs;
     procedure SettingsTabsBackgroundMouseDown(Sender: TObject;
       Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+    procedure ControlList1AfterDrawItem(AIndex: Integer; ACanvas: TCanvas;
+      ARect: TRect; AState: TOwnerDrawState);
+    procedure ControlList1Change(Sender: TObject);
+    procedure ConfigureThemeOptions;
+    procedure LoadSettings;
+    procedure SaveSettings;
     procedure ApplyTheme;
     procedure CMStyleChanged(var AMessage: TMessage); message CM_STYLECHANGED;
   public
@@ -85,7 +110,9 @@ type
 implementation
 
 uses
-  Winapi.Windows, Vcl.GraphUtil, TDump.Explorer.Resources, TDump.Explorer.UI;
+  Winapi.Windows, Winapi.ShlObj, System.IniFiles, System.SysUtils,
+  Vcl.GraphUtil, Vcl.Themes, TDump.Explorer.Resources, TDump.Explorer.UI,
+  TDump.Explorer.Phosphor.Font;
 
 {$R *.dfm}
 
@@ -97,6 +124,121 @@ const
   CSettingsTabInactiveTopBlend = 0.97;
   CSettingsTabHoverTopBlend = 0.82;
   CSettingsTabCloseHoverBlend = 0.72;
+  CThemeOptionCount = 3;
+  CThemeOptionIconSize = 32;
+  CThemeOptionCardMargin = 3;
+  CThemeOptionIconTextGap = 4;
+
+  CThemeOptionSystem = 0;
+  CThemeOptionDark = 1;
+  CThemeOptionLight = 2;
+
+  CSettingsFolderName = 'TDump-Explorer';
+  CSettingsFileName = 'settings.ini';
+  CSettingsGeneralSection = 'General';
+  CSettingsAppearanceSection = 'Appearance';
+  CSettingsWorkspaceSection = 'Workspace';
+  CSettingsTDumpPathKey = 'TDumpPath';
+  CSettingsRecentItemsKey = 'RecentItems';
+  CSettingsThemeKey = 'Theme';
+  CSettingsShowLogPanelKey = 'ShowLogPanel';
+  CSettingsShowRawPanelKey = 'ShowRawPanel';
+  CSettingsFollowRawSelectionKey = 'FollowRawSelection';
+
+  CDefaultRecentItems = 10;
+  CMinimumRecentItems = 1;
+  CMaximumRecentItems = 100;
+
+{ TSettings }
+
+constructor TSettings.Create;
+begin
+  inherited;
+  FTDumpPath := '';
+  FRecentItems := CDefaultRecentItems;
+  FThemeOption := CThemeOptionSystem;
+  FShowLogPanel := True;
+  FShowRawPanel := True;
+  FFollowRawSelection := True;
+end;
+
+class function TSettings.Instance: TSettings;
+begin
+  if FInstance = nil then
+    FInstance := TSettings.Create;
+  Result := FInstance;
+end;
+
+function TSettings.SettingsFolder: string;
+var
+  LRoamingAppData: array[0..MAX_PATH] of Char;
+begin
+  if Failed(SHGetFolderPath(0, CSIDL_APPDATA, 0, SHGFP_TYPE_CURRENT,
+    LRoamingAppData)) then
+    raise Exception.Create('Unable to locate the roaming application-data folder.');
+  Result := IncludeTrailingPathDelimiter(LRoamingAppData) + CSettingsFolderName;
+end;
+
+function TSettings.SettingsFileName: string;
+begin
+  Result := IncludeTrailingPathDelimiter(SettingsFolder) + CSettingsFileName;
+end;
+
+procedure TSettings.Load;
+var
+  LIni: TIniFile;
+  LFileName: string;
+begin
+  LFileName := SettingsFileName;
+  if not FileExists(LFileName) then
+    Exit;
+
+  LIni := TIniFile.Create(LFileName);
+  try
+    FTDumpPath := LIni.ReadString(CSettingsGeneralSection,
+      CSettingsTDumpPathKey, FTDumpPath);
+    FRecentItems := EnsureRange(LIni.ReadInteger(CSettingsGeneralSection,
+      CSettingsRecentItemsKey, FRecentItems), CMinimumRecentItems,
+      CMaximumRecentItems);
+    FThemeOption := EnsureRange(LIni.ReadInteger(CSettingsAppearanceSection,
+      CSettingsThemeKey, FThemeOption), CThemeOptionSystem, CThemeOptionLight);
+    FShowLogPanel := LIni.ReadBool(CSettingsWorkspaceSection,
+      CSettingsShowLogPanelKey, FShowLogPanel);
+    FShowRawPanel := LIni.ReadBool(CSettingsWorkspaceSection,
+      CSettingsShowRawPanelKey, FShowRawPanel);
+    FFollowRawSelection := LIni.ReadBool(CSettingsWorkspaceSection,
+      CSettingsFollowRawSelectionKey, FFollowRawSelection);
+  finally
+    LIni.Free;
+  end;
+end;
+
+procedure TSettings.Save;
+var
+  LFolder: string;
+  LIni: TIniFile;
+begin
+  LFolder := SettingsFolder;
+  if not ForceDirectories(LFolder) then
+    RaiseLastOSError;
+
+  LIni := TIniFile.Create(SettingsFileName);
+  try
+    LIni.WriteString(CSettingsGeneralSection, CSettingsTDumpPathKey, FTDumpPath);
+    LIni.WriteInteger(CSettingsGeneralSection, CSettingsRecentItemsKey,
+      FRecentItems);
+    LIni.WriteInteger(CSettingsAppearanceSection, CSettingsThemeKey,
+      FThemeOption);
+    LIni.WriteBool(CSettingsWorkspaceSection, CSettingsShowLogPanelKey,
+      FShowLogPanel);
+    LIni.WriteBool(CSettingsWorkspaceSection, CSettingsShowRawPanelKey,
+      FShowRawPanel);
+    LIni.WriteBool(CSettingsWorkspaceSection, CSettingsFollowRawSelectionKey,
+      FFollowRawSelection);
+  finally
+    LIni.Free;
+  end;
+end;
 
 { TFrmSettings }
 
@@ -132,18 +274,11 @@ begin
   pnlGeneral.Color := LTheme.BackgroundColor;
   pnlAppearance.Color := LTheme.BackgroundColor;
   pnlWorkspace.Color := LTheme.BackgroundColor;
-  pnlSystemTheme.Color := LTheme.BackgroundColor;
-  pnlLightTheme.Color := LTheme.BackgroundColor;
-  pnlDarkTheme.Color := LTheme.BackgroundColor;
-
   ApplyLabel(lblGeneral, LTheme.TextColor);
   ApplyLabel(lblTDumpPath, LTheme.TextColor);
   ApplyLabel(lblRecentItems, LTheme.TextColor);
   ApplyLabel(lblAppearance, LTheme.TextColor);
   ApplyLabel(lblPreferredTheme, LTheme.InactiveText);
-  ApplyLabel(lblSystemTheme, LTheme.TextColor);
-  ApplyLabel(lblLightTheme, LTheme.SelectionColor);
-  ApplyLabel(lblDarkTheme, LTheme.TextColor);
   ApplyLabel(lblWorkspace, LTheme.TextColor);
   ApplyLabel(lblShowLogPanel, LTheme.TextColor);
   ApplyLabel(lblShowRawPanel, LTheme.TextColor);
@@ -155,10 +290,6 @@ begin
   edTDumpPath.Font.Color := LTheme.TextColor;
   nbRecentItems.Color := LTheme.BackgroundColor;
   nbRecentItems.Font.Color := LTheme.TextColor;
-
-  imgSystemTheme.ImageName := 'cpu_' + LIconSuffix;
-  imgLightTheme.ImageName := 'sun_' + LIconSuffix;
-  imgDarkTheme.ImageName := 'moon_' + LIconSuffix;
 
   if Assigned(FSettingsTabs) then
   begin
@@ -206,12 +337,140 @@ begin
   CustomTitleBar.ButtonPressedForegroundColor := LTheme.TextColor;
   CustomTitleBar.ButtonInactiveBackgroundColor := LTheme.BackgroundColor;
   CustomTitleBar.ButtonInactiveForegroundColor := LTabPalette.InactiveText;
-  TitleBarPanel1.AlphaValue := 255;
+  //TitleBarPanel1.AlphaValue := 255;
   TitleBarPanel1.Invalidate;
 
   ApplyToggle(swShowLogPanel);
   ApplyToggle(swShowRawPanel);
   ApplyToggle(swFollowRawSelection);
+  ControlList1.Color := LTheme.BackgroundColor;
+  ControlList1.ItemColor := LTheme.BackgroundColor;
+  ControlList1.Invalidate;
+end;
+
+procedure TFrmSettings.ConfigureThemeOptions;
+begin
+  // Keep the component's designer size intact.  Only its virtual items are
+  // sized here so three cards always occupy the available row.
+  ControlList1.ItemCount := CThemeOptionCount;
+  ControlList1.ColumnLayout := cltMultiLeftToRight;
+  ControlList1.ItemMargins.Left := 0;
+  ControlList1.ItemMargins.Top := 0;
+  ControlList1.ItemMargins.Right := 0;
+  ControlList1.ItemMargins.Bottom := 0;
+  ControlList1.ItemWidth := Max(1, ControlList1.ClientWidth div CThemeOptionCount);
+  ControlList1.ItemHeight := Max(1, ControlList1.ClientHeight);
+  ControlList1.ItemIndex := FSelectedThemeOption;
+end;
+
+procedure TFrmSettings.LoadSettings;
+begin
+  TSettings.Instance.Load;
+  edTDumpPath.Text := TSettings.Instance.TDumpPath;
+  nbRecentItems.Value := EnsureRange(TSettings.Instance.RecentItems,
+    Round(nbRecentItems.MinValue), Round(nbRecentItems.MaxValue));
+  FSelectedThemeOption := TSettings.Instance.ThemeOption;
+  swShowLogPanel.State := if TSettings.Instance.ShowLogPanel then tssOn else tssOff;
+  swShowRawPanel.State := if TSettings.Instance.ShowRawPanel then tssOn else tssOff;
+  swFollowRawSelection.State := if TSettings.Instance.FollowRawSelection then
+    tssOn
+  else
+    tssOff;
+  ConfigureThemeOptions;
+end;
+
+procedure TFrmSettings.SaveSettings;
+begin
+  TSettings.Instance.TDumpPath := edTDumpPath.Text;
+  TSettings.Instance.RecentItems := Round(nbRecentItems.Value);
+  TSettings.Instance.ThemeOption := FSelectedThemeOption;
+  TSettings.Instance.ShowLogPanel := swShowLogPanel.State = tssOn;
+  TSettings.Instance.ShowRawPanel := swShowRawPanel.State = tssOn;
+  TSettings.Instance.FollowRawSelection :=
+    swFollowRawSelection.State = tssOn;
+  TSettings.Instance.Save;
+end;
+
+procedure TFrmSettings.btnSaveClick(Sender: TObject);
+begin
+  SaveSettings;
+end;
+
+procedure TFrmSettings.ControlList1AfterDrawItem(AIndex: Integer;
+  ACanvas: TCanvas; ARect: TRect; AState: TOwnerDrawState);
+const
+  CThemeOptionCaptions: array[CThemeOptionSystem..CThemeOptionLight] of string =
+    ('System', 'Dark', 'Light');
+  CThemeOptionIconCodes: array[CThemeOptionSystem..CThemeOptionLight] of Word =
+    ($E32E, $E330, $E472); // monitor, moon, sun
+var
+  LTheme: TExplorerTheme;
+  LCardRect: TRect;
+  LTextRect: TRect;
+  LIconRect: TRect;
+  LIconX: Integer;
+  LIconY: Integer;
+  LIconSize: Integer;
+  LContentHeight: Integer;
+  LFillColor: TColor;
+  LTextColor: TColor;
+  LIconColor: TColor;
+begin
+  if (AIndex < CThemeOptionSystem) or (AIndex > CThemeOptionLight) then
+    Exit;
+
+  LTheme := TExplorerTheme.ActiveTheme;
+  LCardRect := ARect;
+  InflateRect(LCardRect, -ScaleValue(CThemeOptionCardMargin), -ScaleValue(CThemeOptionCardMargin));
+  if (LCardRect.Width <= 0) or (LCardRect.Height <= 0) then
+    Exit;
+
+  ACanvas.Brush.Color := TExplorerTheme.ActiveTheme.BackgroundColor;
+  ACanvas.FillRect(ARect);
+  LTextColor := LTheme.TextColor;
+  LIconColor := LTheme.TextColor;
+  if (odSelected in AState) then
+  begin
+    LFillColor := ColorBlendRGB(TExplorerTheme.ActiveTheme.SelectionColor, TExplorerTheme.ActiveTheme.BackgroundColor, 0.9);
+    DrawRoundedBar(ACanvas, ARect, LFillColor, TExplorerTheme.ActiveTheme.SelectionColor, 4.0);
+    LTextColor := LTheme.SelectionColor;
+    LIconColor := LTheme.SelectionColor;
+  end
+  else if (odHotLight in AState) then
+  begin
+    LFillColor := ColorBlendRGB(TExplorerTheme.ActiveTheme.SelectionColor, TExplorerTheme.ActiveTheme.BackgroundColor, 0.95);
+    ACanvas.Brush.Color := LFillColor;
+    ACanvas.FillRect(ARect);
+  end;
+
+
+  ACanvas.Font.Name := TExplorerTheme.FontName;
+  ACanvas.Font.Size := TExplorerTheme.FontSize;
+  //ACanvas.Font.Style := [fsBold];
+  LIconSize := ScaleValue(CThemeOptionIconSize);
+  LContentHeight := LIconSize + ScaleValue(CThemeOptionIconTextGap) + ACanvas.TextHeight(CThemeOptionCaptions[AIndex]);
+  LIconX := LCardRect.Left + (LCardRect.Width - LIconSize) div 2;
+  LIconY := LCardRect.Top + Max(0, (LCardRect.Height - LContentHeight) div 2);
+  LIconRect := Rect(LIconX, LIconY, LIconX + LIconSize, LIconY + LIconSize);
+  PhosphorFont.DrawIcon(ACanvas.Handle, CThemeOptionIconCodes[AIndex], LIconRect, LIconColor, pfwRegular);
+
+  LTextRect := LCardRect;
+  LTextRect.Top := LIconY + LIconSize + ScaleValue(CThemeOptionIconTextGap);
+  ACanvas.Brush.Style := bsClear;
+  ACanvas.Font.Color := LTextColor;
+  DrawText(ACanvas.Handle, PChar(CThemeOptionCaptions[AIndex]), Length(CThemeOptionCaptions[AIndex]), LTextRect,
+    DT_CENTER or DT_SINGLELINE or DT_VCENTER or DT_END_ELLIPSIS or DT_NOPREFIX);
+end;
+
+procedure TFrmSettings.ControlList1Change(Sender: TObject);
+begin
+  if (ControlList1.ItemIndex < CThemeOptionSystem) or
+    (ControlList1.ItemIndex > CThemeOptionLight) then
+    Exit;
+
+  FSelectedThemeOption := ControlList1.ItemIndex;
+
+  ControlList1.Invalidate;
 end;
 
 procedure TFrmSettings.CreateSettingsTabs;
@@ -267,6 +526,10 @@ end;
 constructor TFrmSettings.Create(AOwner: TComponent);
 begin
   inherited;
+  LoadSettings;
+  ControlList1.OnAfterDrawItem := ControlList1AfterDrawItem;
+  ControlList1.OnChange := ControlList1Change;
+  btnSave.OnClick := btnSaveClick;
   CreateSettingsTabs;
   ApplyTheme;
 end;
@@ -277,5 +540,10 @@ begin
   Font.Size := TExplorerTheme.FontSize;
   Font.Height := MulDiv(Font.Height, CurrentPPI, Font.PixelsPerInch);
 end;
+
+initialization
+
+finalization
+  TSettings.FInstance.Free;
 
 end.

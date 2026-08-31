@@ -88,7 +88,6 @@ object FrmMain: TFrmMain
     Width = 1072
     Height = 39
     CustomButtons = <>
-    ExplicitTop = -6
   end
   object CardPanel1: TCardPanel
     Left = 0

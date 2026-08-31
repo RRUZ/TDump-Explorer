@@ -81,6 +81,7 @@ type
     FProgressCompletedFiles: Integer;
     FCurrentFileProgress: Integer;
     FRestoreAlphaBlend: Boolean;
+    procedure ToggleActiveTheme;
     procedure ApplyTheme;
     procedure ApplyExplorerPopupMenuTheme;
     procedure ApplyEmptyStateTheme;
@@ -830,7 +831,8 @@ begin
   end;
 end;
 
-procedure TFrmMain.PopupMenuChangeThemeClick(Sender: TObject);
+
+procedure TFrmMain.ToggleActiveTheme;
 begin
   AlphaBlendValue := 0;
   AlphaBlend := True;
@@ -843,6 +845,12 @@ begin
     FRestoreAlphaBlend := True;
     UnlockDrawing;
   end;
+end;
+
+
+procedure TFrmMain.PopupMenuChangeThemeClick(Sender: TObject);
+begin
+  ToggleActiveTheme;
 end;
 
 procedure TFrmMain.ExplorerPopupMenuItemClick(Sender: TObject;
