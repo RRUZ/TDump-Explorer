@@ -10,7 +10,7 @@ uses
   System.TypInfo, Vcl.Graphics, Vcl.Controls, Vcl.Forms,
   Vcl.Dialogs, Vcl.StdCtrls, Winapi.ShellAPI, TDump.Explorer.Finder,
   TDump.Explorer.Parser, TDump.Explorer.Phosphor.Font, TDump.Explorer.Runner,
-  TDump.Explorer.TextSource,
+  TDump.Explorer.TextSource, TDump.Explorer.Settings,
   TDump.Explorer.Frame, Vcl.ComCtrls, TDump.Explorer.LogControl, Vcl.ExtCtrls,
   Vcl.TitleBarCtrls, Vcl.WinXPanels, Vcl.VirtualImageList,
   TDump.Explorer.GlassTabs, TDump.Explorer.PopupMenu, Vcl.AppEvnts;
@@ -52,6 +52,7 @@ type
     ApplicationEvents1: TApplicationEvents;
     procedure FormShow(Sender: TObject);
     procedure ApplicationEvents1Idle(Sender: TObject; var Done: Boolean);
+    procedure FormCreate(Sender: TObject);
   private
     FAnalysisId: Integer;
     FAnalysisTask: ITask;
@@ -81,6 +82,7 @@ type
     FProgressCompletedFiles: Integer;
     FCurrentFileProgress: Integer;
     FRestoreAlphaBlend: Boolean;
+    procedure SyncActiveTheme;
     procedure ToggleActiveTheme;
     procedure ApplyTheme;
     procedure ApplyExplorerPopupMenuTheme;
@@ -141,6 +143,7 @@ type
       message CWMAnalysisCompleted;
     procedure WMAnalysisProgress(var AMessage: TMessage);
       message CWMAnalysisProgress;
+    procedure WMSettingsChanged(var AMessage: TMessage);  message WM_TDUMP_SETTINGS_CHANGED;
     procedure WMDropFiles(var AMessage: TWMDropFiles); message WM_DROPFILES;
   protected
     procedure CreateParams(var Params: TCreateParams); override;
@@ -160,7 +163,7 @@ implementation
 
 uses
   TDump.Explorer.UI, TDump.Explorer.Utils, TDump.Explorer.Resources,
-  TDump.Explorer.Settings, Vcl.GraphUtil, Vcl.Menus, Vcl.Themes;
+  Vcl.GraphUtil, Vcl.Menus, Vcl.Themes;
 
 {$R *.dfm}
 
@@ -605,6 +608,24 @@ begin
   inherited;
   if Assigned(FTabs) then
     ApplyTheme;
+end;
+
+procedure TFrmMain.SyncActiveTheme;
+begin
+  if (TSettings.Instance.ThemeOption = toLight) and not IsLightThemeActive then
+    ToggleActiveTheme
+  else if (TSettings.Instance.ThemeOption = toDark) and IsLightThemeActive then
+    ToggleActiveTheme
+  else if (TSettings.Instance.ThemeOption = toSystem) then
+  begin
+     if IsWindowsLightTheme <> IsLightThemeActive then
+       ToggleActiveTheme;
+  end;
+end;
+
+procedure TFrmMain.WMSettingsChanged(var AMessage: TMessage);
+begin
+  SyncActiveTheme;
 end;
 
 procedure TFrmMain.CreateTabs;
@@ -1282,6 +1303,11 @@ begin
     DispatchMessage(LMessage);
 end;
 
+procedure TFrmMain.FormCreate(Sender: TObject);
+begin
+  SyncActiveTheme;
+end;
+
 procedure TFrmMain.FormShow(Sender: TObject);
 begin
   Font.Name := TExplorerTheme.FontName;
@@ -1629,6 +1655,7 @@ begin
   end;
   CompleteAnalysisProgress;
 end;
+
 
 procedure TFrmMain.WMAnalysisCompleted(var AMessage: TMessage);
 begin

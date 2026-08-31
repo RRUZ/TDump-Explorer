@@ -55,6 +55,7 @@ procedure DrawSelectionBar(const Canvas: TCanvas; const ARect: TRect; FillColor,
 procedure DrawSplitterLine(const ACanvas: TCanvas; const ARect: TRect; AIsVertical: Boolean; AColor: TColor);
 function IsWindows11: Boolean;
 function IsLightThemeActive: Boolean;
+function IsWindowsLightTheme: Boolean;
 function FormatByteSize(AByteCount: Int64): string;
 
 implementation

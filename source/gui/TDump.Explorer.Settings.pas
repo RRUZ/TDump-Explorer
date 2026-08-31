@@ -31,14 +31,19 @@ uses
   Vcl.TitleBarCtrls,
   TDump.Explorer.GlassTabs, Vcl.ControlList;
 
+const
+  WM_TDUMP_SETTINGS_CHANGED = WM_APP + $243;
+
 type
+  TThemeOption = (toSystem, toDark, toLight);
+
   TSettings = class
   private
     class var FInstance: TSettings;
   private
     FTDumpPath: string;
     FRecentItems: Integer;
-    FThemeOption: Integer;
+    FThemeOption: TThemeOption;
     FShowLogPanel: Boolean;
     FShowRawPanel: Boolean;
     FFollowRawSelection: Boolean;
@@ -51,7 +56,7 @@ type
     procedure Save;
     property TDumpPath: string read FTDumpPath write FTDumpPath;
     property RecentItems: Integer read FRecentItems write FRecentItems;
-    property ThemeOption: Integer read FThemeOption write FThemeOption;
+    property ThemeOption: TThemeOption read FThemeOption write FThemeOption;
     property ShowLogPanel: Boolean read FShowLogPanel write FShowLogPanel;
     property ShowRawPanel: Boolean read FShowRawPanel write FShowRawPanel;
     property FollowRawSelection: Boolean read FFollowRawSelection
@@ -90,7 +95,7 @@ type
   private
     FSettingsTabs: TGlassTabStrip;
     FSettingsTabImages: TVirtualImageList;
-    FSelectedThemeOption: Integer;
+    FSelectedThemeOption: TThemeOption;
 
     procedure CreateSettingsTabs;
     procedure SettingsTabsBackgroundMouseDown(Sender: TObject;
@@ -100,7 +105,8 @@ type
     procedure ControlList1Change(Sender: TObject);
     procedure ConfigureThemeOptions;
     procedure LoadSettings;
-    procedure SaveSettings;
+    function SaveSettings: Boolean;
+    procedure BroadcastSettingsChanged;
     procedure ApplyTheme;
     procedure CMStyleChanged(var AMessage: TMessage); message CM_STYLECHANGED;
   public
@@ -124,14 +130,14 @@ const
   CSettingsTabInactiveTopBlend = 0.97;
   CSettingsTabHoverTopBlend = 0.82;
   CSettingsTabCloseHoverBlend = 0.72;
-  CThemeOptionCount = 3;
+  CThemeOptionCount = Ord(High(TThemeOption)) - Ord(Low(TThemeOption)) + 1;
   CThemeOptionIconSize = 32;
   CThemeOptionCardMargin = 3;
   CThemeOptionIconTextGap = 4;
 
-  CThemeOptionSystem = 0;
-  CThemeOptionDark = 1;
-  CThemeOptionLight = 2;
+  CThemeOptionSystem = Ord(toSystem);
+  CThemeOptionDark = Ord(toDark);
+  CThemeOptionLight = Ord(toLight);
 
   CSettingsFolderName = 'TDump-Explorer';
   CSettingsFileName = 'settings.ini';
@@ -156,7 +162,7 @@ begin
   inherited;
   FTDumpPath := '';
   FRecentItems := CDefaultRecentItems;
-  FThemeOption := CThemeOptionSystem;
+  FThemeOption := toSystem;
   FShowLogPanel := True;
   FShowRawPanel := True;
   FFollowRawSelection := True;
@@ -200,8 +206,9 @@ begin
     FRecentItems := EnsureRange(LIni.ReadInteger(CSettingsGeneralSection,
       CSettingsRecentItemsKey, FRecentItems), CMinimumRecentItems,
       CMaximumRecentItems);
-    FThemeOption := EnsureRange(LIni.ReadInteger(CSettingsAppearanceSection,
-      CSettingsThemeKey, FThemeOption), CThemeOptionSystem, CThemeOptionLight);
+    FThemeOption := TThemeOption(EnsureRange(LIni.ReadInteger(
+      CSettingsAppearanceSection, CSettingsThemeKey, Ord(FThemeOption)),
+      Ord(Low(TThemeOption)), Ord(High(TThemeOption))));
     FShowLogPanel := LIni.ReadBool(CSettingsWorkspaceSection,
       CSettingsShowLogPanelKey, FShowLogPanel);
     FShowRawPanel := LIni.ReadBool(CSettingsWorkspaceSection,
@@ -228,7 +235,7 @@ begin
     LIni.WriteInteger(CSettingsGeneralSection, CSettingsRecentItemsKey,
       FRecentItems);
     LIni.WriteInteger(CSettingsAppearanceSection, CSettingsThemeKey,
-      FThemeOption);
+      Ord(FThemeOption));
     LIni.WriteBool(CSettingsWorkspaceSection, CSettingsShowLogPanelKey,
       FShowLogPanel);
     LIni.WriteBool(CSettingsWorkspaceSection, CSettingsShowRawPanelKey,
@@ -360,7 +367,7 @@ begin
   ControlList1.ItemMargins.Bottom := 0;
   ControlList1.ItemWidth := Max(1, ControlList1.ClientWidth div CThemeOptionCount);
   ControlList1.ItemHeight := Max(1, ControlList1.ClientHeight);
-  ControlList1.ItemIndex := FSelectedThemeOption;
+  ControlList1.ItemIndex := Ord(FSelectedThemeOption);
 end;
 
 procedure TFrmSettings.LoadSettings;
@@ -379,21 +386,47 @@ begin
   ConfigureThemeOptions;
 end;
 
-procedure TFrmSettings.SaveSettings;
+function TFrmSettings.SaveSettings: Boolean;
+var
+  LSettings: TSettings;
+  LRecentItems: Integer;
 begin
-  TSettings.Instance.TDumpPath := edTDumpPath.Text;
-  TSettings.Instance.RecentItems := Round(nbRecentItems.Value);
-  TSettings.Instance.ThemeOption := FSelectedThemeOption;
-  TSettings.Instance.ShowLogPanel := swShowLogPanel.State = tssOn;
-  TSettings.Instance.ShowRawPanel := swShowRawPanel.State = tssOn;
-  TSettings.Instance.FollowRawSelection :=
+  LSettings := TSettings.Instance;
+  LRecentItems := Round(nbRecentItems.Value);
+  Result := (LSettings.TDumpPath <> edTDumpPath.Text) or
+    (LSettings.RecentItems <> LRecentItems) or
+    (LSettings.ThemeOption <> FSelectedThemeOption) or
+    (LSettings.ShowLogPanel <> (swShowLogPanel.State = tssOn)) or
+    (LSettings.ShowRawPanel <> (swShowRawPanel.State = tssOn)) or
+    (LSettings.FollowRawSelection <>
+      (swFollowRawSelection.State = tssOn));
+  if not Result then
+    Exit;
+
+  LSettings.TDumpPath := edTDumpPath.Text;
+  LSettings.RecentItems := LRecentItems;
+  LSettings.ThemeOption := FSelectedThemeOption;
+  LSettings.ShowLogPanel := swShowLogPanel.State = tssOn;
+  LSettings.ShowRawPanel := swShowRawPanel.State = tssOn;
+  LSettings.FollowRawSelection :=
     swFollowRawSelection.State = tssOn;
-  TSettings.Instance.Save;
+  LSettings.Save;
+end;
+
+procedure TFrmSettings.BroadcastSettingsChanged;
+begin
+  for var LIndex := 0 to Screen.FormCount - 1 do
+  begin
+    var LForm := Screen.Forms[LIndex];
+    if LForm.HandleAllocated then
+      PostMessage(LForm.Handle, WM_TDUMP_SETTINGS_CHANGED, 0, 0);
+  end;
 end;
 
 procedure TFrmSettings.btnSaveClick(Sender: TObject);
 begin
-  SaveSettings;
+  if SaveSettings then
+    BroadcastSettingsChanged;
 end;
 
 procedure TFrmSettings.ControlList1AfterDrawItem(AIndex: Integer;
@@ -468,7 +501,7 @@ begin
     (ControlList1.ItemIndex > CThemeOptionLight) then
     Exit;
 
-  FSelectedThemeOption := ControlList1.ItemIndex;
+  FSelectedThemeOption := TThemeOption(ControlList1.ItemIndex);
 
   ControlList1.Invalidate;
 end;

@@ -3,7 +3,7 @@ object FrmSettings: TFrmSettings
   Top = 0
   BorderStyle = bsDialog
   Caption = 'Settings'
-  ClientHeight = 560
+  ClientHeight = 598
   ClientWidth = 585
   Color = clWindow
   CustomTitleBar.Control = TitleBarPanel1
@@ -38,7 +38,7 @@ object FrmSettings: TFrmSettings
     Left = 0
     Top = 37
     Width = 585
-    Height = 523
+    Height = 561
     Align = alClient
     BevelOuter = bvNone
     Color = clWindow
@@ -49,20 +49,22 @@ object FrmSettings: TFrmSettings
     ParentBackground = False
     TabOrder = 0
     StyleElements = [seFont, seBorder]
+    ExplicitHeight = 523
     object pnFooter: TPanel
       Left = 20
       Top = 459
       Width = 545
-      Height = 50
+      Height = 88
       Align = alClient
       BevelOuter = bvNone
       Color = clWindow
       ParentBackground = False
       TabOrder = 3
       StyleElements = [seFont, seBorder]
+      ExplicitHeight = 50
       DesignSize = (
         545
-        50)
+        88)
       object lblInformation: TLabel
         Left = 0
         Top = 6

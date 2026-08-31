@@ -33,6 +33,7 @@ object FrmMain: TFrmMain
   GlassFrame.Top = 40
   Position = poDesktopCenter
   StyleElements = [seFont, seClient]
+  OnCreate = FormCreate
   OnShow = FormShow
   TextHeight = 15
   object Splitter1: TSplitter
