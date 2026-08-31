@@ -51,6 +51,7 @@ type
     FTreeHighlighter: TTinyHighlighter;
     FSelectingTreeFromRawView: Boolean;
     function TreeTextColor(ADetailKind: TTreeDetailKind): TColor;
+    function TreeParserMode(ADetailKind: TTreeDetailKind): TTinyParserMode;
     function HeaderFormatCaption: string;
     function HeaderArchitectureCaption: string;
     procedure UpdateDocumentHeader;
@@ -222,6 +223,17 @@ begin
       Result := LTheme.TypeColor;
   else
     Result := LTheme.TextColor;
+  end;
+end;
+
+function TDumpDocumentFrame.TreeParserMode(
+  ADetailKind: TTreeDetailKind): TTinyParserMode;
+begin
+  case ADetailKind of
+    tdkOMFRecord:
+      Result := tpmOMFRecord;
+  else
+    Result := tpmTDumpValues;
   end;
 end;
 
@@ -1241,12 +1253,13 @@ begin
   var LNodeData := PTreeItemData(Sender.GetNodeData(Node));
   if (LNodeData = nil) or
     not (cTreeDetailKindInfos[LNodeData.DetailKind].TextColorKind in
-      [ttckMethod, ttckType]) then
+      [ttckMethod, ttckType, ttckSyntax]) then
     Exit;
 
   DefaultDraw := False;
   FTreeHighlighter.TextRect(TargetCanvas, CellRect, Text,
-    TExplorerTheme.ActiveTheme, [tfVerticalCenter]);
+    TExplorerTheme.ActiveTheme, [tfVerticalCenter],
+    TreeParserMode(LNodeData.DetailKind));
 end;
 
 procedure TDumpDocumentFrame.TreeFocusChanged(Sender: TBaseVirtualTree;

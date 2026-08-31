@@ -44,7 +44,8 @@ type
     tdkMachLazyBindingInfo, tdkMachExports, tdkMachResources, tdkMachRawSymbols,
     tdkArchiveMembers, tdkArchiveSymbols, tdkDiagnostics);
 
-  TTreeTextColorKind = (ttckDefault, ttckHighlighted, ttckMethod, ttckType);
+  TTreeTextColorKind = (ttckDefault, ttckHighlighted, ttckMethod, ttckType,
+    ttckSyntax);
 
   TTreeDetailKindInfo = record
     Caption: string;
@@ -87,7 +88,7 @@ const
     (Caption: 'ELF Dynamic Section'; ImageName: ''; TextColorKind: ttckHighlighted),
     (Caption: 'ELF Relocations'; ImageName: ''; TextColorKind: ttckHighlighted),
     (Caption: 'OMF Records'; ImageName: ''; TextColorKind: ttckHighlighted),
-    (Caption: 'OMF Record'; ImageName: ''; TextColorKind: ttckDefault),
+    (Caption: 'OMF Record'; ImageName: ''; TextColorKind: ttckSyntax),
     (Caption: 'OMF Library Members'; ImageName: ''; TextColorKind: ttckHighlighted),
     (Caption: 'OMF Library Index'; ImageName: ''; TextColorKind: ttckHighlighted),
     (Caption: 'Relocations'; ImageName: ''; TextColorKind: ttckHighlighted),

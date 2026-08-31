@@ -48,6 +48,8 @@ type
     [Test] procedure DebugInformationProjection;
     [Test] procedure P2ProjectionsAndMerge;
     [Test] procedure MachRawSyntaxHints;
+    [Test] procedure OMFRawSyntaxHints;
+    [Test] procedure OMFFixUpAndLEDataProjection;
     [Test] procedure MachReportSections;
     [Test] procedure GeneratedDocumentIntegrity;
     [Test] procedure GeneratedNativeFormatCoverage;
@@ -835,6 +837,68 @@ begin
   end;
 end;
 
+procedure TestOMFRawSyntaxHints;
+  function SyntaxHintForRecordLine(ARecord: TDumpObjectRecord;
+    ALineNumber: Integer): TDumpRawSyntaxHint;
+  begin
+    Result := rshOMFRecord;
+    for var LDataRow in ARecord.HexDataRows do
+      if LDataRow.StartLine = ALineNumber then
+        Exit(rshOMFLEData);
+  end;
+begin
+  var LDocument := ParseGeneratedFixture('OMF.Object.Win32.tdump');
+  try
+    Require(LDocument.ObjectRecords.Count > 1000,
+      'The OMF fixture must provide record rows for raw rendering.');
+    for var LRecord in LDocument.ObjectRecords do
+    begin
+      Require(LRecord.SourceSpan.SyntaxHint = rshOMFRecord,
+        'Every OMF record must request OMF record syntax.');
+      for var LLineNumber := LRecord.StartLine to LRecord.EndLine do
+        Require(LDocument.Lines[LLineNumber - 1].SourceSpan.SyntaxHint =
+          SyntaxHintForRecordLine(LRecord, LLineNumber),
+          'Every OMF record source line must retain its raw syntax hint.');
+    end;
+  finally
+    LDocument.Free;
+  end;
+end;
+
+procedure TestOMFFixUpAndLEDataProjection;
+begin
+  var LDocument := ParseGeneratedFixture('OMF.Object.Win32.tdump');
+  try
+    var LFixUpRecord: TDumpObjectRecord := nil;
+    var LLEDataRecord: TDumpObjectRecord := nil;
+    for var LRecord in LDocument.ObjectRecords do
+    begin
+      if (LFixUpRecord = nil) and SameText(LRecord.RawOffset, '00FE6E') then
+        LFixUpRecord := LRecord;
+      if (LLEDataRecord = nil) and SameText(LRecord.RawOffset, '015638') then
+        LLEDataRecord := LRecord;
+    end;
+    Require((LFixUpRecord <> nil) and (LFixUpRecord.FixUps.Count = 2) and
+      (LFixUpRecord.FixUps[0].RawFixUp = '024') and
+      SameText(LFixUpRecord.FixUps[0].Mode, 'Seg') and
+      SameText(LFixUpRecord.FixUps[0].Location, 'Offset32') and
+      SameText(LFixUpRecord.FixUps[0].Frame, 'TARGET') and
+      ContainsText(LFixUpRecord.FixUps[0].Target,
+        'System::DefaultRandom32()'),
+      'FIXU32 rows must project typed FixUp, mode, location, frame, and target fields.');
+    Require((LLEDataRecord <> nil) and (LLEDataRecord.HexDataRows.Count = 11) and
+      (LLEDataRecord.HexDataRows[0].RawOffset = '0000') and
+      ContainsText(LLEDataRecord.HexDataRows[0].Bytes,
+        '04 00 00 00 0E 0F 54 4D') and
+      (LLEDataRecord.HexDataRows[0].ASCII = '......TMonitorSu') and
+      (LDocument.Lines[LLEDataRecord.HexDataRows[0].StartLine - 1].
+        SourceSpan.SyntaxHint = rshOMFLEData),
+      'LEDATA rows must retain their offset, hexadecimal bytes, and ASCII columns.');
+  finally
+    LDocument.Free;
+  end;
+end;
+
 procedure TestMachReportSections;
 var
   LDocument: TDumpDocument;
@@ -1005,9 +1069,13 @@ begin
       'Delayed import descriptors must remain distinct and in report order.');
     Require((LDocument.DelayedImportTable.Modules[0].Properties.Count = 7) and
       SameText(LDocument.DelayedImportTable.Modules[0].Properties[0].Name,
-        'Attributes') and
+      'Attributes') and
       (LDocument.DelayedImportTable.Modules[2].Properties.Count = 7),
       'Each delayed import descriptor must retain its seven metadata properties.');
+    for var LProperty in LDocument.DelayedImportTable.Modules[0].Properties do
+      Require(LDocument.Lines[LProperty.StartLine - 1].SourceSpan.SyntaxHint =
+        rshPEImportProperty,
+        'Delayed import property rows must retain PE address syntax for RAW output.');
     Require(LDocument.DelayedImportTable.SourceSpan.IsValid and
       (LDocument.DelayedImportTable.SourceSpan.Run = LDocument.PrimaryRun) and
       LDocument.DelayedImportTable.Modules[0].SourceSpan.IsValid and
@@ -1181,11 +1249,16 @@ begin
   try
     var LDynamicRelocationCount := 0;
     var LProcedureLinkageRelocationCount := 0;
+    var LHasRelocationSyntaxHint := False;
     for var LRelocation in LDocument.ELFRelocations do
       if SameText(LRelocation.SectionName, '.rela.dyn') then
         Inc(LDynamicRelocationCount)
       else if SameText(LRelocation.SectionName, '.rela.plt') then
+      begin
         Inc(LProcedureLinkageRelocationCount);
+        LHasRelocationSyntaxHint := LHasRelocationSyntaxHint or
+          (LRelocation.SourceSpan.SyntaxHint = rshELFRelocation);
+      end;
     Require((LDocument.FileKind = dfELFObject) and
       (LDocument.ELFProgramHeaders.Count = 7) and
       SameText(LDocument.ELFProgramHeaders[0].HeaderType, 'LOAD') and
@@ -1194,7 +1267,15 @@ begin
       SameText(LDocument.ELFDynamicEntries[0].Tag, 'NEEDED') and
       LDocument.ELFDynamicEntries[0].SourceSpan.IsValid and
       (LDynamicRelocationCount = 27667) and
-      (LProcedureLinkageRelocationCount = 5788),
+      (LProcedureLinkageRelocationCount = 5788) and
+      LHasRelocationSyntaxHint and
+      (LDocument.Diagnostics.Count = 1) and
+      (LDocument.Diagnostics[0].Severity = dsWarning) and
+      (LDocument.Diagnostics[0].LineNumber = 82) and
+      (LDocument.Diagnostics[0].Message =
+        'target section index for relocations (sh_info) is 0') and
+      (LDocument.Diagnostics[0].RawLine =
+        'Warning: target section index for relocations (sh_info) is 0'),
       'The real InterBase ELF shared-library fixture must retain program headers, dynamic entries, and relocation-table sections.');
   finally
     LDocument.Free;
@@ -1309,6 +1390,16 @@ end;
 procedure TParserFixture.MachRawSyntaxHints;
 begin
   TestMachRawSyntaxHints;
+end;
+
+procedure TParserFixture.OMFRawSyntaxHints;
+begin
+  TestOMFRawSyntaxHints;
+end;
+
+procedure TParserFixture.OMFFixUpAndLEDataProjection;
+begin
+  TestOMFFixUpAndLEDataProjection;
 end;
 
 procedure TParserFixture.MachReportSections;

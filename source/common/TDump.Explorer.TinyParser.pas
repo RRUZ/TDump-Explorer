@@ -20,7 +20,9 @@ uses
   System.Generics.Collections;
 
 type
-  TTinyParserMode = (tpmTDumpValues, tpmCppBuilderMethod, tpmMachLinker);
+  TTinyParserMode = (tpmTDumpValues, tpmCppBuilderMethod, tpmMachLinker,
+    tpmExtractedString, tpmELFRelocation, tpmOMFRecord, tpmOMFLEData,
+    tpmPEImportProperty);
 
   TTinyTokenKind = (
     ttkWhitespace,
@@ -84,7 +86,14 @@ type
       const AText: string; AStartIndex, ANameStartIndex: Integer);
     procedure AddItaniumSignatureTokens(AResult: TTinyTokenList;
       const AText: string; AStartIndex, AEndIndex: Integer);
+    procedure AddBorlandSignatureTokens(AResult: TTinyTokenList;
+      const AText: string; AStartIndex, AEndIndex: Integer);
     procedure ApplyMachLinkerMode(AResult: TTinyTokenList);
+    procedure ApplyExtractedStringMode(AResult: TTinyTokenList);
+    procedure ApplyELFRelocationMode(AResult: TTinyTokenList);
+    procedure ApplyOMFRecordMode(AResult: TTinyTokenList);
+    procedure ApplyOMFLEDataMode(AResult: TTinyTokenList);
+    procedure ApplyPEImportPropertyMode(AResult: TTinyTokenList);
     procedure PromoteItaniumGeneratedOwners(AResult: TTinyTokenList);
     class function TryReadHexadecimal(const AText: string; AStartIndex: Integer;
       out AEndIndex: Integer): Boolean; static;
@@ -147,6 +156,53 @@ begin
   end;
 end;
 
+procedure TTinyParser.AddBorlandSignatureTokens(AResult: TTinyTokenList;
+  const AText: string; AStartIndex, AEndIndex: Integer);
+begin
+  // Borland signatures retain qualified type names after the $ delimiter,
+  // for example $qqrp19Vcl@Menus@TMenuItem.  Preserve unknown encoding as a
+  // signature, while exposing only names with an unambiguous boundary (@ or
+  // a source-name length digit followed by an uppercase identifier).
+  var LCursor := AStartIndex;
+  var LIndex := AStartIndex;
+  while LIndex < AEndIndex do
+  begin
+    var LNameStart := 0;
+    if (AText[LIndex] = '@') and (LIndex + 1 < AEndIndex) and
+      IsIdentifierStart(AText[LIndex + 1]) then
+      LNameStart := LIndex + 1
+    else if (LIndex > AStartIndex) and
+      CharInSet(AText[LIndex - 1], ['0'..'9']) and
+      CharInSet(AText[LIndex], ['A'..'Z']) then
+      LNameStart := LIndex
+    else if (LIndex > AStartIndex) and
+      CharInSet(AText[LIndex - 1], ['%', '\']) and
+      CharInSet(AText[LIndex], ['A'..'Z']) then
+      LNameStart := LIndex;
+
+    if LNameStart = 0 then
+    begin
+      Inc(LIndex);
+      Continue;
+    end;
+
+    var LNameEnd := LNameStart;
+    while (LNameEnd < AEndIndex) and IsIdentifierCharacter(AText[LNameEnd]) do
+      Inc(LNameEnd);
+    if LCursor < LNameStart then
+      AddToken(AResult, ttkMangledSignature, AText, LCursor, LNameStart);
+    var LName := Copy(AText, LNameStart, LNameEnd - LNameStart);
+    if IsCppBuilderTypeName(LName) then
+      AddToken(AResult, ttkTypeName, AText, LNameStart, LNameEnd)
+    else
+      AddToken(AResult, ttkNamespace, AText, LNameStart, LNameEnd);
+    LCursor := LNameEnd;
+    LIndex := LNameEnd;
+  end;
+  if LCursor < AEndIndex then
+    AddToken(AResult, ttkMangledSignature, AText, LCursor, AEndIndex);
+end;
+
 procedure TTinyParser.ApplyCppBuilderMethodMode(AResult: TTinyTokenList);
 begin
   PromoteItaniumGeneratedOwners(AResult);
@@ -169,8 +225,71 @@ begin
         (AResult[LPreviousIndex].Kind = ttkWhitespace) do
         Dec(LPreviousIndex);
       var LIsQualifiedIdentifier := (LPreviousIndex >= 0) and
+        (AResult[LPreviousIndex].Text = '.');
+      if not LIsQualifiedIdentifier then
+        LIsQualifiedIdentifier := (LPreviousIndex >= 0) and
         (AResult[LPreviousIndex].Text = ':');
       if LIsQualifiedIdentifier then
+      begin
+        if AResult[LPreviousIndex].Text = ':' then
+        begin
+          Dec(LPreviousIndex);
+          while (LPreviousIndex >= 0) and
+            (AResult[LPreviousIndex].Kind = ttkWhitespace) do
+            Dec(LPreviousIndex);
+          LIsQualifiedIdentifier := (LPreviousIndex >= 0) and
+            (AResult[LPreviousIndex].Text = ':');
+        end;
+      end;
+
+      if (LNextIndex < AResult.Count) and (AResult[LNextIndex].Text = '(') then
+        LToken.Kind := ttkMethodName
+      else if IsCppBuilderTypeName(LToken.Text) or
+        (LIsQualifiedIdentifier and CharInSet(LToken.Text[1], ['A'..'Z'])) then
+        LToken.Kind := ttkTypeName
+      else if ((LNextIndex < AResult.Count) and
+        (AResult[LNextIndex].Text = '.')) or
+        ((LNextIndex + 1 < AResult.Count) and
+        (AResult[LNextIndex].Text = ':') and
+        (AResult[LNextIndex + 1].Text = ':')) then
+        LToken.Kind := ttkNamespace;
+      if LToken.Kind = ttkString then
+        LToken.Kind := ttkMethodName;
+    end;
+    AResult[LIndex] := LToken;
+  end;
+end;
+
+procedure TTinyParser.ApplyExtractedStringMode(AResult: TTinyTokenList);
+begin
+  // A Strings table is mixed content.  Unlike a dedicated method view, it
+  // must not promote every plain word to a method.  Preserve only structure
+  // that can be established from syntax.
+  PromoteItaniumGeneratedOwners(AResult);
+  for var LIndex := 0 to AResult.Count - 1 do
+  begin
+    var LToken := AResult[LIndex];
+    if LToken.Kind <> ttkString then
+      Continue;
+
+    if IsCppBuilderKeyword(LToken.Text) then
+      LToken.Kind := ttkKeyword
+    else
+    begin
+      var LNextIndex := LIndex + 1;
+      while (LNextIndex < AResult.Count) and
+        (AResult[LNextIndex].Kind = ttkWhitespace) do
+        Inc(LNextIndex);
+      var LPreviousIndex := LIndex - 1;
+      while (LPreviousIndex >= 0) and
+        (AResult[LPreviousIndex].Kind = ttkWhitespace) do
+        Dec(LPreviousIndex);
+      var LIsQualifiedIdentifier := (LPreviousIndex >= 0) and
+        (AResult[LPreviousIndex].Text = '.');
+      if not LIsQualifiedIdentifier then
+        LIsQualifiedIdentifier := (LPreviousIndex >= 0) and
+          (AResult[LPreviousIndex].Text = ':');
+      if LIsQualifiedIdentifier and (AResult[LPreviousIndex].Text = ':') then
       begin
         Dec(LPreviousIndex);
         while (LPreviousIndex >= 0) and
@@ -182,17 +301,296 @@ begin
 
       if (LNextIndex < AResult.Count) and (AResult[LNextIndex].Text = '(') then
         LToken.Kind := ttkMethodName
-      else if (LNextIndex + 1 < AResult.Count) and
-        (AResult[LNextIndex].Text = ':') and
-        (AResult[LNextIndex + 1].Text = ':') then
-        LToken.Kind := ttkNamespace
       else if IsCppBuilderTypeName(LToken.Text) or
         (LIsQualifiedIdentifier and CharInSet(LToken.Text[1], ['A'..'Z'])) then
-        LToken.Kind := ttkTypeName;
+        LToken.Kind := ttkTypeName
+      else if ((LNextIndex < AResult.Count) and
+        (AResult[LNextIndex].Text = '.')) or
+        ((LNextIndex + 1 < AResult.Count) and
+        (AResult[LNextIndex].Text = ':') and
+        (AResult[LNextIndex + 1].Text = ':')) then
+        LToken.Kind := ttkNamespace;
+    end;
+    AResult[LIndex] := LToken;
+  end;
+end;
+
+procedure TTinyParser.ApplyELFRelocationMode(AResult: TTinyTokenList);
+begin
+  // ELF relocation rows have a stable column layout.  Apply the same
+  // semantics used by the structured relocation grid, but only after the
+  // first two fields positively identify a relocation row.
+  var LFirstTokenIndex := -1;
+  var LSecondTokenIndex := -1;
+  for var LIndex := 0 to AResult.Count - 1 do
+    if AResult[LIndex].Kind <> ttkWhitespace then
+      if LFirstTokenIndex < 0 then
+        LFirstTokenIndex := LIndex
+      else
+      begin
+        LSecondTokenIndex := LIndex;
+        Break;
+      end;
+
+  if (LFirstTokenIndex < 0) or (LSecondTokenIndex < 0) or
+    (AResult[LFirstTokenIndex].Kind <> ttkInteger) or
+    not StartsText('R_', AResult[LSecondTokenIndex].Text) then
+    Exit;
+
+  var LFieldIndex := 0;
+  for var LIndex := 0 to AResult.Count - 1 do
+  begin
+    var LToken := AResult[LIndex];
+    if LToken.Kind = ttkWhitespace then
+      Continue;
+    case LFieldIndex of
+      0, 5:
+        LToken.Kind := ttkInteger;
+      1:
+        LToken.Kind := ttkSymbol;
+      2..4, 6:
+        LToken.Kind := ttkHexadecimal;
+    else
+      // The final name cell is rendered in the grid's semantic method mode.
+      // Only promote textual tokens so punctuation in versioned names remains
+      // symbol-colored.
       if LToken.Kind = ttkString then
         LToken.Kind := ttkMethodName;
     end;
     AResult[LIndex] := LToken;
+    Inc(LFieldIndex);
+  end;
+end;
+
+procedure TTinyParser.ApplyOMFRecordMode(AResult: TTinyTokenList);
+  function IsOMFLabel(const AText: string): Boolean;
+  begin
+    Result := MatchText(AText, ['FixUp', 'Mode', 'Loc', 'Frame', 'Target',
+      'Segment', 'Offset', 'Length', 'Type', 'Purpose', 'List', 'Class',
+      'SubClass', 'Record', 'Purge', 'Imported', 'by', 'Internal', 'Name',
+      'Module', 'Detail']);
+  end;
+
+  function IsUppercaseSymbol(const AText: string): Boolean;
+  begin
+    Result := Length(AText) > 1;
+    if not Result then
+      Exit;
+    for var LCharacter in AText do
+      if not CharInSet(LCharacter, ['A'..'Z', '0'..'9', '_']) then
+        Exit(False);
+  end;
+
+  function NextVisibleToken(AIndex: Integer): Integer;
+  begin
+    Inc(AIndex);
+    while (AIndex < AResult.Count) and
+      (AResult[AIndex].Kind = ttkWhitespace) do
+      Inc(AIndex);
+    if AIndex < AResult.Count then
+      Result := AIndex
+    else
+      Result := -1;
+  end;
+
+  procedure PromoteValueAfterLabel(const AFirstLabel, ASecondLabel: string;
+    AKind: TTinyTokenKind);
+  begin
+    for var LIndex := 0 to AResult.Count - 1 do
+    begin
+      if not SameText(AResult[LIndex].Text, AFirstLabel) then
+        Continue;
+      var LSecondIndex := NextVisibleToken(LIndex);
+      if (LSecondIndex < 0) or
+        not SameText(AResult[LSecondIndex].Text, ASecondLabel) then
+        Continue;
+      var LColonIndex := NextVisibleToken(LSecondIndex);
+      if (LColonIndex < 0) or (AResult[LColonIndex].Text <> ':') then
+        Continue;
+      var LValueIndex := NextVisibleToken(LColonIndex);
+      while LValueIndex >= 0 do
+      begin
+        var LValueToken := AResult[LValueIndex];
+        if LValueToken.Kind in [ttkString, ttkNamespace, ttkTypeName] then
+        begin
+          LValueToken.Kind := AKind;
+          AResult[LValueIndex] := LValueToken;
+        end;
+        LValueIndex := NextVisibleToken(LValueIndex);
+      end;
+    end;
+  end;
+
+  procedure PromoteTheadrModule;
+  begin
+    for var LIndex := 0 to AResult.Count - 1 do
+      if SameText(AResult[LIndex].Text, 'THEADR') then
+      begin
+        var LValueIndex := NextVisibleToken(LIndex);
+        if (LValueIndex >= 0) and (AResult[LValueIndex].Kind in
+          [ttkString, ttkNamespace, ttkTypeName]) then
+        begin
+          var LValueToken := AResult[LValueIndex];
+          LValueToken.Kind := ttkSymbol;
+          AResult[LValueIndex] := LValueToken;
+        end;
+      end;
+  end;
+
+  procedure PromoteModuleFileNames;
+  begin
+    for var LIndex := 0 to AResult.Count - 1 do
+    begin
+      var LDotIndex := NextVisibleToken(LIndex);
+      if (LDotIndex < 0) or (AResult[LDotIndex].Text <> '.') then
+        Continue;
+      var LExtensionIndex := NextVisibleToken(LDotIndex);
+      if (LExtensionIndex < 0) or not MatchText(AResult[LExtensionIndex].Text,
+        ['dll', 'drv', 'ocx', 'exe']) then
+        Continue;
+      if AResult[LIndex].Kind in [ttkString, ttkNamespace, ttkTypeName] then
+      begin
+        var LNameToken := AResult[LIndex];
+        LNameToken.Kind := ttkSymbol;
+        AResult[LIndex] := LNameToken;
+      end;
+      if AResult[LExtensionIndex].Kind in
+        [ttkString, ttkNamespace, ttkTypeName] then
+      begin
+        var LExtensionToken := AResult[LExtensionIndex];
+        LExtensionToken.Kind := ttkSymbol;
+        AResult[LExtensionIndex] := LExtensionToken;
+      end;
+    end;
+  end;
+
+  procedure PromoteStandaloneMethod;
+  begin
+    var LTokenIndex := -1;
+    for var LIndex := 0 to AResult.Count - 1 do
+      if AResult[LIndex].Kind <> ttkWhitespace then
+      begin
+        if LTokenIndex >= 0 then
+          Exit;
+        LTokenIndex := LIndex;
+      end;
+    if (LTokenIndex < 0) or (AResult[LTokenIndex].Kind <> ttkString) or
+      (Length(AResult[LTokenIndex].Text) < 3) or
+      not CharInSet(AResult[LTokenIndex].Text[1], ['A'..'Z']) then
+      Exit;
+
+    var LUppercaseCount := 0;
+    var LHasLowercase := False;
+    for var LCharacter in AResult[LTokenIndex].Text do
+    begin
+      LUppercaseCount := LUppercaseCount + Ord(CharInSet(LCharacter,
+        ['A'..'Z']));
+      LHasLowercase := LHasLowercase or CharInSet(LCharacter, ['a'..'z']);
+    end;
+    if (LUppercaseCount >= 2) and LHasLowercase then
+    begin
+      var LMethodToken := AResult[LTokenIndex];
+      LMethodToken.Kind := ttkMethodName;
+      AResult[LTokenIndex] := LMethodToken;
+    end;
+  end;
+
+begin
+  // OMF rows mix plain record metadata with embedded C++Builder names.  The
+  // conservative extracted-string mode handles the latter without turning
+  // descriptive field values into methods; add the OMF record vocabulary on
+  // top for the structural portions of the row.
+  ApplyExtractedStringMode(AResult);
+  for var LIndex := 0 to AResult.Count - 1 do
+  begin
+    var LToken := AResult[LIndex];
+    if IsOMFLabel(LToken.Text) then
+      LToken.Kind := ttkKeyword
+    else if (LToken.Kind = ttkString) and
+      (IsUppercaseSymbol(LToken.Text) or StartsText('_', LToken.Text)) then
+      LToken.Kind := ttkSymbol;
+    AResult[LIndex] := LToken;
+  end;
+  PromoteTheadrModule;
+  PromoteModuleFileNames;
+  PromoteValueAfterLabel('Internal', 'Name', ttkMethodName);
+  PromoteValueAfterLabel('Module', 'Name', ttkSymbol);
+  PromoteStandaloneMethod;
+end;
+
+procedure TTinyParser.ApplyOMFLEDataMode(AResult: TTinyTokenList);
+  function IsHexText(const AText: string): Boolean;
+  begin
+    Result := AText <> '';
+    for var LCharacter in AText do
+      if not CharInSet(LCharacter, ['0'..'9', 'A'..'F', 'a'..'f']) then
+        Exit(False);
+  end;
+
+begin
+  // LEDATA rows have three stable visual columns: offset, byte payload, and
+  // printable ASCII.  Keep RAW output consistent with the structured grid.
+  var LOffsetIndex := -1;
+  var LColonIndex := -1;
+  for var LIndex := 0 to AResult.Count - 1 do
+    if AResult[LIndex].Kind <> ttkWhitespace then
+      if LOffsetIndex < 0 then
+        LOffsetIndex := LIndex
+      else
+      begin
+        LColonIndex := LIndex;
+        Break;
+      end;
+  if (LOffsetIndex < 0) or (LColonIndex < 0) or
+    not IsHexText(AResult[LOffsetIndex].Text) or
+    (AResult[LColonIndex].Text <> ':') then
+    Exit;
+
+  var LOffsetToken := AResult[LOffsetIndex];
+  LOffsetToken.Kind := ttkHexadecimal;
+  AResult[LOffsetIndex] := LOffsetToken;
+  var LInASCII := False;
+  var LByteCount := 0;
+  for var LIndex := LColonIndex + 1 to AResult.Count - 1 do
+  begin
+    var LToken := AResult[LIndex];
+    if LInASCII then
+    begin
+      if LToken.Kind <> ttkWhitespace then
+        LToken.Kind := ttkString;
+    end
+    else if LToken.Kind = ttkWhitespace then
+    begin
+      if (LByteCount > 0) and (Length(LToken.Text) >= 3) then
+        LInASCII := True;
+    end
+    else if (Length(LToken.Text) = 2) and IsHexText(LToken.Text) then
+    begin
+      LToken.Kind := ttkHexadecimal;
+      Inc(LByteCount);
+    end
+    else
+      Exit;
+    AResult[LIndex] := LToken;
+  end;
+end;
+
+procedure TTinyParser.ApplyPEImportPropertyMode(AResult: TTinyTokenList);
+begin
+  // TDUMP emits import-descriptor addresses as bare eight-digit values.  A
+  // value such as 40347540 is hexadecimal even though it happens not to
+  // contain A..F, so the lexical default alone cannot distinguish it from a
+  // decimal number.  This mode is applied only to parser-confirmed PE import
+  // property rows, keeping ordinary report counts numeric.
+  for var LIndex := 0 to AResult.Count - 1 do
+  begin
+    var LToken := AResult[LIndex];
+    if (LToken.Kind = ttkInteger) and (Length(LToken.Text) = 8) and
+      (LToken.Text[1] <> '-') then
+    begin
+      LToken.Kind := ttkHexadecimal;
+      AResult[LIndex] := LToken;
+    end;
   end;
 end;
 
@@ -310,11 +708,15 @@ begin
     // Delphi system types also appear verbatim in the demangled Mach report.
     // Keep their classification independent of whether the same type was
     // recovered from an Itanium source-name component.
-    'AnsiString', 'RawByteString', 'ShortString', 'UnicodeString',
+    'string', 'AnsiString', 'RawByteString', 'ShortString', 'UnicodeString',
     'WideString', 'Variant', 'OleVariant', 'Currency', 'Extended', 'Real',
-    'Single', 'NativeInt', 'NativeUInt', 'Integer', 'Cardinal', 'Int64',
-    'UInt64', 'Byte', 'Word', 'LongWord', 'LongInt', 'SmallInt', 'Boolean',
-    'Char', 'PChar', 'PWideChar', 'Pointer']) or
+    'Real48', 'Comp', 'Single', 'NativeInt', 'NativeUInt', 'Integer',
+    'Cardinal', 'Int64', 'UInt64', 'Byte', 'Word', 'LongWord', 'LongInt',
+    'ShortInt', 'SmallInt', 'Boolean', 'ByteBool', 'WordBool', 'LongBool',
+    'Char', 'AnsiChar', 'WideChar', 'PChar', 'PAnsiChar', 'PWideChar',
+    // TDUMP preserves two legacy suffix bytes from the Delphi RTL string
+    // table. They still denote pointer types, not separate identifiers.
+    'PAnsiChar0', 'PWideCharL', 'PFixedUInt', 'HRESULT', 'Pointer']) or
     ((Length(AText) >= 2) and (AText[1] = 'T') and
       CharInSet(AText[2], ['A'..'Z']));
 end;
@@ -393,6 +795,23 @@ begin
     end;
     var LMethodStartIndex := 0;
     var LMethodEndIndex := 0;
+    // Strings extracted from an image can retain one byte immediately before
+    // a valid Borland linker name (for example Y@System@...).  That byte is
+    // extraction residue, never a source-level method identifier.
+    if (LIndex < Length(AText)) and (AText[LIndex + 1] = '@') and
+      TryReadBorlandMethod(AText, LIndex + 1, LMethodStartIndex,
+        LMethodEndIndex, LEndIndex) then
+    begin
+      AddToken(AResult, ttkMangledSignature, AText, LStartIndex,
+        LStartIndex + 1);
+      AddBorlandOwnerTokens(AResult, AText, LIndex + 1, LMethodStartIndex);
+      AddToken(AResult, ttkMethodName, AText, LMethodStartIndex,
+        LMethodEndIndex);
+      if LMethodEndIndex < LEndIndex then
+        AddBorlandSignatureTokens(AResult, AText, LMethodEndIndex, LEndIndex);
+      LIndex := LEndIndex;
+      Continue;
+    end;
     if TryReadBorlandMethod(AText, LIndex, LMethodStartIndex,
       LMethodEndIndex, LEndIndex) then
     begin
@@ -401,8 +820,7 @@ begin
       AddToken(AResult, ttkMethodName, AText, LMethodStartIndex,
         LMethodEndIndex);
       if LMethodEndIndex < LEndIndex then
-        AddToken(AResult, ttkMangledSignature, AText, LMethodEndIndex,
-          LEndIndex);
+        AddBorlandSignatureTokens(AResult, AText, LMethodEndIndex, LEndIndex);
       LIndex := LEndIndex;
       Continue;
     end;
@@ -493,6 +911,16 @@ begin
       ApplyCppBuilderMethodMode(AResult);
     tpmMachLinker:
       ApplyMachLinkerMode(AResult);
+    tpmExtractedString:
+      ApplyExtractedStringMode(AResult);
+    tpmELFRelocation:
+      ApplyELFRelocationMode(AResult);
+    tpmOMFRecord:
+      ApplyOMFRecordMode(AResult);
+    tpmOMFLEData:
+      ApplyOMFLEDataMode(AResult);
+    tpmPEImportProperty:
+      ApplyPEImportPropertyMode(AResult);
   end;
 end;
 
@@ -680,8 +1108,15 @@ begin
 
   var LIndex := AStartIndex + 1;
   var LMethodStart := LIndex;
+  var LInSignature := False;
   while LIndex <= Length(AText) do
   begin
+    if AText[LIndex] = '$' then
+    begin
+      LInSignature := True;
+      Inc(LIndex);
+      Continue;
+    end;
     if (AText[LIndex] = '\') and (LIndex < Length(AText)) and
       (AText[LIndex + 1] = '@') then
     begin
@@ -693,7 +1128,7 @@ begin
     end;
     if (AText[LIndex] = '@') and (LIndex > AStartIndex + 1) then
     begin
-      if (LIndex + 1 <= Length(AText)) and
+      if not LInSignature and (LIndex + 1 <= Length(AText)) and
         IsIdentifierStart(AText[LIndex + 1]) then
         LMethodStart := LIndex + 1;
       Inc(LIndex);

@@ -53,7 +53,8 @@ uses
   System.SysUtils,
   TDump.Explorer.Highlighter,
   TDump.Explorer.HighlighterProviders,
-  TDump.Explorer.TinyParser;
+  TDump.Explorer.TinyParser,
+  TDump.Explorer.UI;
 
 class procedure TPEView.PopulateDataDirectories(AControl: THighlighterControl;
   ADocument: TDumpDocument);
@@ -143,24 +144,48 @@ end;
 
 class procedure TPEView.PopulateRelocationBlock(AControl: THighlighterControl;
   ABlock: TDumpRelocationBlock);
+const
+  RelocationsPerRow = 4;
 begin
   if (AControl = nil) or (ABlock = nil) then Exit;
   AControl.ParserMode := tpmTDumpValues;
   AControl.BeginUpdate;
   try
     AControl.Clear;
-    AControl.SetColumnHeaders(['Type', 'Offset']);
-    AControl.SetColumnDataTypes([thdtSymbol, thdtHexadecimal]);
-    AControl.SetItemProvider(TCallbackHighlighterRowProvider.Create(
-      ABlock.Entries.Count,
-      function(AIndex: Integer): string
+    AControl.UseColumnMode := True;
+    AControl.ShowLineNumbers := False;
+    AControl.AutoSizeColumns := True;
+    AControl.Font.Name := TExplorerTheme.FontName;
+    AControl.Font.Size := TExplorerTheme.FontSize;
+    AControl.SetColumnDataTypes([
+      thdtSymbol, thdtHexadecimal, thdtSymbol, thdtHexadecimal,
+      thdtSymbol, thdtHexadecimal, thdtSymbol, thdtHexadecimal]);
+    AControl.SetColumnParserModes([
+      tpmTDumpValues, tpmTDumpValues, tpmTDumpValues, tpmTDumpValues,
+      tpmTDumpValues, tpmTDumpValues, tpmTDumpValues, tpmTDumpValues]);
+
+    var LColumns: TArray<string>;
+    SetLength(LColumns, RelocationsPerRow * 2);
+    for var LEntryIndex := 0 to ABlock.Entries.Count - 1 do
+    begin
+      var LRelocation := ABlock.Entries[LEntryIndex];
+      var LOffset := LRelocation.RawOffset;
+      if (LOffset = '') and LRelocation.HasOffset then
+        LOffset := IntToHex(LRelocation.Offset, 4);
+
+      var LColumnIndex := (LEntryIndex mod RelocationsPerRow) * 2;
+      LColumns[LColumnIndex] := LRelocation.RelocationType;
+      LColumns[LColumnIndex + 1] := LOffset;
+      if (LEntryIndex mod RelocationsPerRow) = RelocationsPerRow - 1 then
       begin
-        var LRelocation := ABlock.Entries[AIndex];
-        var LOffset := LRelocation.RawOffset;
-        if (LOffset = '') and LRelocation.HasOffset then
-          LOffset := IntToHex(LRelocation.Offset, 4);
-        Result := LRelocation.RelocationType + #9 + LOffset;
-      end));
+        AControl.AddColumns(LColumns);
+        LColumns := nil;
+        SetLength(LColumns, RelocationsPerRow * 2);
+      end;
+    end;
+
+    if (ABlock.Entries.Count mod RelocationsPerRow) <> 0 then
+      AControl.AddColumns(LColumns);
   finally
     AControl.EndUpdate;
   end;
@@ -170,12 +195,15 @@ class procedure TPEView.PopulateStrings(AControl: THighlighterControl;
   ADocument: TDumpDocument);
 begin
   if (AControl = nil) or (ADocument = nil) then Exit;
-  AControl.ParserMode := tpmTDumpValues;
+  // Extracted strings often contain Delphi/C++ type and method names.  They
+  // are not report values, so render their semantic syntax in the same mode
+  // used for demangled symbols.
+  AControl.ParserMode := tpmExtractedString;
   AControl.BeginUpdate;
   try
     AControl.Clear;
     AControl.SetColumnHeaders(['Offset', 'String']);
-    AControl.SetColumnDataTypes([thdtInteger, thdtText]);
+    AControl.SetColumnDataTypes([thdtInteger, thdtAuto]);
     AControl.SetItemProvider(TCallbackHighlighterRowProvider.Create(
       ADocument.Strings.Count,
       function(AIndex: Integer): string
@@ -203,17 +231,23 @@ class procedure TPEView.PopulateImportDirectory(AControl: THighlighterControl;
 begin
   if (AControl = nil) or (ADocument = nil) then Exit;
   AControl.ParserMode := tpmCppBuilderMethod;
-  var LText := TStringBuilder.Create;
+  AControl.BeginUpdate;
   try
-    LText.AppendLine('Import Directory');
-    LText.AppendLine(Format('%d module(s)', [ADocument.Imports.Count]));
-    LText.AppendLine;
+    AControl.Clear;
+    AControl.UseColumnMode := True;
+    AControl.ShowLineNumbers := False;
+    AControl.AutoSizeColumns := False;
+    AControl.Font.Name := TExplorerTheme.FontName;
+    AControl.Font.Size := TExplorerTheme.FontSize;
+    AControl.SetColumnHeaders(['Module', 'Imports']);
+    AControl.SetColumnDataTypes([thdtSymbol, thdtInteger]);
+    AControl.SetColumnParserModes([tpmTDumpValues, tpmTDumpValues]);
+    AControl.SetColumnWidthWeights([1, 1]);
     for var LModule in ADocument.Imports do
-      LText.AppendLine(Format('%s [%d imported methods]',
-        [ImportModuleCaption(LModule), LModule.Entries.Count]));
-    AControl.SetText(LText.ToString);
+      AControl.AddColumns([ImportModuleCaption(LModule),
+        LModule.Entries.Count.ToString]);
   finally
-    LText.Free;
+    AControl.EndUpdate;
   end;
 end;
 
@@ -278,19 +312,24 @@ class procedure TPEView.PopulateDelayedImportTable(AControl: THighlighterControl
 begin
   if (AControl = nil) or (ADocument = nil) or
     (ADocument.DelayedImportTable = nil) then Exit;
-  AControl.ParserMode := tpmCppBuilderMethod;
-  var LText := TStringBuilder.Create;
+  AControl.ParserMode := tpmTDumpValues;
+  AControl.BeginUpdate;
   try
-    LText.AppendLine('Delayed Load Import Table');
-    LText.AppendLine(Format('%d module(s)',
-      [ADocument.DelayedImportTable.Modules.Count]));
-    LText.AppendLine;
+    AControl.Clear;
+    AControl.UseColumnMode := True;
+    AControl.ShowLineNumbers := False;
+    AControl.AutoSizeColumns := False;
+    AControl.Font.Name := TExplorerTheme.FontName;
+    AControl.Font.Size := TExplorerTheme.FontSize;
+    AControl.SetColumnHeaders(['Module', 'Imports']);
+    AControl.SetColumnDataTypes([thdtSymbol, thdtInteger]);
+    AControl.SetColumnParserModes([tpmTDumpValues, tpmTDumpValues]);
+    AControl.SetColumnWidthWeights([1, 1]);
     for var LModule in ADocument.DelayedImportTable.Modules do
-      LText.AppendLine(Format('%s [%d imported methods]',
-        [ImportModuleCaption(LModule), LModule.Entries.Count]));
-    AControl.SetText(LText.ToString);
+      AControl.AddColumns([ImportModuleCaption(LModule),
+        LModule.Entries.Count.ToString]);
   finally
-    LText.Free;
+    AControl.EndUpdate;
   end;
 end;
 

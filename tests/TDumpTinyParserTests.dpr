@@ -20,15 +20,18 @@ const
   CTestResultsDirectory = 'C:\dev\TDump-Explorer\tests\test-results';
   CTestResultsFile = CTestResultsDirectory + '\TDumpTinyParserTests.nunit.xml';
   CMachFixture = 'C:\dev\TDump-Explorer\fixtures\generated\Mach.Universal.Rad37.tdump';
+  CVclStringsFixture = 'C:\dev\TDump-Explorer\fixtures\generated\VCL.Win32.strings.tdump';
 
 type
   [TestFixture]
   TTinyParserFixture = class
   public
     [Test] procedure TDumpValueTokenization;
+    [Test] procedure PEImportPropertyTokenization;
     [Test] procedure HighlightThemes;
     [Test] procedure CppBuilderMethodTokenization;
     [Test] procedure MachFixtureLinkerTokenization;
+    [Test] procedure VclStringsBorlandTokenization;
     [Test] procedure TextFormatDrawing;
   end;
 
@@ -122,6 +125,16 @@ const
     'System::PackageInfoTable * const, System::TLibModule *)';
   CGenericMethod = 'System::Generics::Collections::TDictionary__2<' +
     'System::UnicodeString, System::Variant>::TKeyEnumerator::MoveNext()';
+  CDelphiSystemTypes = 'AnsiChar ShortInt ByteBool WordBool LongBool string ' +
+    'PAnsiChar0 PWideCharL PFixedUInt HRESULT';
+  CELFRelocation = '0 R_X86_64_JUMP_SLOT 885018 155456 268220 1279 0 ' +
+    'ASN1_TYPE_set';
+  COMFFixUp = 'FixUp: 007 Mode: Seg Loc: Offset32 Frame: TARGET ' +
+    'Target: VEI[1480]: __fastcall System::Finalization()';
+  COMFLEData = '0000: 04 00 00 00 0E 0F 54 4D  6F 6E 69 74 6F 72 53 75   ' +
+    '......TMonitorSu';
+  COMFComment = '0003A0 COMMENT Purge: Yes, List: Yes, Class: 160 (0A0h), ' +
+    'SubClass: 1 (01h)';
 begin
   var LParser := TTinyParser.Create;
   try
@@ -158,6 +171,139 @@ begin
           'Mach demangled generic arguments must match the Itanium type coloring.');
       finally
         LMachDemangledGenericTokens.Free;
+      end;
+      var LExtractedGenericStringTokens := LParser.Tokenize(
+        '\TArray<System.Generics.Collections.TPair<System.TClass,' +
+        'System.Classes.TFieldsCache.TFields>>', tpmExtractedString);
+      try
+        Require(HasToken(LExtractedGenericStringTokens, ttkNamespace,
+          'System') and HasToken(LExtractedGenericStringTokens,
+          ttkNamespace, 'Generics') and HasToken(LExtractedGenericStringTokens,
+          ttkNamespace, 'Collections') and HasToken(LExtractedGenericStringTokens,
+          ttkNamespace, 'Classes'),
+          'Extracted Delphi strings must classify dot-qualified owners as namespaces.');
+        Require(HasToken(LExtractedGenericStringTokens, ttkTypeName,
+          'TArray') and HasToken(LExtractedGenericStringTokens,
+          ttkTypeName, 'TPair') and HasToken(LExtractedGenericStringTokens,
+          ttkTypeName, 'TClass') and HasToken(LExtractedGenericStringTokens,
+          ttkTypeName, 'TFieldsCache') and HasToken(LExtractedGenericStringTokens,
+          ttkTypeName, 'TFields'),
+          'Extracted Delphi generic strings must classify embedded T types.');
+      finally
+        LExtractedGenericStringTokens.Free;
+      end;
+      var LExtractedBorlandTokens := LParser.Tokenize(
+        'Y@System@Generics@Defaults@EqualityComparer_Selector_Float' +
+        '$qqrp24System@Typinfo@TTypeInfoi', tpmExtractedString);
+      try
+        Require(HasToken(LExtractedBorlandTokens, ttkMangledSignature, 'Y'),
+          'One-byte string-extraction residue before a Borland name must be neutral.');
+        Require(HasToken(LExtractedBorlandTokens, ttkNamespace, 'System') and
+          HasToken(LExtractedBorlandTokens, ttkNamespace, 'Generics') and
+          HasToken(LExtractedBorlandTokens, ttkNamespace, 'Defaults'),
+          'An embedded Borland linker name must retain its namespace chain.');
+        Require(HasToken(LExtractedBorlandTokens, ttkMethodName,
+          'EqualityComparer_Selector_Float'),
+          'The Borland member before its signature must remain the method token.');
+        Require(not HasToken(LExtractedBorlandTokens, ttkMethodName,
+          'TTypeInfoi'),
+          'Borland parameter payload after $ must not replace the method token.');
+      finally
+        LExtractedBorlandTokens.Free;
+      end;
+      var LPlainStringTokens := LParser.Tokenize(
+        'This program must be run under Win32', tpmExtractedString);
+      try
+        for var LToken in LPlainStringTokens do
+          Require(not (LToken.Kind in [ttkKeyword, ttkNamespace, ttkTypeName,
+            ttkMethodName]),
+            'Natural-language extracted strings must remain plain text.');
+      finally
+        LPlainStringTokens.Free;
+      end;
+      var LSystemTypeTokens := LParser.Tokenize(CDelphiSystemTypes,
+        tpmExtractedString);
+      try
+        for var LTypeName in CDelphiSystemTypes.Split([' ']) do
+          Require(HasToken(LSystemTypeTokens, ttkTypeName, LTypeName),
+            'Extracted Delphi system type must retain type highlighting: ' +
+            LTypeName);
+      finally
+        LSystemTypeTokens.Free;
+      end;
+      var LELFRelocationTokens := LParser.Tokenize(CELFRelocation,
+        tpmELFRelocation);
+      try
+        Require(HasToken(LELFRelocationTokens, ttkInteger, '0') and
+          HasToken(LELFRelocationTokens, ttkSymbol, 'R_X86_64_JUMP_SLOT') and
+          HasToken(LELFRelocationTokens, ttkHexadecimal, '885018') and
+          HasToken(LELFRelocationTokens, ttkHexadecimal, '155456') and
+          HasToken(LELFRelocationTokens, ttkHexadecimal, '268220') and
+          HasToken(LELFRelocationTokens, ttkInteger, '1279') and
+          HasToken(LELFRelocationTokens, ttkMethodName, 'ASN1_TYPE_set'),
+          'ELF relocation rows must use the grid column semantics in RAW output.');
+      finally
+        LELFRelocationTokens.Free;
+      end;
+      var LOMFFixUpTokens := LParser.Tokenize(COMFFixUp, tpmOMFRecord);
+      try
+        Require(HasToken(LOMFFixUpTokens, ttkKeyword, 'FixUp') and
+          HasToken(LOMFFixUpTokens, ttkKeyword, 'Mode') and
+          HasToken(LOMFFixUpTokens, ttkKeyword, 'Loc') and
+          HasToken(LOMFFixUpTokens, ttkKeyword, 'Frame') and
+          HasToken(LOMFFixUpTokens, ttkKeyword, 'Target'),
+          'OMF record labels must be classified as structural keywords.');
+        Require(HasToken(LOMFFixUpTokens, ttkSymbol, 'TARGET') and
+          HasToken(LOMFFixUpTokens, ttkSymbol, 'VEI'),
+          'OMF record codes and targets must be classified as symbols.');
+        Require(HasToken(LOMFFixUpTokens, ttkKeyword, '__fastcall') and
+          HasToken(LOMFFixUpTokens, ttkNamespace, 'System') and
+          HasToken(LOMFFixUpTokens, ttkMethodName, 'Finalization'),
+          'Embedded C++Builder calls in OMF records must retain semantic highlighting.');
+      finally
+        LOMFFixUpTokens.Free;
+      end;
+      var LLEDataTokens := LParser.Tokenize(COMFLEData, tpmOMFLEData);
+      try
+        Require(HasToken(LLEDataTokens, ttkHexadecimal, '0000') and
+          HasToken(LLEDataTokens, ttkHexadecimal, '04') and
+          HasToken(LLEDataTokens, ttkHexadecimal, '75') and
+          HasToken(LLEDataTokens, ttkString, 'TMonitorSu'),
+          'LEDATA RAW rows must classify offsets and bytes as hexadecimal while retaining plain ASCII text.');
+      finally
+        LLEDataTokens.Free;
+      end;
+      var LOMFCommentTokens := LParser.Tokenize(COMFComment, tpmOMFRecord);
+      try
+        Require(HasToken(LOMFCommentTokens, ttkSymbol, 'COMMENT') and
+          HasToken(LOMFCommentTokens, ttkKeyword, 'Purge') and
+          HasToken(LOMFCommentTokens, ttkKeyword, 'Class') and
+          HasToken(LOMFCommentTokens, ttkKeyword, 'SubClass') and
+          HasToken(LOMFCommentTokens, ttkHexadecimal, '0003A0') and
+          HasToken(LOMFCommentTokens, ttkHexadecimal, '0A0h'),
+          'OMF COMMENT records must preserve the same code, label, and hexadecimal colors in nodes, details, and RAW output.');
+      finally
+        LOMFCommentTokens.Free;
+      end;
+      var LOMFModuleTokens := LParser.Tokenize('Module Name: MSWSOCK.dll',
+        tpmOMFRecord);
+      try
+        Require(HasToken(LOMFModuleTokens, ttkKeyword, 'Module') and
+          HasToken(LOMFModuleTokens, ttkKeyword, 'Name') and
+          HasToken(LOMFModuleTokens, ttkSymbol, 'MSWSOCK') and
+          HasToken(LOMFModuleTokens, ttkSymbol, 'dll'),
+          'OMF module names must remain symbol-colored in the structured view and RAW output.');
+      finally
+        LOMFModuleTokens.Free;
+      end;
+      var LOMFInternalNameTokens := LParser.Tokenize('GetTypeByNameA',
+        tpmOMFRecord);
+      try
+        Require(HasToken(LOMFInternalNameTokens, ttkMethodName,
+          'GetTypeByNameA'),
+          'Standalone OMF internal names must remain method-colored in detail views.');
+      finally
+        LOMFInternalNameTokens.Free;
       end;
       var LBorlandMethodTokens := LParser.Tokenize(
         '@Sysinit@InterlockedExchange$qqsrii', tpmCppBuilderMethod);
@@ -521,6 +667,25 @@ begin
   end;
 end;
 
+procedure TestPEImportPropertyTokenization;
+begin
+  var LParser := TTinyParser.Create;
+  try
+    var LTokens := LParser.Tokenize('Import Name Table 40347540',
+      tpmPEImportProperty);
+    try
+      Require(HasToken(LTokens, ttkHexadecimal, '40347540'),
+        'Bare all-digit PE import addresses must be hexadecimal in RAW output.');
+      Require(not HasToken(LTokens, ttkInteger, '40347540'),
+        'PE import addresses must not fall back to decimal highlighting.');
+    finally
+      LTokens.Free;
+    end;
+  finally
+    LParser.Free;
+  end;
+end;
+
 procedure TestMachFixtureLinkerTokenization;
 const
   CItaniumSymbolPattern = '_{1,2}Z(?:N|TRN|TVN|TIN|TSN)[A-Za-z0-9_]+';
@@ -580,6 +745,40 @@ begin
   end;
 end;
 
+procedure TestVclStringsBorlandTokenization;
+const
+  CExtractedBorlandPattern = '(?m)^\d+:\s+([^@\r\n]@System@[^\r\n]+)\r?$';
+begin
+  Require(TFile.Exists(CVclStringsFixture),
+    'The generated VCL strings fixture must be available for Borland linker coverage.');
+
+  var LMatches := TRegEx.Matches(TFile.ReadAllText(CVclStringsFixture),
+    CExtractedBorlandPattern);
+  Require(LMatches.Count > 10000,
+    'The VCL strings fixture must provide broad embedded Borland linker-name coverage.');
+
+  var LParser := TTinyParser.Create;
+  try
+    for var LMatch in LMatches do
+    begin
+      var LText := LMatch.Groups[1].Value;
+      var LTokens := LParser.Tokenize(LText, tpmExtractedString);
+      try
+        Require(HasToken(LTokens, ttkMangledSignature, Copy(LText, 1, 1)),
+          'One-byte extraction residue must remain neutral: ' + LText);
+        Require(HasToken(LTokens, ttkNamespace, 'System'),
+          'An embedded Borland linker name must retain System as a namespace: ' + LText);
+        Require(not HasToken(LTokens, ttkMethodName, Copy(LText, 1, 1)),
+          'One-byte extraction residue must never become a method: ' + LText);
+      finally
+        LTokens.Free;
+      end;
+    end;
+  finally
+    LParser.Free;
+  end;
+end;
+
 procedure TestTextFormatDrawing;
 begin
   var LBitmap := TBitmap.Create;
@@ -608,6 +807,11 @@ begin
   TestTDumpValueTokenization;
 end;
 
+procedure TTinyParserFixture.PEImportPropertyTokenization;
+begin
+  TestPEImportPropertyTokenization;
+end;
+
 procedure TTinyParserFixture.HighlightThemes;
 begin
   TestHighlightThemes;
@@ -621,6 +825,11 @@ end;
 procedure TTinyParserFixture.MachFixtureLinkerTokenization;
 begin
   TestMachFixtureLinkerTokenization;
+end;
+
+procedure TTinyParserFixture.VclStringsBorlandTokenization;
+begin
+  TestVclStringsBorlandTokenization;
 end;
 
 procedure TTinyParserFixture.TextFormatDrawing;

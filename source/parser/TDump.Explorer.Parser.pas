@@ -69,7 +69,8 @@ type
 
   // Declares an exact, parser-confirmed rendering rule for one source span.
   // Consumers must not infer this from raw text alone.
-  TDumpRawSyntaxHint = (rshDefault, rshCppBuilderMethod, rshMachLinker);
+  TDumpRawSyntaxHint = (rshDefault, rshCppBuilderMethod, rshMachLinker,
+    rshELFRelocation, rshOMFRecord, rshOMFLEData, rshPEImportProperty);
 
   // Identifies a contiguous source range from one TDUMP invocation.
   // Raw text remains document-owned; the run provides provenance without copies.
@@ -435,6 +436,34 @@ type
     SourceSpan: TDumpSourceSpan;
   end;
 
+  // Represents one FIXU32 body row without retaining a second copy of the
+  // record's repeated column labels.
+  TDumpOMFFixUp = class
+  public
+    FixUp: UInt64;
+    HasFixUp: Boolean;
+    RawFixUp: string;
+    Mode: string;
+    Location: string;
+    Frame: string;
+    Target: string;
+    StartLine: Integer;
+    RawText: string;
+  end;
+
+  // Represents one LEDATA payload row as the offset, hexadecimal bytes, and
+  // printable ASCII columns emitted by TDUMP.
+  TDumpOMFHexDataRow = class
+  public
+    Offset: UInt64;
+    HasOffset: Boolean;
+    RawOffset: string;
+    Bytes: string;
+    ASCII: string;
+    StartLine: Integer;
+    RawText: string;
+  end;
+
   // Represents an OMF/COFF-style record heading without duplicating its body.
   TDumpObjectRecord = class
   public
@@ -450,6 +479,8 @@ type
     SourceSpan: TDumpSourceSpan;
     RawText: string;
     Details: TList<TDumpProperty>;
+    FixUps: TObjectList<TDumpOMFFixUp>;
+    HexDataRows: TObjectList<TDumpOMFHexDataRow>;
     constructor Create;
     destructor Destroy; override;
   end;
@@ -1976,10 +2007,14 @@ constructor TDumpObjectRecord.Create;
 begin
   inherited Create;
   Details := TList<TDumpProperty>.Create;
+  FixUps := TObjectList<TDumpOMFFixUp>.Create(True);
+  HexDataRows := TObjectList<TDumpOMFHexDataRow>.Create(True);
 end;
 
 destructor TDumpObjectRecord.Destroy;
 begin
+  FixUps.Free;
+  HexDataRows.Free;
   Details.Free;
   inherited;
 end;
@@ -2458,6 +2493,15 @@ procedure TDumpParser.AttachRunProvenance;
       // regular report labels into method names.
       FDocument.Lines.SetSyntaxHint(LLineIndex - 1, rshMachLinker);
   end;
+
+  procedure ApplyPEImportPropertySyntaxHints(AProperties: TList<TDumpProperty>);
+  begin
+    for var LProperty in AProperties do
+      if (LProperty.StartLine >= 1) and
+        (LProperty.StartLine <= FDocument.Lines.Count) then
+        FDocument.Lines.SetSyntaxHint(LProperty.StartLine - 1,
+          rshPEImportProperty);
+  end;
 begin
   var LRun := FDocument.PrimaryRun;
   LRun.ToolKind := FDocument.ToolKind;
@@ -2493,6 +2537,7 @@ begin
     LModule.SourceSpan.Run := LRun;
     LModule.SourceSpan.StartLine := LModule.StartLine;
     LModule.SourceSpan.EndLine := LModule.EndLine;
+    ApplyPEImportPropertySyntaxHints(LModule.Properties);
     for var LImport in LModule.Entries do
     begin
       LImport.SourceSpan.Run := LRun;
@@ -2516,6 +2561,7 @@ begin
       LModule.SourceSpan.Run := LRun;
       LModule.SourceSpan.StartLine := LModule.StartLine;
       LModule.SourceSpan.EndLine := LModule.EndLine;
+      ApplyPEImportPropertySyntaxHints(LModule.Properties);
       for var LImport in LModule.Entries do
       begin
         LImport.SourceSpan.Run := LRun;
@@ -2571,6 +2617,14 @@ begin
     LRecord.SourceSpan.Run := LRun;
     LRecord.SourceSpan.StartLine := LRecord.StartLine;
     LRecord.SourceSpan.EndLine := LRecord.EndLine;
+    LRecord.SourceSpan.SyntaxHint := rshOMFRecord;
+    for var LLineNumber := LRecord.StartLine to LRecord.EndLine do
+      if (LLineNumber >= 1) and (LLineNumber <= FDocument.Lines.Count) then
+        FDocument.Lines.SetSyntaxHint(LLineNumber - 1, rshOMFRecord);
+    for var LDataRow in LRecord.HexDataRows do
+      if (LDataRow.StartLine >= 1) and
+        (LDataRow.StartLine <= FDocument.Lines.Count) then
+        FDocument.Lines.SetSyntaxHint(LDataRow.StartLine - 1, rshOMFLEData);
   end;
   for var LMember in FDocument.LibraryMembers do
   begin
@@ -2671,6 +2725,11 @@ begin
     LRelocation.SourceSpan.Run := LRun;
     LRelocation.SourceSpan.StartLine := LRelocation.StartLine;
     LRelocation.SourceSpan.EndLine := LRelocation.EndLine;
+    LRelocation.SourceSpan.SyntaxHint := rshELFRelocation;
+    if (LRelocation.StartLine >= 1) and
+      (LRelocation.StartLine <= FDocument.Lines.Count) then
+      FDocument.Lines.SetSyntaxHint(LRelocation.StartLine - 1,
+        rshELFRelocation);
   end;
   for var LEntry in FDocument.ELFDynamicEntries do
   begin
@@ -4746,6 +4805,104 @@ procedure TDumpParser.ParseOMF;
       TryParseHexUIntToken(ARawOffset, AOffset);
   end;
 
+  function TryParseFixUp32Line(const ALine: string; ALineNumber: Integer;
+    out AFixUp: TDumpOMFFixUp): Boolean;
+  begin
+    AFixUp := nil;
+    var LLine := Trim(ALine);
+    var LSearchText := LowerCase(LLine);
+    var LFixUpPosition := Pos('fixup:', LSearchText);
+    var LModePosition := Pos('mode:', LSearchText);
+    var LLocationPosition := Pos('loc:', LSearchText);
+    var LFramePosition := Pos('frame:', LSearchText);
+    var LTargetPosition := Pos('target:', LSearchText);
+    if (LFixUpPosition <> 1) or (LModePosition <= LFixUpPosition) or
+      (LLocationPosition <= LModePosition) or
+      (LFramePosition <= LLocationPosition) or
+      (LTargetPosition <= LFramePosition) then
+      Exit(False);
+
+    AFixUp := TDumpOMFFixUp.Create;
+    AFixUp.RawFixUp := Trim(Copy(LLine, LFixUpPosition + Length('FixUp:'),
+      LModePosition - (LFixUpPosition + Length('FixUp:'))));
+    AFixUp.Mode := Trim(Copy(LLine, LModePosition + Length('Mode:'),
+      LLocationPosition - (LModePosition + Length('Mode:'))));
+    AFixUp.Location := Trim(Copy(LLine, LLocationPosition + Length('Loc:'),
+      LFramePosition - (LLocationPosition + Length('Loc:'))));
+    AFixUp.Frame := Trim(Copy(LLine, LFramePosition + Length('Frame:'),
+      LTargetPosition - (LFramePosition + Length('Frame:'))));
+    AFixUp.Target := Trim(Copy(LLine, LTargetPosition + Length('Target:'),
+      MaxInt));
+    AFixUp.HasFixUp := TryParseHexUIntToken(AFixUp.RawFixUp, AFixUp.FixUp);
+    AFixUp.StartLine := ALineNumber;
+    AFixUp.RawText := ALine;
+    Result := AFixUp.RawFixUp <> '';
+    if not Result then
+      FreeAndNil(AFixUp);
+  end;
+
+  function TryParseLEDataLine(const ALine: string; ALineNumber: Integer;
+    out ADataRow: TDumpOMFHexDataRow): Boolean;
+  begin
+    ADataRow := nil;
+    var LLine := Trim(ALine);
+    var LColonPosition := Pos(':', LLine);
+    if LColonPosition <= 1 then
+      Exit(False);
+    var LRawOffset := Trim(Copy(LLine, 1, LColonPosition - 1));
+    var LOffset: UInt64;
+    if not TryParseHexUIntToken(LRawOffset, LOffset) then
+      Exit(False);
+
+    var LData := TrimLeft(Copy(LLine, LColonPosition + 1, MaxInt));
+    var LScanIndex := 1;
+    var LLastByteEnd := 0;
+    var LAsciiStart := 0;
+    var LByteCount := 0;
+    while LScanIndex <= Length(LData) do
+    begin
+      var LWhitespaceCount := 0;
+      while (LScanIndex <= Length(LData)) and
+        CharInSet(LData[LScanIndex], [' ', #9]) do
+      begin
+        Inc(LWhitespaceCount);
+        Inc(LScanIndex);
+      end;
+      if LScanIndex > Length(LData) then
+        Break;
+      if (LByteCount > 0) and (LWhitespaceCount >= 3) then
+      begin
+        LAsciiStart := LScanIndex;
+        Break;
+      end;
+
+      var LTokenStart := LScanIndex;
+      while (LScanIndex <= Length(LData)) and
+        not CharInSet(LData[LScanIndex], [' ', #9]) do
+        Inc(LScanIndex);
+      var LByteText := Copy(LData, LTokenStart, LScanIndex - LTokenStart);
+      if (Length(LByteText) <> 2) or
+        not CharInSet(LByteText[1], ['0'..'9', 'A'..'F', 'a'..'f']) or
+        not CharInSet(LByteText[2], ['0'..'9', 'A'..'F', 'a'..'f']) then
+        Exit(False);
+      Inc(LByteCount);
+      LLastByteEnd := LScanIndex - 1;
+    end;
+    if LByteCount = 0 then
+      Exit(False);
+
+    ADataRow := TDumpOMFHexDataRow.Create;
+    ADataRow.Offset := LOffset;
+    ADataRow.HasOffset := True;
+    ADataRow.RawOffset := LRawOffset;
+    ADataRow.Bytes := TrimRight(Copy(LData, 1, LLastByteEnd));
+    if LAsciiStart > 0 then
+      ADataRow.ASCII := Trim(Copy(LData, LAsciiStart, MaxInt));
+    ADataRow.StartLine := ALineNumber;
+    ADataRow.RawText := ALine;
+    Result := True;
+  end;
+
 begin
   var LStartLine := FMarkerLines[lmOMFObject];
   if LStartLine < 0 then
@@ -4858,6 +5015,18 @@ begin
           LDetail.StartLine := LLineIndex + 1;
         end;
         LRecord.Details.Add(LDetail);
+        if SameText(LRecord.RecordKind, 'FIXU32') then
+        begin
+          var LFixUp: TDumpOMFFixUp;
+          if TryParseFixUp32Line(FLines[LLineIndex], LLineIndex + 1, LFixUp) then
+            LRecord.FixUps.Add(LFixUp);
+        end;
+        if SameText(LRecord.RecordKind, 'LEDATA') then
+        begin
+          var LDataRow: TDumpOMFHexDataRow;
+          if TryParseLEDataLine(FLines[LLineIndex], LLineIndex + 1, LDataRow) then
+            LRecord.HexDataRows.Add(LDataRow);
+        end;
       end;
   end;
   if FDocument.ObjectRecords.Count > 0 then
@@ -5883,9 +6052,31 @@ procedure TDumpParser.ParseToolDiagnostics;
   end;
 
   procedure AddToolDiagnostic(ALineNumber: Integer; const ALine: string);
+  var
+    LSeverity: TDumpDiagnosticSeverity;
+    LMessage: string;
   begin
-    if not HasDiagnosticAtLine(ALineNumber) then
-      AddDiagnostic(dsError, ALineNumber, 'TDUMP tool diagnostic.', ALine);
+    if HasDiagnosticAtLine(ALineNumber) then
+      Exit;
+
+    // TDUMP diagnostic prefixes are already explicit in the report.  Keep
+    // their severity and the meaningful message body rather than replacing
+    // either with a generic parser error.
+    LSeverity := dsError;
+    LMessage := ALine;
+    if StartsWithText(ALine, 'WARNING:') then
+    begin
+      LSeverity := dsWarning;
+      LMessage := Trim(Copy(ALine, Length('WARNING:') + 1, MaxInt));
+    end
+    else if StartsWithText(ALine, 'ERROR:') then
+      LMessage := Trim(Copy(ALine, Length('ERROR:') + 1, MaxInt))
+    else if StartsWithText(ALine, 'FATAL:') then
+      LMessage := Trim(Copy(ALine, Length('FATAL:') + 1, MaxInt));
+
+    if LMessage = '' then
+      LMessage := ALine;
+    AddDiagnostic(LSeverity, ALineNumber, LMessage, ALine);
   end;
 
 begin

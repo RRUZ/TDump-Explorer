@@ -205,6 +205,14 @@ begin
       Result := Ord(tpmCppBuilderMethod);
     rshMachLinker:
       Result := Ord(tpmMachLinker);
+    rshELFRelocation:
+      Result := Ord(tpmELFRelocation);
+    rshOMFRecord:
+      Result := Ord(tpmOMFRecord);
+    rshOMFLEData:
+      Result := Ord(tpmOMFLEData);
+    rshPEImportProperty:
+      Result := Ord(tpmPEImportProperty);
   end;
 end;
 

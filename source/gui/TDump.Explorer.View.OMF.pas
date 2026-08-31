@@ -28,6 +28,10 @@ type
       ADocument: TDumpDocument); static;
     class procedure PopulateRecord(AControl: THighlighterControl;
       ARecord: TDumpObjectRecord); static;
+    class procedure PopulateFixUp32(AControl: THighlighterControl;
+      ARecord: TDumpObjectRecord); static;
+    class procedure PopulateLEData(AControl: THighlighterControl;
+      ARecord: TDumpObjectRecord); static;
     class procedure PopulateArchiveMembers(AControl: THighlighterControl;
       ADocument: TDumpDocument); static;
     class procedure PopulateArchiveSymbols(AControl: THighlighterControl;
@@ -41,7 +45,8 @@ uses
   System.SysUtils,
   TDump.Explorer.Highlighter,
   TDump.Explorer.HighlighterProviders,
-  TDump.Explorer.TinyParser;
+  TDump.Explorer.TinyParser,
+  TDump.Explorer.UI;
 
 class procedure TOMFView.PopulateRecords(AControl: THighlighterControl;
   ADocument: TDumpDocument);
@@ -102,6 +107,7 @@ begin
   try
     AControl.Clear;
     AControl.SetColumnHeaders(['Property', 'Value']);
+    AControl.SetColumnDataTypes([thdtText, thdtAuto]);
     if LIndex.HasFileOffset then AControl.AddColumns(['Index file offset', LIndex.RawFileOffset]);
     if LIndex.HasBlockCount then AControl.AddColumns(['Index blocks', LIndex.BlockCount.ToString]);
     if LIndex.HasPageSize then AControl.AddColumns(['Library page size', LIndex.PageSize.ToString + ' bytes']);
@@ -114,16 +120,94 @@ class procedure TOMFView.PopulateRecord(AControl: THighlighterControl;
   ARecord: TDumpObjectRecord);
 begin
   if (AControl = nil) or (ARecord = nil) then Exit;
-  AControl.ParserMode := tpmTDumpValues;
-  AControl.BeginUpdate;
+  if SameText(ARecord.RecordKind, 'FIXU32') and
+    (ARecord.FixUps.Count > 0) then
+  begin
+    PopulateFixUp32(AControl, ARecord);
+    Exit;
+  end;
+  if SameText(ARecord.RecordKind, 'LEDATA') and
+    (ARecord.HexDataRows.Count > 0) then
+  begin
+    PopulateLEData(AControl, ARecord);
+    Exit;
+  end;
+
+  AControl.Font.Name := TExplorerTheme.FontName;
+  AControl.Font.Size := TExplorerTheme.FontSize;
+  AControl.HeaderControl1.ParentFont := False;
+  AControl.HeaderControl1.Font.Name := TExplorerTheme.FontName;
+  AControl.HeaderControl1.Font.Size := TExplorerTheme.FontSize;
+  AControl.AutoSizeColumns := True;
+  AControl.UseColumnMode := True;
+  AControl.ShowLineNumbers := False;
+  AControl.ParserMode := tpmOMFRecord;
+    AControl.BeginUpdate;
   try
     AControl.Clear;
     AControl.SetColumnHeaders(['Property', 'Value']);
+    AControl.SetColumnDataTypes([thdtAuto, thdtAuto]);
     AControl.AddColumns(['Offset', ARecord.RawOffset]);
     AControl.AddColumns(['Record', ARecord.RecordKind]);
     if ARecord.Name <> '' then AControl.AddColumns(['Name', ARecord.Name]);
     for var LDetail in ARecord.Details do
       AControl.AddColumns([LDetail.Name, LDetail.RawValue]);
+  finally
+    AControl.EndUpdate;
+  end;
+end;
+
+class procedure TOMFView.PopulateFixUp32(AControl: THighlighterControl;
+  ARecord: TDumpObjectRecord);
+begin
+  if (AControl = nil) or (ARecord = nil) then Exit;
+  AControl.Font.Name := TExplorerTheme.FontName;
+  AControl.Font.Size := TExplorerTheme.FontSize;
+  AControl.HeaderControl1.ParentFont := False;
+  AControl.HeaderControl1.Font.Name := TExplorerTheme.FontName;
+  AControl.HeaderControl1.Font.Size := TExplorerTheme.FontSize;
+  AControl.ParserMode := tpmOMFRecord;
+  AControl.BeginUpdate;
+  try
+    AControl.Clear;
+    AControl.PrepareGridPresentation;
+    AControl.SetColumnHeaders(['FixUp', 'Mode', 'Loc', 'Frame', 'Target']);
+    AControl.SetColumnDataTypes([thdtHexadecimal, thdtText, thdtText,
+      thdtSymbol, thdtAuto]);
+    AControl.SetColumnParserModes([tpmTDumpValues, tpmOMFRecord,
+      tpmOMFRecord, tpmOMFRecord, tpmOMFRecord]);
+    AControl.SetColumnWidthWeights([2, 2, 3, 3, 8]);
+    AControl.AutoSizeColumns := False;
+    for var LFixUp in ARecord.FixUps do
+      AControl.AddColumns([LFixUp.RawFixUp, LFixUp.Mode, LFixUp.Location,
+        LFixUp.Frame, LFixUp.Target]);
+  finally
+    AControl.EndUpdate;
+  end;
+end;
+
+class procedure TOMFView.PopulateLEData(AControl: THighlighterControl;
+  ARecord: TDumpObjectRecord);
+begin
+  if (AControl = nil) or (ARecord = nil) then Exit;
+  AControl.Font.Name := TExplorerTheme.FixedWidthFontName;
+  AControl.Font.Size := TExplorerTheme.FixedWidthFontSize;
+  AControl.HeaderControl1.ParentFont := False;
+  AControl.HeaderControl1.Font.Name := TExplorerTheme.FontName;
+  AControl.HeaderControl1.Font.Size := TExplorerTheme.FontSize;
+  AControl.ParserMode := tpmTDumpValues;
+  AControl.BeginUpdate;
+  try
+    AControl.Clear;
+    AControl.PrepareGridPresentation;
+    AControl.SetColumnHeaders(['Offset', 'Bytes', 'ASCII']);
+    AControl.SetColumnDataTypes([thdtHexadecimal, thdtHexadecimal, thdtText]);
+    AControl.SetColumnParserModes([tpmTDumpValues, tpmTDumpValues,
+      tpmTDumpValues]);
+    AControl.SetColumnWidthWeights([1, 5, 5]);
+    AControl.AutoSizeColumns := False;
+    for var LDataRow in ARecord.HexDataRows do
+      AControl.AddColumns([LDataRow.RawOffset, LDataRow.Bytes, LDataRow.ASCII]);
   finally
     AControl.EndUpdate;
   end;

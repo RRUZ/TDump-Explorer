@@ -35,6 +35,8 @@ type
       FItemParserModes: TList<Integer>;
       FColumnHeaders: TStringList;
       FColumnDataTypes: array of TTinyHighlightDataType;
+      FColumnParserModes: array of Integer;
+      FColumnWidthWeights: array of Integer;
       FMeasureBitmap: TBitmap;
       FAutoSizeColumns: Boolean;
       FUseColumnMode: Boolean;
@@ -67,6 +69,8 @@ type
     function ColumnCount(const AText: string): Integer;
     function ColumnText(AItemIndex, AColumnIndex: Integer): string;
     function ColumnDataType(AColumnIndex: Integer): TTinyHighlightDataType;
+    function ColumnParserMode(AColumnIndex: Integer;
+      ADefaultMode: TTinyParserMode): TTinyParserMode;
     function ColumnWidth(AColumnIndex: Integer; AAvailableWidth: Integer): Integer;
     function DisplayLineNumber(AItemIndex: Integer): Integer;
     procedure DrawFilterMatches(ACanvas: TCanvas; const ARect: TRect;
@@ -116,6 +120,8 @@ type
     procedure SetColumnHeaders(const AColumns: array of string);
     procedure SetColumnDataTypes(
       const ADataTypes: array of TTinyHighlightDataType);
+    procedure SetColumnParserModes(const AParserModes: array of TTinyParserMode);
+    procedure SetColumnWidthWeights(const AWeights: array of Integer);
     procedure SetItemParserMode(AItemIndex: Integer;
       AParserMode: TTinyParserMode);
     procedure SetItemImageName(AItemIndex: Integer; const AImageName: string);
@@ -286,6 +292,15 @@ begin
   Result := thdtAuto;
 end;
 
+function THighlighterControl.ColumnParserMode(AColumnIndex: Integer;
+  ADefaultMode: TTinyParserMode): TTinyParserMode;
+begin
+  Result := ADefaultMode;
+  if (AColumnIndex >= 0) and (AColumnIndex < Length(FColumnParserModes)) and
+    (FColumnParserModes[AColumnIndex] >= 0) then
+    Result := TTinyParserMode(FColumnParserModes[AColumnIndex]);
+end;
+
 function THighlighterControl.DisplayLineNumber(AItemIndex: Integer): Integer;
 begin
   if FItemProvider <> nil then
@@ -342,6 +357,16 @@ begin
   if FAutoSizeColumns and (AColumnIndex >= 0) and
     (AColumnIndex < Length(FColumnWidths)) then
     Exit(FColumnWidths[AColumnIndex]);
+  if (Length(FColumnWidthWeights) = FColumnCount) and
+    (AColumnIndex >= 0) and (AColumnIndex < FColumnCount) then
+  begin
+    var LTotalWeight := 0;
+    for var LWeight in FColumnWidthWeights do
+      Inc(LTotalWeight, LWeight);
+    if LTotalWeight > 0 then
+      Exit((AAvailableWidth * FColumnWidthWeights[AColumnIndex]) div
+        LTotalWeight);
+  end;
   Result := AAvailableWidth div FColumnCount;
 end;
 
@@ -427,6 +452,8 @@ begin
   FLineNumbers.Clear;
   FColumnHeaders.Clear;
   SetLength(FColumnDataTypes, 0);
+  SetLength(FColumnParserModes, 0);
+  SetLength(FColumnWidthWeights, 0);
   UpdateControlList;
 end;
 
@@ -481,16 +508,21 @@ begin
     FColumnHeaders.Add(StringReplace(StringReplace(LColumn, #13, ' ',
       [rfReplaceAll]), #10, ' ', [rfReplaceAll]));
   SetLength(FColumnDataTypes, FColumnHeaders.Count);
+  SetLength(FColumnParserModes, FColumnHeaders.Count);
+  SetLength(FColumnWidthWeights, 0);
   for var LColumnIndex := 0 to High(FColumnDataTypes) do
+  begin
     FColumnDataTypes[LColumnIndex] := if LColumnIndex = 0 then thdtText
       else thdtAuto;
+    FColumnParserModes[LColumnIndex] := -1;
+  end;
   UpdateControlList;
 end;
 
 procedure THighlighterControl.SetColumnDataTypes(
   const ADataTypes: array of TTinyHighlightDataType);
 begin
-  SetLength(FColumnDataTypes, FColumnHeaders.Count);
+  SetLength(FColumnDataTypes, Max(FColumnHeaders.Count, Length(ADataTypes)));
   for var LColumnIndex := 0 to High(FColumnDataTypes) do
   begin
     if LColumnIndex <= High(ADataTypes) then
@@ -508,6 +540,8 @@ begin
   ClearHighlightedItems;
   FColumnHeaders.Clear;
   SetLength(FColumnDataTypes, 0);
+  SetLength(FColumnParserModes, 0);
+  SetLength(FColumnWidthWeights, 0);
   FItems.BeginUpdate;
   try
     FItems.Text := AText;
@@ -611,6 +645,31 @@ begin
   FHighlightedRangeStart := -1;
   FHighlightedRangeEnd := -1;
   ControlList1.Invalidate;
+end;
+
+procedure THighlighterControl.SetColumnParserModes(
+  const AParserModes: array of TTinyParserMode);
+begin
+  SetLength(FColumnParserModes, Max(FColumnHeaders.Count,
+    Length(AParserModes)));
+  for var LColumnIndex := 0 to High(FColumnParserModes) do
+    if LColumnIndex <= High(AParserModes) then
+      FColumnParserModes[LColumnIndex] := Ord(AParserModes[LColumnIndex])
+    else
+      FColumnParserModes[LColumnIndex] := -1;
+  ControlList1.Invalidate;
+end;
+
+procedure THighlighterControl.SetColumnWidthWeights(
+  const AWeights: array of Integer);
+begin
+  SetLength(FColumnWidthWeights, Max(FColumnHeaders.Count, Length(AWeights)));
+  for var LColumnIndex := 0 to High(FColumnWidthWeights) do
+    if LColumnIndex <= High(AWeights) then
+      FColumnWidthWeights[LColumnIndex] := Max(0, AWeights[LColumnIndex])
+    else
+      FColumnWidthWeights[LColumnIndex] := 0;
+  UpdateControlList;
 end;
 
 function THighlighterControl.IsItemHighlighted(AItemIndex: Integer): Boolean;
@@ -803,6 +862,7 @@ begin
     var LItemParserMode := ItemParserMode(AIndex);
     if LItemParserMode >= 0 then
       LParserMode := TTinyParserMode(LItemParserMode);
+    LParserMode := ColumnParserMode(LColumnIndex, LParserMode);
     LTextFormat := [tfLeft, tfVerticalCenter, tfSingleLine, tfNoPrefix];
     if FUseEndEllipsis then
       Include(LTextFormat, tfEndEllipsis);
