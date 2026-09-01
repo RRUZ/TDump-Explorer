@@ -21,6 +21,8 @@ uses
 type
   TExplorerPopupMenuItemClick = procedure(Sender: TObject;
     AItemIndex: Integer) of object;
+  TExplorerPopupMenuShortcut = procedure(Sender: TObject;
+    AShortcut: Char) of object;
 
   TExplorerPopupMenuForm = class(TForm)
   published
@@ -29,10 +31,14 @@ type
     procedure FormDeactivate(Sender: TObject);
   private
     FOnItemClick: TExplorerPopupMenuItemClick;
+    FOnShortcut: TExplorerPopupMenuShortcut;
     procedure MenuItemsClick(Sender: TObject);
+    procedure FormKeyDown(Sender: TObject; var Key: Word;
+      Shift: TShiftState);
     procedure WMNCHitTest(var AMessage: TWMNCHitTest); message WM_NCHITTEST;
     procedure CMStyleChanged(var AMessage: TMessage); message CM_STYLECHANGED;
     procedure ApplyTheme;
+    procedure AdjustSizeToContent;
   protected
     procedure CreateParams(var Params: TCreateParams); override;
     //procedure CreateWnd; override;
@@ -42,6 +48,8 @@ type
     property MenuItems: THighlighterControl read MenuItemsControl;
     property OnItemClick: TExplorerPopupMenuItemClick read FOnItemClick
       write FOnItemClick;
+    property OnShortcut: TExplorerPopupMenuShortcut read FOnShortcut
+      write FOnShortcut;
   end;
 
 implementation
@@ -74,6 +82,8 @@ begin
   MenuItemsControl.AutoSizeColumns := False;
   MenuItemsControl.ControlList1.ItemHeight := ScaleValue(40);
   MenuItemsControl.OnItemClick := MenuItemsClick;
+  KeyPreview := True;
+  OnKeyDown := FormKeyDown;
 
   ApplyTheme;
 end;
@@ -81,16 +91,50 @@ end;
 procedure TExplorerPopupMenuForm.CreateParams(var Params: TCreateParams);
 begin
   inherited;
-  Params.Style := Params.Style or WS_SIZEBOX;
+  Params.Style := Params.Style and not WS_SIZEBOX;
+end;
+
+procedure TExplorerPopupMenuForm.AdjustSizeToContent;
+begin
+  var LMeasureBitmap := TBitmap.Create;
+  try
+    LMeasureBitmap.Canvas.Font.Assign(MenuItemsControl.Font);
+    var LContentWidth := 0;
+    for var LIndex := 0 to MenuItemsControl.Count - 1 do
+    begin
+      var LItemWidth := LMeasureBitmap.Canvas.TextWidth(
+        MenuItemsControl.Items[LIndex]) + ScaleValue(16);
+      if Assigned(MenuItemsControl.Images) and
+        (MenuItemsControl.ItemImageName(LIndex) <> '') and
+        (MenuItemsControl.Images.GetIndexByName(
+          MenuItemsControl.ItemImageName(LIndex)) >= 0) then
+        Inc(LItemWidth, MenuItemsControl.Images.Width + ScaleValue(8));
+      LContentWidth := Max(LContentWidth, LItemWidth);
+    end;
+
+    ClientWidth := Max(ScaleValue(96), LContentWidth +
+      MenuItemsControl.Margins.Left + MenuItemsControl.Margins.Right);
+
+    var LItemCount := Max(1, MenuItemsControl.Count);
+    var LItemHeight := MenuItemsControl.ControlList1.ItemHeight +
+      MenuItemsControl.ControlList1.ItemMargins.Top +
+      MenuItemsControl.ControlList1.ItemMargins.Bottom;
+    ClientHeight := TitleBarPanel1.Height + MenuItemsControl.Margins.Top +
+      MenuItemsControl.Margins.Bottom + (LItemCount * LItemHeight) +
+      ScaleValue(8);
+  finally
+    LMeasureBitmap.Free;
+  end;
 end;
 
 procedure TExplorerPopupMenuForm.ShowAt(const APoint: TPoint);
 begin
-  ClientWidth := ScaleValue(256);
-  ClientHeight := ScaleValue(130);
+  AdjustSizeToContent;
   var LPopupWidth := Width;
   var LPopupHeight := Height;
   var LWorkArea := Screen.WorkAreaRect;
+  LPopupWidth := Min(LPopupWidth, LWorkArea.Width);
+  LPopupHeight := Min(LPopupHeight, LWorkArea.Height);
   // The chevron click point is its centre.  Start the popup at that button
   // instead of right-aligning it to the pointer, which could place it outside
   // the owner window when the tabs are near the left edge.
@@ -109,6 +153,28 @@ begin
   Hide;
   if Assigned(FOnItemClick) then
     FOnItemClick(Self, MenuItemsControl.ControlList1.ItemIndex);
+end;
+
+procedure TExplorerPopupMenuForm.FormKeyDown(Sender: TObject; var Key: Word;
+  Shift: TShiftState);
+var
+  LShortcut: Char;
+begin
+  if not (ssAlt in Shift) then
+    Exit;
+
+  if Key in [Ord('1')..Ord('9')] then
+    LShortcut := Char(Key)
+  else if Key in [VK_NUMPAD1..VK_NUMPAD9] then
+    LShortcut := Chr(Ord('1') + Key - VK_NUMPAD1)
+  else if Key in [Ord('A')..Ord('Z')] then
+    LShortcut := Char(Key)
+  else
+    Exit;
+
+  if Assigned(FOnShortcut) then
+    FOnShortcut(Self, LShortcut);
+  Key := 0;
 end;
 
 procedure TExplorerPopupMenuForm.FormDeactivate(Sender: TObject);

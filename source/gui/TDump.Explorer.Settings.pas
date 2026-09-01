@@ -32,7 +32,7 @@ uses
   TDump.Explorer.GlassTabs, Vcl.ControlList;
 
 const
-  WM_TDUMP_SETTINGS_CHANGED = WM_APP + $243;
+  cWmTDumpSettingsChanged = WM_APP + $243;
 
 type
   TThemeOption = (toSystem, toDark, toLight);
@@ -43,19 +43,28 @@ type
   private
     FTDumpPath: string;
     FRecentItems: Integer;
+    FRecentFiles: TStringList;
     FThemeOption: TThemeOption;
     FShowLogPanel: Boolean;
     FShowRawPanel: Boolean;
     FFollowRawSelection: Boolean;
+    procedure SetRecentItems(const AValue: Integer);
+    procedure TrimRecentFiles;
     function SettingsFolder: string;
     function SettingsFileName: string;
     constructor Create;
   public
     class function Instance: TSettings; static;
+    destructor Destroy; override;
     procedure Load;
     procedure Save;
+    procedure AddRecentItem(const AFileName: string);
+    procedure RemoveRecentItem(const AFileName: string);
+    procedure ClearRecentItems;
+    function RecentItemCount: Integer;
+    function RecentItem(AIndex: Integer): string;
     property TDumpPath: string read FTDumpPath write FTDumpPath;
-    property RecentItems: Integer read FRecentItems write FRecentItems;
+    property RecentItems: Integer read FRecentItems write SetRecentItems;
     property ThemeOption: TThemeOption read FThemeOption write FThemeOption;
     property ShowLogPanel: Boolean read FShowLogPanel write FShowLogPanel;
     property ShowRawPanel: Boolean read FShowRawPanel write FShowRawPanel;
@@ -123,37 +132,40 @@ uses
 {$R *.dfm}
 
 const
-  CSettingsTitleBarButtonMargin = 50;
-  CSettingsTitleBarHeight = 40;
-  CSettingsTabHeight = 38;
-  CSettingsTabBorderBlend = 0.82;
-  CSettingsTabInactiveTopBlend = 0.97;
-  CSettingsTabHoverTopBlend = 0.82;
-  CSettingsTabCloseHoverBlend = 0.72;
-  CThemeOptionCount = Ord(High(TThemeOption)) - Ord(Low(TThemeOption)) + 1;
-  CThemeOptionIconSize = 32;
-  CThemeOptionCardMargin = 3;
-  CThemeOptionIconTextGap = 4;
+  cSettingsTitleBarButtonMargin = 50;
+  cSettingsTitleBarHeight = 40;
+  cSettingsTabHeight = 38;
+  cSettingsTabBorderBlend = 0.82;
+  cSettingsTabInactiveTopBlend = 0.97;
+  cSettingsTabHoverTopBlend = 0.82;
+  cSettingsTabCloseHoverBlend = 0.72;
+  cThemeOptionCount = Ord(High(TThemeOption)) - Ord(Low(TThemeOption)) + 1;
+  cThemeOptionIconSize = 32;
+  cThemeOptionCardMargin = 3;
+  cThemeOptionIconTextGap = 4;
 
-  CThemeOptionSystem = Ord(toSystem);
-  CThemeOptionDark = Ord(toDark);
-  CThemeOptionLight = Ord(toLight);
+  cThemeOptionSystem = Ord(toSystem);
+  cThemeOptionDark = Ord(toDark);
+  cThemeOptionLight = Ord(toLight);
 
-  CSettingsFolderName = 'TDump-Explorer';
-  CSettingsFileName = 'settings.ini';
-  CSettingsGeneralSection = 'General';
-  CSettingsAppearanceSection = 'Appearance';
-  CSettingsWorkspaceSection = 'Workspace';
-  CSettingsTDumpPathKey = 'TDumpPath';
-  CSettingsRecentItemsKey = 'RecentItems';
-  CSettingsThemeKey = 'Theme';
-  CSettingsShowLogPanelKey = 'ShowLogPanel';
-  CSettingsShowRawPanelKey = 'ShowRawPanel';
-  CSettingsFollowRawSelectionKey = 'FollowRawSelection';
+  cSettingsFolderName = 'TDump-Explorer';
+  cSettingsFileName = 'settings.ini';
+  cSettingsGeneralSection = 'General';
+  cSettingsRecentFilesSection = 'Recent Files';
+  cSettingsAppearanceSection = 'Appearance';
+  cSettingsWorkspaceSection = 'Workspace';
+  cSettingsTDumpPathKey = 'TDumpPath';
+  cSettingsRecentItemsKey = 'RecentItems';
+  cSettingsRecentFileCountKey = 'Count';
+  cSettingsRecentFileKeyPrefix = 'Item';
+  cSettingsThemeKey = 'Theme';
+  cSettingsShowLogPanelKey = 'ShowLogPanel';
+  cSettingsShowRawPanelKey = 'ShowRawPanel';
+  cSettingsFollowRawSelectionKey = 'FollowRawSelection';
 
-  CDefaultRecentItems = 10;
-  CMinimumRecentItems = 1;
-  CMaximumRecentItems = 100;
+  cDefaultRecentItems = 10;
+  cMinimumRecentItems = 1;
+  cMaximumRecentItems = 100;
 
 { TSettings }
 
@@ -161,11 +173,18 @@ constructor TSettings.Create;
 begin
   inherited;
   FTDumpPath := '';
-  FRecentItems := CDefaultRecentItems;
+  FRecentItems := cDefaultRecentItems;
+  FRecentFiles := TStringList.Create;
   FThemeOption := toSystem;
   FShowLogPanel := True;
   FShowRawPanel := True;
   FFollowRawSelection := True;
+end;
+
+destructor TSettings.Destroy;
+begin
+  FRecentFiles.Free;
+  inherited;
 end;
 
 class function TSettings.Instance: TSettings;
@@ -182,12 +201,62 @@ begin
   if Failed(SHGetFolderPath(0, CSIDL_APPDATA, 0, SHGFP_TYPE_CURRENT,
     LRoamingAppData)) then
     raise Exception.Create('Unable to locate the roaming application-data folder.');
-  Result := IncludeTrailingPathDelimiter(LRoamingAppData) + CSettingsFolderName;
+  Result := IncludeTrailingPathDelimiter(LRoamingAppData) + cSettingsFolderName;
 end;
 
 function TSettings.SettingsFileName: string;
 begin
-  Result := IncludeTrailingPathDelimiter(SettingsFolder) + CSettingsFileName;
+  Result := IncludeTrailingPathDelimiter(SettingsFolder) + cSettingsFileName;
+end;
+
+procedure TSettings.SetRecentItems(const AValue: Integer);
+begin
+  var LRecentItems := EnsureRange(AValue, cMinimumRecentItems,
+    cMaximumRecentItems);
+  if FRecentItems = LRecentItems then
+    Exit;
+  FRecentItems := LRecentItems;
+  TrimRecentFiles;
+end;
+
+procedure TSettings.TrimRecentFiles;
+begin
+  while FRecentFiles.Count > FRecentItems do
+    FRecentFiles.Delete(FRecentFiles.Count - 1);
+end;
+
+procedure TSettings.AddRecentItem(const AFileName: string);
+begin
+  var LFileName := Trim(AFileName);
+  if LFileName = '' then
+    Exit;
+
+  LFileName := ExpandFileName(LFileName);
+  RemoveRecentItem(LFileName);
+  FRecentFiles.Insert(0, LFileName);
+  TrimRecentFiles;
+end;
+
+procedure TSettings.RemoveRecentItem(const AFileName: string);
+begin
+  for var LIndex := FRecentFiles.Count - 1 downto 0 do
+    if SameText(FRecentFiles[LIndex], AFileName) then
+      FRecentFiles.Delete(LIndex);
+end;
+
+procedure TSettings.ClearRecentItems;
+begin
+  FRecentFiles.Clear;
+end;
+
+function TSettings.RecentItemCount: Integer;
+begin
+  Result := FRecentFiles.Count;
+end;
+
+function TSettings.RecentItem(AIndex: Integer): string;
+begin
+  Result := FRecentFiles[AIndex];
 end;
 
 procedure TSettings.Load;
@@ -201,20 +270,32 @@ begin
 
   LIni := TIniFile.Create(LFileName);
   try
-    FTDumpPath := LIni.ReadString(CSettingsGeneralSection,
-      CSettingsTDumpPathKey, FTDumpPath);
-    FRecentItems := EnsureRange(LIni.ReadInteger(CSettingsGeneralSection,
-      CSettingsRecentItemsKey, FRecentItems), CMinimumRecentItems,
-      CMaximumRecentItems);
+    FRecentFiles.Clear;
+    FTDumpPath := LIni.ReadString(cSettingsGeneralSection,
+      cSettingsTDumpPathKey, FTDumpPath);
+    RecentItems := LIni.ReadInteger(cSettingsGeneralSection,
+      cSettingsRecentItemsKey, FRecentItems);
     FThemeOption := TThemeOption(EnsureRange(LIni.ReadInteger(
-      CSettingsAppearanceSection, CSettingsThemeKey, Ord(FThemeOption)),
+      cSettingsAppearanceSection, cSettingsThemeKey, Ord(FThemeOption)),
       Ord(Low(TThemeOption)), Ord(High(TThemeOption))));
-    FShowLogPanel := LIni.ReadBool(CSettingsWorkspaceSection,
-      CSettingsShowLogPanelKey, FShowLogPanel);
-    FShowRawPanel := LIni.ReadBool(CSettingsWorkspaceSection,
-      CSettingsShowRawPanelKey, FShowRawPanel);
-    FFollowRawSelection := LIni.ReadBool(CSettingsWorkspaceSection,
-      CSettingsFollowRawSelectionKey, FFollowRawSelection);
+    FShowLogPanel := LIni.ReadBool(cSettingsWorkspaceSection,
+      cSettingsShowLogPanelKey, FShowLogPanel);
+    FShowRawPanel := LIni.ReadBool(cSettingsWorkspaceSection,
+      cSettingsShowRawPanelKey, FShowRawPanel);
+    FFollowRawSelection := LIni.ReadBool(cSettingsWorkspaceSection,
+      cSettingsFollowRawSelectionKey, FFollowRawSelection);
+
+    var LRecentFileCount := EnsureRange(LIni.ReadInteger(
+      cSettingsRecentFilesSection, cSettingsRecentFileCountKey, 0), 0,
+      cMaximumRecentItems);
+    for var LIndex := 0 to LRecentFileCount - 1 do
+    begin
+      var LRecentFileName := LIni.ReadString(cSettingsRecentFilesSection,
+        cSettingsRecentFileKeyPrefix + LIndex.ToString, '');
+      if LRecentFileName <> '' then
+        FRecentFiles.Add(LRecentFileName);
+    end;
+    TrimRecentFiles;
   finally
     LIni.Free;
   end;
@@ -231,16 +312,26 @@ begin
 
   LIni := TIniFile.Create(SettingsFileName);
   try
-    LIni.WriteString(CSettingsGeneralSection, CSettingsTDumpPathKey, FTDumpPath);
-    LIni.WriteInteger(CSettingsGeneralSection, CSettingsRecentItemsKey,
+    LIni.WriteString(cSettingsGeneralSection, cSettingsTDumpPathKey, FTDumpPath);
+    LIni.WriteInteger(cSettingsGeneralSection, cSettingsRecentItemsKey,
       FRecentItems);
-    LIni.WriteInteger(CSettingsAppearanceSection, CSettingsThemeKey,
+    LIni.EraseSection(cSettingsRecentFilesSection);
+    if FRecentFiles.Count > 0 then
+    begin
+      LIni.WriteInteger(cSettingsRecentFilesSection,
+        cSettingsRecentFileCountKey, FRecentFiles.Count);
+      for var LIndex := 0 to FRecentFiles.Count - 1 do
+        LIni.WriteString(cSettingsRecentFilesSection,
+          cSettingsRecentFileKeyPrefix + LIndex.ToString,
+          FRecentFiles[LIndex]);
+    end;
+    LIni.WriteInteger(cSettingsAppearanceSection, cSettingsThemeKey,
       Ord(FThemeOption));
-    LIni.WriteBool(CSettingsWorkspaceSection, CSettingsShowLogPanelKey,
+    LIni.WriteBool(cSettingsWorkspaceSection, cSettingsShowLogPanelKey,
       FShowLogPanel);
-    LIni.WriteBool(CSettingsWorkspaceSection, CSettingsShowRawPanelKey,
+    LIni.WriteBool(cSettingsWorkspaceSection, cSettingsShowRawPanelKey,
       FShowRawPanel);
-    LIni.WriteBool(CSettingsWorkspaceSection, CSettingsFollowRawSelectionKey,
+    LIni.WriteBool(cSettingsWorkspaceSection, cSettingsFollowRawSelectionKey,
       FFollowRawSelection);
   finally
     LIni.Free;
@@ -303,28 +394,28 @@ begin
     LTabPalette.StripTop := LTheme.BackgroundColor;
     LTabPalette.StripBottom := LTheme.BackgroundColor;
     LTabPalette.StripBorder := ColorBlendRGB(LTheme.TextColor,
-      LTheme.BackgroundColor, CSettingsTabBorderBlend);
+      LTheme.BackgroundColor, cSettingsTabBorderBlend);
     LTabPalette.BackgroundTopLine := LTheme.BackgroundColor;
     LTabPalette.TabTop := LTheme.BackgroundColor;
     LTabPalette.TabBottom := LTheme.BackgroundColor;
     LTabPalette.InactiveTop := ColorBlendRGB(LTheme.TextColor,
-      LTheme.BackgroundColor, CSettingsTabInactiveTopBlend);
+      LTheme.BackgroundColor, cSettingsTabInactiveTopBlend);
     LTabPalette.InactiveBottom := LTheme.BackgroundColor;
     LTabPalette.HoverTop := ColorBlendRGB(LTheme.SelectionColor,
-      LTheme.BackgroundColor, CSettingsTabHoverTopBlend);
+      LTheme.BackgroundColor, cSettingsTabHoverTopBlend);
     LTabPalette.HoverBottom := LTheme.BackgroundColor;
     LTabPalette.Accent := LTheme.SelectionColor;
     LTabPalette.Text := LTheme.TextColor;
     LTabPalette.InactiveText := LTheme.InactiveText;
     LTabPalette.CloseHover := ColorBlendRGB(LTheme.SelectionColor,
-      LTheme.BackgroundColor, CSettingsTabCloseHoverBlend);
+      LTheme.BackgroundColor, cSettingsTabCloseHoverBlend);
     FSettingsTabs.Palette := LTabPalette;
     if FSettingsTabs.Items.Count > 0 then
       FSettingsTabs.Items[0].ImageName := 'gear_' + LIconSuffix;
   end;
 
   CustomTitleBar.SystemHeight := False;
-  CustomTitleBar.Height := ScaleValue(CSettingsTitleBarHeight);
+  CustomTitleBar.Height := ScaleValue(cSettingsTitleBarHeight);
   CustomTitleBar.SystemColors := False;
   CustomTitleBar.StyleColors := False;
   CustomTitleBar.SystemButtons := False;
@@ -359,13 +450,13 @@ procedure TFrmSettings.ConfigureThemeOptions;
 begin
   // Keep the component's designer size intact.  Only its virtual items are
   // sized here so three cards always occupy the available row.
-  ControlList1.ItemCount := CThemeOptionCount;
+  ControlList1.ItemCount := cThemeOptionCount;
   ControlList1.ColumnLayout := cltMultiLeftToRight;
   ControlList1.ItemMargins.Left := 0;
   ControlList1.ItemMargins.Top := 0;
   ControlList1.ItemMargins.Right := 0;
   ControlList1.ItemMargins.Bottom := 0;
-  ControlList1.ItemWidth := Max(1, ControlList1.ClientWidth div CThemeOptionCount);
+  ControlList1.ItemWidth := Max(1, ControlList1.ClientWidth div cThemeOptionCount);
   ControlList1.ItemHeight := Max(1, ControlList1.ClientHeight);
   ControlList1.ItemIndex := Ord(FSelectedThemeOption);
 end;
@@ -419,7 +510,7 @@ begin
   begin
     var LForm := Screen.Forms[LIndex];
     if LForm.HandleAllocated then
-      PostMessage(LForm.Handle, WM_TDUMP_SETTINGS_CHANGED, 0, 0);
+      PostMessage(LForm.Handle, cWmTDumpSettingsChanged, 0, 0);
   end;
 end;
 
@@ -432,9 +523,9 @@ end;
 procedure TFrmSettings.ControlList1AfterDrawItem(AIndex: Integer;
   ACanvas: TCanvas; ARect: TRect; AState: TOwnerDrawState);
 const
-  CThemeOptionCaptions: array[CThemeOptionSystem..CThemeOptionLight] of string =
+  cThemeOptionCaptions: array[cThemeOptionSystem..cThemeOptionLight] of string =
     ('System', 'Dark', 'Light');
-  CThemeOptionIconCodes: array[CThemeOptionSystem..CThemeOptionLight] of Word =
+  cThemeOptionIconCodes: array[cThemeOptionSystem..cThemeOptionLight] of Word =
     ($E32E, $E330, $E472); // monitor, moon, sun
 var
   LTheme: TExplorerTheme;
@@ -449,12 +540,12 @@ var
   LTextColor: TColor;
   LIconColor: TColor;
 begin
-  if (AIndex < CThemeOptionSystem) or (AIndex > CThemeOptionLight) then
+  if (AIndex < cThemeOptionSystem) or (AIndex > cThemeOptionLight) then
     Exit;
 
   LTheme := TExplorerTheme.ActiveTheme;
   LCardRect := ARect;
-  InflateRect(LCardRect, -ScaleValue(CThemeOptionCardMargin), -ScaleValue(CThemeOptionCardMargin));
+  InflateRect(LCardRect, -ScaleValue(cThemeOptionCardMargin), -ScaleValue(cThemeOptionCardMargin));
   if (LCardRect.Width <= 0) or (LCardRect.Height <= 0) then
     Exit;
 
@@ -480,25 +571,25 @@ begin
   ACanvas.Font.Name := TExplorerTheme.FontName;
   ACanvas.Font.Size := TExplorerTheme.FontSize;
   //ACanvas.Font.Style := [fsBold];
-  LIconSize := ScaleValue(CThemeOptionIconSize);
-  LContentHeight := LIconSize + ScaleValue(CThemeOptionIconTextGap) + ACanvas.TextHeight(CThemeOptionCaptions[AIndex]);
+  LIconSize := ScaleValue(cThemeOptionIconSize);
+  LContentHeight := LIconSize + ScaleValue(cThemeOptionIconTextGap) + ACanvas.TextHeight(cThemeOptionCaptions[AIndex]);
   LIconX := LCardRect.Left + (LCardRect.Width - LIconSize) div 2;
   LIconY := LCardRect.Top + Max(0, (LCardRect.Height - LContentHeight) div 2);
   LIconRect := Rect(LIconX, LIconY, LIconX + LIconSize, LIconY + LIconSize);
-  PhosphorFont.DrawIcon(ACanvas.Handle, CThemeOptionIconCodes[AIndex], LIconRect, LIconColor, pfwRegular);
+  PhosphorFont.DrawIcon(ACanvas.Handle, cThemeOptionIconCodes[AIndex], LIconRect, LIconColor, pfwRegular);
 
   LTextRect := LCardRect;
-  LTextRect.Top := LIconY + LIconSize + ScaleValue(CThemeOptionIconTextGap);
+  LTextRect.Top := LIconY + LIconSize + ScaleValue(cThemeOptionIconTextGap);
   ACanvas.Brush.Style := bsClear;
   ACanvas.Font.Color := LTextColor;
-  DrawText(ACanvas.Handle, PChar(CThemeOptionCaptions[AIndex]), Length(CThemeOptionCaptions[AIndex]), LTextRect,
+  DrawText(ACanvas.Handle, PChar(cThemeOptionCaptions[AIndex]), Length(cThemeOptionCaptions[AIndex]), LTextRect,
     DT_CENTER or DT_SINGLELINE or DT_VCENTER or DT_END_ELLIPSIS or DT_NOPREFIX);
 end;
 
 procedure TFrmSettings.ControlList1Change(Sender: TObject);
 begin
-  if (ControlList1.ItemIndex < CThemeOptionSystem) or
-    (ControlList1.ItemIndex > CThemeOptionLight) then
+  if (ControlList1.ItemIndex < cThemeOptionSystem) or
+    (ControlList1.ItemIndex > cThemeOptionLight) then
     Exit;
 
   FSelectedThemeOption := TThemeOption(ControlList1.ItemIndex);
@@ -508,7 +599,7 @@ end;
 
 procedure TFrmSettings.CreateSettingsTabs;
 begin
-  TitleBarPanel1.Height := ScaleValue(CSettingsTitleBarHeight);
+  TitleBarPanel1.Height := ScaleValue(cSettingsTitleBarHeight);
 
   FSettingsTabImages := TVirtualImageList.Create(Self);
   FSettingsTabImages.Width := 16;
@@ -524,17 +615,17 @@ begin
   FSettingsTabs.Margins.Top := 0;
   // Match the main window: the reserved area belongs to the native title
   // bar buttons and must never be covered by a tab.
-  FSettingsTabs.Margins.Right := ScaleValue(CSettingsTitleBarButtonMargin);
+  FSettingsTabs.Margins.Right := ScaleValue(cSettingsTitleBarButtonMargin);
   FSettingsTabs.Margins.Bottom := 0;
   FSettingsTabs.AlignWithMargins := True;
   FSettingsTabs.Align := alBottom;
   // TabHeight is DPI-scaled internally.  Keeping the tab two logical pixels
   // shorter than the 40 px title bar restores the same visible top gap as
   // the main window without stretching the tab itself.
-  FSettingsTabs.TabHeight := CSettingsTabHeight;
+  FSettingsTabs.TabHeight := cSettingsTabHeight;
   FSettingsTabs.Font.Assign(Font);
   FSettingsTabs.ShowAddButton := False;
-  FSettingsTabs.ShowChevronButton := False;
+  FSettingsTabs.ShowCustomRightButton := False;
   FSettingsTabs.OnBackgroundMouseDown := SettingsTabsBackgroundMouseDown;
   FSettingsTabs.AddTab('Settings', 'gear_light', False, True);
   FSettingsTabs.SendToBack;

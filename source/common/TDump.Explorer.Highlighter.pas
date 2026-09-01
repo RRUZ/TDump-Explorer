@@ -69,7 +69,7 @@ uses
   Vcl.Themes;
 
 const
-  CTruncationEllipsis = '...';
+  cTruncationEllipsis = '...';
 
 constructor TTinyHighlighter.Create;
 begin
@@ -88,14 +88,14 @@ end;
 function TTinyHighlighter.FitText(ACanvas: TCanvas; const AText: string;
   AMaximumWidth: Integer; ATextFormat: TTextFormat): string;
 const
-  CEllipsis = '...';
+  cEllipsis = '...';
 begin
   Result := AText;
   if (AMaximumWidth <= 0) or (ACanvas.TextWidth(Result) <= AMaximumWidth) or
     not (ATextFormat * [tfEndEllipsis, tfPathEllipsis, tfWordEllipsis] <> []) then
     Exit;
 
-  if ACanvas.TextWidth(CEllipsis) > AMaximumWidth then
+  if ACanvas.TextWidth(cEllipsis) > AMaximumWidth then
   begin
     Result := '';
     Exit;
@@ -105,13 +105,13 @@ begin
   while LLow < LHigh do
   begin
     var LMiddle := LLow + ((LHigh - LLow + 1) div 2);
-    if ACanvas.TextWidth(Copy(AText, 1, LMiddle) + CEllipsis) <=
+    if ACanvas.TextWidth(Copy(AText, 1, LMiddle) + cEllipsis) <=
       AMaximumWidth then
       LLow := LMiddle
     else
       LHigh := LMiddle - 1;
   end;
-  Result := Copy(AText, 1, LLow) + CEllipsis;
+  Result := Copy(AText, 1, LLow) + cEllipsis;
 end;
 
 procedure TTinyHighlighter.DrawTokenizedText(ACanvas: TCanvas;
@@ -121,12 +121,12 @@ procedure TTinyHighlighter.DrawTokenizedText(ACanvas: TCanvas;
 begin
   var LVisibleLength := Length(AText);
   var LHasEllipsis := (ADisplayedText <> AText) and
-    (Length(ADisplayedText) >= Length(CTruncationEllipsis)) and
+    (Length(ADisplayedText) >= Length(cTruncationEllipsis)) and
     (Copy(ADisplayedText,
-      Length(ADisplayedText) - Length(CTruncationEllipsis) + 1,
-      Length(CTruncationEllipsis)) = CTruncationEllipsis);
+      Length(ADisplayedText) - Length(cTruncationEllipsis) + 1,
+      Length(cTruncationEllipsis)) = cTruncationEllipsis);
   if LHasEllipsis then
-    LVisibleLength := Length(ADisplayedText) - Length(CTruncationEllipsis)
+    LVisibleLength := Length(ADisplayedText) - Length(cTruncationEllipsis)
   else if ADisplayedText <> AText then
     LVisibleLength := Length(ADisplayedText);
 
@@ -182,7 +182,7 @@ begin
     if LHasEllipsis then
     begin
       ACanvas.Font.Color := ATheme.TextColor;
-      ACanvas.TextOut(LX, AY, CTruncationEllipsis);
+      ACanvas.TextOut(LX, AY, cTruncationEllipsis);
     end;
   finally
     if LSavedDeviceContext <> 0 then

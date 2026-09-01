@@ -25,7 +25,7 @@ function GetPhosphorIconName(ACode: Word): string;
 implementation
 
 const
-  CIconNames: array[0..1511] of TPhosphorIconName = (
+  cIconNames: array[0..1511] of TPhosphorIconName = (
     (Code: $E000; Name: 'pulse'),
     (Code: $E002; Name: 'airplane'),
     (Code: $E004; Name: 'airplay'),
@@ -1542,14 +1542,14 @@ const
 
 function GetPhosphorIconName(ACode: Word): string;
 begin
-  var LLow := Low(CIconNames);
-  var LHigh := High(CIconNames);
+  var LLow := Low(cIconNames);
+  var LHigh := High(cIconNames);
   while LLow <= LHigh do
   begin
     var LMiddle := (LLow + LHigh) div 2;
-    if CIconNames[LMiddle].Code = ACode then
-      Exit(CIconNames[LMiddle].Name);
-    if CIconNames[LMiddle].Code < ACode then
+    if cIconNames[LMiddle].Code = ACode then
+      Exit(cIconNames[LMiddle].Name);
+    if cIconNames[LMiddle].Code < ACode then
       LLow := LMiddle + 1
     else
       LHigh := LMiddle - 1;

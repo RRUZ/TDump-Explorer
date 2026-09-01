@@ -12,7 +12,7 @@ uses
   Vcl.StdCtrls, Vcl.WinXCtrls;
 
 const
-  WM_RAW_FILTER_READY = WM_USER + $541;
+  cWmRawFilterReady = WM_USER + $541;
 
 type
   TRawViewSourceLineSelectedEvent = procedure(Sender: TObject;
@@ -55,7 +55,7 @@ type
     procedure SetSyncWithSelectedNode(const AValue: Boolean);
     procedure CMStyleChanged(var AMessage: TMessage); message CM_STYLECHANGED;
     procedure WMRawFilterReady(var AMessage: TMessage);
-      message WM_RAW_FILTER_READY;
+      message cWmRawFilterReady;
     procedure ApplyTheme;
   public
     constructor Create(AOwner: TComponent); override;
@@ -121,8 +121,8 @@ destructor TRawViewFrame.Destroy;
 begin
   CancelFilterTask(True);
   var LMessage: TMsg;
-  while PeekMessage(LMessage, Handle, WM_RAW_FILTER_READY,
-    WM_RAW_FILTER_READY, PM_REMOVE) do
+  while PeekMessage(LMessage, Handle, cWmRawFilterReady,
+    cWmRawFilterReady, PM_REMOVE) do
     TObject(LMessage.lParam).Free;
   FHighlighterControl.SetItemProvider(nil);
   FRowProvider := nil;
@@ -235,7 +235,7 @@ begin
         LResult.Indexes := LIndexes.ToArray;
         LResult.Generation := LGeneration;
         LResult.Document := LDocument;
-        if not PostMessage(Handle, WM_RAW_FILTER_READY, 0,
+        if not PostMessage(Handle, cWmRawFilterReady, 0,
           LPARAM(LResult)) then
           LResult.Free;
       finally

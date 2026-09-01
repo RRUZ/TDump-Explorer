@@ -17,10 +17,10 @@ uses
   TDump.Explorer.Highlighter in '..\source\common\TDump.Explorer.Highlighter.pas';
 
 const
-  CTestResultsDirectory = 'C:\dev\TDump-Explorer\tests\test-results';
-  CTestResultsFile = CTestResultsDirectory + '\TDumpTinyParserTests.nunit.xml';
-  CMachFixture = 'C:\dev\TDump-Explorer\fixtures\generated\Mach.Universal.Rad37.tdump';
-  CVclStringsFixture = 'C:\dev\TDump-Explorer\fixtures\generated\VCL.Win32.strings.tdump';
+  cTestResultsDirectory = 'C:\dev\TDump-Explorer\tests\test-results';
+  cTestResultsFile = cTestResultsDirectory + '\TDumpTinyParserTests.nunit.xml';
+  cMachFixture = 'C:\dev\TDump-Explorer\fixtures\generated\Mach.Universal.Rad37.tdump';
+  cVclStringsFixture = 'C:\dev\TDump-Explorer\fixtures\generated\VCL.Win32.strings.tdump';
 
 type
   [TestFixture]
@@ -51,13 +51,13 @@ end;
 
 procedure TestTDumpValueTokenization;
 const
-  CText = 'Name="Turbo Dump" Hex=0x1A2B Legacy=BAF4C9h Magic=CAFEBABE ' +
+  cText = 'Name="Turbo Dump" Hex=0x1A2B Legacy=BAF4C9h Magic=CAFEBABE ' +
     'Count=-42 Ratio=3.1415 Date=2026-08-23 Time=23:59:59.123 ' +
     'Stamp=2026-08-23T23:59:59.123 Path=C:\temp Mode=32bit RVA=00002010';
 begin
   var LParser := TTinyParser.Create;
   try
-    var LTokens := LParser.Tokenize(CText);
+    var LTokens := LParser.Tokenize(cText);
     try
       Require(HasToken(LTokens, ttkStringLiteral, '"Turbo Dump"'),
         'Double-quoted TDUMP text must be classified as a string literal.');
@@ -121,24 +121,24 @@ end;
 
 procedure TestCppBuilderMethodTokenization;
 const
-  CMethod = 'System::__linkproc__ __fastcall PackageLoad(' +
+  cMethod = 'System::__linkproc__ __fastcall PackageLoad(' +
     'System::PackageInfoTable * const, System::TLibModule *)';
-  CGenericMethod = 'System::Generics::Collections::TDictionary__2<' +
+  cGenericMethod = 'System::Generics::Collections::TDictionary__2<' +
     'System::UnicodeString, System::Variant>::TKeyEnumerator::MoveNext()';
-  CDelphiSystemTypes = 'AnsiChar ShortInt ByteBool WordBool LongBool string ' +
+  cDelphiSystemTypes = 'AnsiChar ShortInt ByteBool WordBool LongBool string ' +
     'PAnsiChar0 PWideCharL PFixedUInt HRESULT';
-  CELFRelocation = '0 R_X86_64_JUMP_SLOT 885018 155456 268220 1279 0 ' +
+  cELFRelocation = '0 R_X86_64_JUMP_SLOT 885018 155456 268220 1279 0 ' +
     'ASN1_TYPE_set';
-  COMFFixUp = 'FixUp: 007 Mode: Seg Loc: Offset32 Frame: TARGET ' +
+  cOMFFixUp = 'FixUp: 007 Mode: Seg Loc: Offset32 Frame: TARGET ' +
     'Target: VEI[1480]: __fastcall System::Finalization()';
-  COMFLEData = '0000: 04 00 00 00 0E 0F 54 4D  6F 6E 69 74 6F 72 53 75   ' +
+  cOMFLEData = '0000: 04 00 00 00 0E 0F 54 4D  6F 6E 69 74 6F 72 53 75   ' +
     '......TMonitorSu';
-  COMFComment = '0003A0 COMMENT Purge: Yes, List: Yes, Class: 160 (0A0h), ' +
+  cOMFComment = '0003A0 COMMENT Purge: Yes, List: Yes, Class: 160 (0A0h), ' +
     'SubClass: 1 (01h)';
 begin
   var LParser := TTinyParser.Create;
   try
-    var LTokens := LParser.Tokenize(CMethod, tpmCppBuilderMethod);
+    var LTokens := LParser.Tokenize(cMethod, tpmCppBuilderMethod);
     try
       Require(HasToken(LTokens, ttkKeyword, '__fastcall'),
         'Calling conventions must be classified as method keywords.');
@@ -152,7 +152,7 @@ begin
         'C++Builder T-prefixed classes must be classified as types.');
       Require(HasToken(LTokens, ttkKeyword, 'const'),
         'C++ type qualifiers must be classified as keywords.');
-      var LDemangledGenericTokens := LParser.Tokenize(CGenericMethod,
+      var LDemangledGenericTokens := LParser.Tokenize(cGenericMethod,
         tpmCppBuilderMethod);
       try
         Require(HasToken(LDemangledGenericTokens, ttkTypeName,
@@ -163,7 +163,7 @@ begin
         LDemangledGenericTokens.Free;
       end;
       var LMachDemangledGenericTokens := LParser.Tokenize(
-        'symbol: ' + CGenericMethod, tpmMachLinker);
+        'symbol: ' + cGenericMethod, tpmMachLinker);
       try
         Require(HasToken(LMachDemangledGenericTokens, ttkTypeName,
           'UnicodeString') and HasToken(LMachDemangledGenericTokens,
@@ -221,17 +221,17 @@ begin
       finally
         LPlainStringTokens.Free;
       end;
-      var LSystemTypeTokens := LParser.Tokenize(CDelphiSystemTypes,
+      var LSystemTypeTokens := LParser.Tokenize(cDelphiSystemTypes,
         tpmExtractedString);
       try
-        for var LTypeName in CDelphiSystemTypes.Split([' ']) do
+        for var LTypeName in cDelphiSystemTypes.Split([' ']) do
           Require(HasToken(LSystemTypeTokens, ttkTypeName, LTypeName),
             'Extracted Delphi system type must retain type highlighting: ' +
             LTypeName);
       finally
         LSystemTypeTokens.Free;
       end;
-      var LELFRelocationTokens := LParser.Tokenize(CELFRelocation,
+      var LELFRelocationTokens := LParser.Tokenize(cELFRelocation,
         tpmELFRelocation);
       try
         Require(HasToken(LELFRelocationTokens, ttkInteger, '0') and
@@ -245,7 +245,7 @@ begin
       finally
         LELFRelocationTokens.Free;
       end;
-      var LOMFFixUpTokens := LParser.Tokenize(COMFFixUp, tpmOMFRecord);
+      var LOMFFixUpTokens := LParser.Tokenize(cOMFFixUp, tpmOMFRecord);
       try
         Require(HasToken(LOMFFixUpTokens, ttkKeyword, 'FixUp') and
           HasToken(LOMFFixUpTokens, ttkKeyword, 'Mode') and
@@ -263,7 +263,7 @@ begin
       finally
         LOMFFixUpTokens.Free;
       end;
-      var LLEDataTokens := LParser.Tokenize(COMFLEData, tpmOMFLEData);
+      var LLEDataTokens := LParser.Tokenize(cOMFLEData, tpmOMFLEData);
       try
         Require(HasToken(LLEDataTokens, ttkHexadecimal, '0000') and
           HasToken(LLEDataTokens, ttkHexadecimal, '04') and
@@ -273,7 +273,7 @@ begin
       finally
         LLEDataTokens.Free;
       end;
-      var LOMFCommentTokens := LParser.Tokenize(COMFComment, tpmOMFRecord);
+      var LOMFCommentTokens := LParser.Tokenize(cOMFComment, tpmOMFRecord);
       try
         Require(HasToken(LOMFCommentTokens, ttkSymbol, 'COMMENT') and
           HasToken(LOMFCommentTokens, ttkKeyword, 'Purge') and
@@ -688,17 +688,17 @@ end;
 
 procedure TestMachFixtureLinkerTokenization;
 const
-  CItaniumSymbolPattern = '_{1,2}Z(?:N|TRN|TVN|TIN|TSN)[A-Za-z0-9_]+';
+  cItaniumSymbolPattern = '_{1,2}Z(?:N|TRN|TVN|TIN|TSN)[A-Za-z0-9_]+';
 begin
-  Require(TFile.Exists(CMachFixture),
+  Require(TFile.Exists(cMachFixture),
     'The generated Mach fixture must be available for linker-tokenization coverage.');
 
   var LNames := TDictionary<string, Byte>.Create;
   var LParser := TTinyParser.Create;
   var LSpecialMemberCount := 0;
   try
-    for var LMatch in TRegEx.Matches(TFile.ReadAllText(CMachFixture),
-      CItaniumSymbolPattern) do
+    for var LMatch in TRegEx.Matches(TFile.ReadAllText(cMachFixture),
+      cItaniumSymbolPattern) do
       LNames.TryAdd(LMatch.Value, 0);
     Require(LNames.Count > 1000,
       'The Mach fixture must provide broad Itanium linker-name coverage.');
@@ -747,13 +747,13 @@ end;
 
 procedure TestVclStringsBorlandTokenization;
 const
-  CExtractedBorlandPattern = '(?m)^\d+:\s+([^@\r\n]@System@[^\r\n]+)\r?$';
+  cExtractedBorlandPattern = '(?m)^\d+:\s+([^@\r\n]@System@[^\r\n]+)\r?$';
 begin
-  Require(TFile.Exists(CVclStringsFixture),
+  Require(TFile.Exists(cVclStringsFixture),
     'The generated VCL strings fixture must be available for Borland linker coverage.');
 
-  var LMatches := TRegEx.Matches(TFile.ReadAllText(CVclStringsFixture),
-    CExtractedBorlandPattern);
+  var LMatches := TRegEx.Matches(TFile.ReadAllText(cVclStringsFixture),
+    cExtractedBorlandPattern);
   Require(LMatches.Count > 10000,
     'The VCL strings fixture must provide broad embedded Borland linker-name coverage.');
 
@@ -843,8 +843,8 @@ begin
   var LRunner := TDUnitX.CreateRunner;
   LRunner.UseRTTI := False;
   LRunner.FailsOnNoAsserts := True;
-  ForceDirectories(CTestResultsDirectory);
-  LRunner.AddLogger(TDUnitXXMLNUnitFileLogger.Create(CTestResultsFile));
+  ForceDirectories(cTestResultsDirectory);
+  LRunner.AddLogger(TDUnitXXMLNUnitFileLogger.Create(cTestResultsFile));
   var LResults := LRunner.Execute;
   if not LResults.AllPassed then
     ExitCode := EXIT_ERRORS;

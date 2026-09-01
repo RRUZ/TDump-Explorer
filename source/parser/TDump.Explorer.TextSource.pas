@@ -20,7 +20,7 @@ uses
   System.Generics.Collections;
 
 const
-  CMaxTDumpReportSize: Int64 = 100 * 1024 * 1024;
+  cMaxTDumpReportSize: Int64 = 100 * 1024 * 1024;
 
 type
   // Provides indexed access without requiring callers to own individual lines.
@@ -176,9 +176,9 @@ begin
     if (LLowSize = INVALID_FILE_SIZE) and (GetLastError <> NO_ERROR) then
       RaiseLastOSError;
     var LSize := (UInt64(LHighSize) shl 32) or LLowSize;
-    if LSize > UInt64(CMaxTDumpReportSize) then
+    if LSize > UInt64(cMaxTDumpReportSize) then
       raise ERangeError.CreateFmt('Report exceeds the %d MiB size limit: %s',
-        [CMaxTDumpReportSize div (1024 * 1024), AFileName]);
+        [cMaxTDumpReportSize div (1024 * 1024), AFileName]);
     FSize := Cardinal(LSize);
     if FSize > 0 then
     begin

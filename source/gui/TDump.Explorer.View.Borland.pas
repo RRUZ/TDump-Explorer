@@ -62,7 +62,7 @@ end;
 
 function BorlandValueForLabel(const ALine, ALabel: string): string;
 const
-  CLabels: array[0..15] of string = ('OvlNum:', 'LibIndex:', 'SegCount:',
+  cLabels: array[0..15] of string = ('OvlNum:', 'LibIndex:', 'SegCount:',
     'Time:', 'Name:', 'cbSymbols:', 'cNamespaces:', 'cUDTs:', 'cOthers:',
     'Total:', 'SymHash:', 'cbSymHash:', 'AddrHash:', 'cbAddrHash:',
     'Number of types:', 'Flags:');
@@ -78,7 +78,7 @@ begin
     Exit;
   Inc(LStart, Length(ALabel));
   LEnd := Length(ALine) + 1;
-  for LKnownLabel in CLabels do
+  for LKnownLabel in cLabels do
   begin
     LCandidate := PosEx(LKnownLabel, ALine, LStart);
     if (LCandidate > 0) and (LCandidate < LEnd) then
@@ -355,16 +355,7 @@ begin
   var LSubsection := ADocument.BorlandSubsections[ASubsectionIndex];
   AControl.ParserMode := tpmTDumpValues;
   AControl.BeginUpdate;
-  try     {
-    if SameText(LSubsection.SubsectionType, 'sstModule') then
-    begin
-      AControl.Font.Name := TExplorerTheme.FixedWidthFontName;
-    end
-    else
-    begin
-      AControl.Font.Name := TExplorerTheme.FontName;
-      AControl.Font.Size := TExplorerTheme.FontSize;
-    end; }
+  try
     AControl.Clear;
     AControl.UseColumnMode := True;
     AControl.AutoSizeColumns := True;

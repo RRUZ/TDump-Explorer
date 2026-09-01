@@ -59,7 +59,7 @@ end;
 
 function CaptureProcessOutput(const AExecutableFileName, AParameters: string): string;
 const
-  CBufferSize = 4096;
+  cBufferSize = 4096;
 var
   LSecurityAttributes: TSecurityAttributes;
   LReadPipe: THandle;
@@ -104,14 +104,14 @@ begin
     try
       CloseHandle(LWritePipe);
       LWritePipe := 0;
-      SetLength(LBuffer, CBufferSize);
+      SetLength(LBuffer, cBufferSize);
       repeat
         while PeekNamedPipe(LReadPipe, nil, 0, nil, @LAvailable, nil) and
           (LAvailable > 0) do
         begin
           LBytesToRead := LAvailable;
-          if LBytesToRead > CBufferSize then
-            LBytesToRead := CBufferSize;
+          if LBytesToRead > cBufferSize then
+            LBytesToRead := cBufferSize;
           if not ReadFile(LReadPipe, LBuffer[0], LBytesToRead, LBytesRead, nil) or
             (LBytesRead = 0) then
             Break;
@@ -124,8 +124,8 @@ begin
         (LAvailable > 0) do
       begin
         LBytesToRead := LAvailable;
-        if LBytesToRead > CBufferSize then
-          LBytesToRead := CBufferSize;
+        if LBytesToRead > cBufferSize then
+          LBytesToRead := cBufferSize;
         if not ReadFile(LReadPipe, LBuffer[0], LBytesToRead, LBytesRead, nil) or
           (LBytesRead = 0) then
           Break;

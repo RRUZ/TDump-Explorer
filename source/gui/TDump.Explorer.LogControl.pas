@@ -56,7 +56,7 @@ uses
 {$R *.dfm}
 
 const
-  CMaximumRetainedLogEntries = 10000;
+  cMaximumRetainedLogEntries = 10000;
 
 constructor TLogControl.Create(AOwner: TComponent);
 begin
@@ -94,7 +94,7 @@ begin
   LEntry.Message := StringReplace(LEntry.Message, #13, ' ', [rfReplaceAll]);
   LEntry.Message := StringReplace(LEntry.Message, #10, ' ', [rfReplaceAll]);
   FEntries.Add(LEntry);
-  while FEntries.Count > CMaximumRetainedLogEntries do
+  while FEntries.Count > cMaximumRetainedLogEntries do
     FEntries.Delete(0);
 
   UpdateControlList;
@@ -133,11 +133,14 @@ var
   LStatusRect: TRect;
   LMessageRect: TRect;
   LFillColor: TColor;
+  LSelected: Boolean;
+  LBrushStyle: TBrushStyle;
 begin
   if (AIndex < 0) or (AIndex >= FEntries.Count) then
     Exit;
 
-  if (odSelected in AState) then
+  LSelected := odSelected in AState;
+  if LSelected then
   begin
     LFillColor := ColorBlendRGB(TExplorerTheme.ActiveTheme.SelectionColor, TExplorerTheme.ActiveTheme.BackgroundColor, 0.9);
     if IsWindows11 then
@@ -176,20 +179,23 @@ begin
 
   ACanvas.Font.Name := TExplorerTheme.FontName;
   ACanvas.Font.Size := TExplorerTheme.FontSize;
-  {
-  if (odSelected in AState) or (odFocused in AState) then
-    ACanvas.Font.Color := LStyle.GetSystemColor(clHighlightText)
+  if LSelected then
+    ACanvas.Font.Color := TExplorerTheme.ActiveTheme.SelectionColor
   else
-  }
-  ACanvas.Font.Color := EntryTypeColor(LEntry.EntryType);
+    ACanvas.Font.Color := EntryTypeColor(LEntry.EntryType);
 
+  LBrushStyle := ACanvas.Brush.Style;
   ACanvas.Brush.Style := bsClear;
-  DrawText(ACanvas.Handle, PChar(LTimestampText), Length(LTimestampText),
-    LTimestampRect, DT_SINGLELINE or DT_VCENTER or DT_END_ELLIPSIS or DT_NOPREFIX);
-  DrawText(ACanvas.Handle, PChar(LStatusText), Length(LStatusText),
-    LStatusRect, DT_SINGLELINE or DT_VCENTER or DT_END_ELLIPSIS or DT_NOPREFIX);
-  DrawText(ACanvas.Handle, PChar(LEntry.Message), Length(LEntry.Message),
-    LMessageRect, DT_SINGLELINE or DT_VCENTER or DT_END_ELLIPSIS or DT_NOPREFIX);
+  try
+    ACanvas.TextRect(LTimestampRect, LTimestampText,
+      [tfVerticalCenter, tfSingleLine, tfEndEllipsis, tfNoPrefix]);
+    ACanvas.TextRect(LStatusRect, LStatusText,
+      [tfVerticalCenter, tfSingleLine, tfEndEllipsis, tfNoPrefix]);
+    ACanvas.TextRect(LMessageRect, LEntry.Message,
+      [tfVerticalCenter, tfSingleLine, tfEndEllipsis, tfNoPrefix]);
+  finally
+    ACanvas.Brush.Style := LBrushStyle;
+  end;
 end;
 
 procedure TLogControl.ControlList1KeyDown(Sender: TObject; var Key: Word;

@@ -25,7 +25,15 @@ type
   TGlassGradientDirection = (ggdVertical, ggdHorizontal,
     ggdForwardDiagonal, ggdBackwardDiagonal);
 
-  TGlassChevronButtonPosition = (gcpLeft, gcpRight);
+  TGlassTabCustomButtonContent = (gtcbcGlyph, gtcbcImage);
+  TGlassTabCustomButtonGlyph = (gtcbgChevronLeft, gtcbgChevronRight,
+    gtcbgChevronUp, gtcbgChevronDown, gtcbgPlus, gtcbgClose);
+  TGlassTabCustomButton = (gtcbLeft, gtcbRight);
+  TGlassTabButtonDrawState = (gtbdsNormal, gtbdsHot, gtbdsDisabled);
+  TGlassTabCustomButtonDrawEvent = procedure(Sender: TObject;
+    AButton: TGlassTabCustomButton; ACanvas: TCanvas; const ARect: TRect;
+    const AGlyphRect: TRect; AState: TGlassTabButtonDrawState;
+    AGlyphColor: TColor; var AHandled: Boolean) of object;
 
   TGlassTabItem = class(TCollectionItem)
   private
@@ -78,18 +86,20 @@ type
   TGlassTabStrip = class(TCustomControl)
   private
     const
-      CDefaultTabHeight = 38;
-      CDefaultLeftInset = 8;
-      CTabTop = 6;
-      CSelectedShoulderWidth = 14;
-      CAddButtonWidth = 36;
-      CChevronButtonWidth = 28;
-      CTextHeight = 12;
-      CButtonHoverHalfWidth = 14;
-      CButtonHoverHalfHeight = 12;
-      CButtonHoverRadius = 6;
-      CBaselineOffset = 1;
-      CDefaultTrailingReservedSpace = 150;
+      cDefaultTabHeight = 38;
+      cDefaultLeftInset = 8;
+      cTabTop = 6;
+      cSelectedShoulderWidth = 14;
+      cAddButtonWidth = 36;
+      cCustomButtonWidth = 28;
+      cTextHeight = 12;
+      cButtonHoverHalfWidth = 14;
+      cButtonHoverHalfHeight = 12;
+      cButtonHoverRadius = 6;
+      cBaselineOffset = 1;
+      cDefaultTrailingReservedSpace = 150;
+      cGlyphButtonDisabledAlpha = 72;
+      cDefaultCustomButtonGlyphSize = 18;
   private
     FItems: TGlassTabItems;
     FImages: TCustomImageList;
@@ -99,13 +109,27 @@ type
     FShowAddButton: Boolean;
     FHotAddButton: Boolean;
     FPressedAddButton: Boolean;
-    FShowChevronButton: Boolean;
-    FChevronButtonPosition: TGlassChevronButtonPosition;
+    FShowCustomLeftButton: Boolean;
+    FShowCustomRightButton: Boolean;
     FTrailingReservedSpace: Integer;
-    FHotChevronButton: Boolean;
-    FPressedChevronButton: Boolean;
+    FHotCustomLeftButton: Boolean;
+    FHotCustomRightButton: Boolean;
+    FPressedCustomLeftButton: Boolean;
+    FPressedCustomRightButton: Boolean;
+    FCustomLeftButtonContent: TGlassTabCustomButtonContent;
+    FCustomRightButtonContent: TGlassTabCustomButtonContent;
+    FCustomLeftButtonGlyph: TGlassTabCustomButtonGlyph;
+    FCustomRightButtonGlyph: TGlassTabCustomButtonGlyph;
+    FCustomLeftButtonImageIndex: System.UITypes.TImageIndex;
+    FCustomRightButtonImageIndex: System.UITypes.TImageIndex;
+    FCustomLeftButtonHint: string;
+    FCustomRightButtonHint: string;
     FButtonHoverGlow: Boolean;
     FButtonHoverBackground: Boolean;
+    FGlyphButtonNormalColor: TColor;
+    FGlyphButtonHotColor: TColor;
+    FGlyphButtonDisabledColor: TColor;
+    FCustomButtonGlyphSize: Integer;
     FBackgroundGradientDirection: TGlassGradientDirection;
     FTabGradientDirection: TGlassGradientDirection;
     FLeftInset: Integer;
@@ -124,7 +148,9 @@ type
     FOnChange: TTabChangingEvent;
     FOnCloseTab: TTabCloseEvent;
     FOnAddButtonClick: TNotifyEvent;
-    FOnChevronButtonClick: TNotifyEvent;
+    FOnCustomLeftButtonClick: TNotifyEvent;
+    FOnCustomRightButtonClick: TNotifyEvent;
+    FOnCustomButtonDraw: TGlassTabCustomButtonDrawEvent;
     FOnBackgroundMouseDown: TMouseEvent;
     FOnBackgroundDblClick: TMouseEvent;
     FOnAfterPaintBackground: TGlassTabBackgroundPaintEvent;
@@ -153,17 +179,33 @@ type
     procedure SetTabHeight(const AValue: Integer);
     procedure SetActiveIndex(const AValue: Integer);
     procedure SetShowAddButton(const AValue: Boolean);
-    procedure SetShowChevronButton(const AValue: Boolean);
-    procedure SetChevronButtonPosition(
-      const AValue: TGlassChevronButtonPosition);
+    procedure SetShowCustomLeftButton(const AValue: Boolean);
+    procedure SetShowCustomRightButton(const AValue: Boolean);
+    procedure SetCustomLeftButtonContent(
+      const AValue: TGlassTabCustomButtonContent);
+    procedure SetCustomRightButtonContent(
+      const AValue: TGlassTabCustomButtonContent);
+    procedure SetCustomLeftButtonGlyph(
+      const AValue: TGlassTabCustomButtonGlyph);
+    procedure SetCustomRightButtonGlyph(
+      const AValue: TGlassTabCustomButtonGlyph);
+    procedure SetCustomLeftButtonImageIndex(
+      const AValue: System.UITypes.TImageIndex);
+    procedure SetCustomRightButtonImageIndex(
+      const AValue: System.UITypes.TImageIndex);
     procedure SetTrailingReservedSpace(const AValue: Integer);
     procedure SetButtonHoverGlow(const AValue: Boolean);
     procedure SetButtonHoverBackground(const AValue: Boolean);
+    procedure SetGlyphButtonNormalColor(const AValue: TColor);
+    procedure SetGlyphButtonHotColor(const AValue: TColor);
+    procedure SetGlyphButtonDisabledColor(const AValue: TColor);
+    procedure SetCustomButtonGlyphSize(const AValue: Integer);
     procedure SetLeftInset(const AValue: Integer);
     function GetTabRect(AIndex: Integer): TRect;
     function GetCloseRect(AIndex: Integer): TRect;
     function GetAddButtonRect: TRect;
-    function GetChevronButtonRect: TRect;
+    function GetCustomLeftButtonRect: TRect;
+    function GetCustomRightButtonRect: TRect;
     function GetActionButtonsWidth: Integer;
     function GetActionButtonsLeft: Integer;
     function GetActionAreaRect: TRect;
@@ -174,12 +216,20 @@ type
     function GetVisibleTabsRight: Integer;
     function IsOverflowing: Boolean;
     function IsAddButtonVisible: Boolean;
-    function IsChevronButtonVisible: Boolean;
+    function IsCustomLeftButtonVisible: Boolean;
+    function IsCustomRightButtonVisible: Boolean;
+    function HasTrailingActionButtons: Boolean;
     function CanNavigateLeft: Boolean;
     function CanNavigateRight: Boolean;
     procedure EnsureActiveTabVisible;
     function ResolveImageIndex(
       AItem: TGlassTabItem): System.UITypes.TImageIndex;
+    function ResolveCustomButtonImageIndex(
+      AImageIndex: System.UITypes.TImageIndex): System.UITypes.TImageIndex;
+    function ButtonDrawState(AHot: Boolean): TGlassTabButtonDrawState;
+    function GlyphButtonColor(AState: TGlassTabButtonDrawState): TColor;
+    function GetCustomButtonGlyphRect(const ARect: TRect): TRect;
+    procedure UpdateCustomButtonHint(const APoint: TPoint);
     function TabAt(const APoint: TPoint): Integer;
     function CloseAt(const APoint: TPoint): Integer;
     procedure DrawTab(ACanvas: TCanvas; AGraphics: TGPGraphics;
@@ -188,11 +238,19 @@ type
       AClosePen, AHotClosePen: TGPPen; AIndex: Integer; ASelected: Boolean);
     procedure DrawNavigationButton(AGraphics: TGPGraphics;
       const ARect: TRect; ALeft, AHot, AEnabled: Boolean);
-    procedure DrawChevronButton(AGraphics: TGPGraphics;
-      const ARect: TRect; AHot: Boolean);
+    procedure DrawButtonGlyph(AGraphics: TGPGraphics; const ARect: TRect;
+      AGlyph: TGlassTabCustomButtonGlyph;
+      AState: TGlassTabButtonDrawState);
+    procedure DrawCustomButton(ACanvas: TCanvas; AGraphics: TGPGraphics;
+      const ARect: TRect; AButton: TGlassTabCustomButton;
+      AState: TGlassTabButtonDrawState;
+      AContent: TGlassTabCustomButtonContent;
+      AGlyph: TGlassTabCustomButtonGlyph;
+      AImageIndex: System.UITypes.TImageIndex);
   protected
     procedure DoAddButtonClick; virtual;
-    procedure DoChevronButtonClick; virtual;
+    procedure DoCustomLeftButtonClick; virtual;
+    procedure DoCustomRightButtonClick; virtual;
     procedure DoAfterPaintBackground(ACanvas: TCanvas;
       const ARect: TRect); virtual;
     procedure DoAfterPaintTab(ACanvas: TCanvas; const ARect: TRect;
@@ -249,28 +307,61 @@ type
       read FTabGradientDirection write SetTabGradientDirection
       default ggdVertical;
     property TabHeight: Integer read GetTabHeight write SetTabHeight
-      default CDefaultTabHeight;
+      default cDefaultTabHeight;
     property ActiveIndex: Integer read FActiveIndex write SetActiveIndex default -1;
     property ShowAddButton: Boolean read FShowAddButton write SetShowAddButton default True;
-    property ShowChevronButton: Boolean read FShowChevronButton
-      write SetShowChevronButton default True;
-    property ChevronButtonPosition: TGlassChevronButtonPosition
-      read FChevronButtonPosition write SetChevronButtonPosition
-      default gcpRight;
+    property ShowCustomLeftButton: Boolean read FShowCustomLeftButton
+      write SetShowCustomLeftButton default False;
+    property ShowCustomRightButton: Boolean read FShowCustomRightButton
+      write SetShowCustomRightButton default True;
+    property CustomLeftButtonContent: TGlassTabCustomButtonContent
+      read FCustomLeftButtonContent write SetCustomLeftButtonContent
+      default gtcbcGlyph;
+    property CustomRightButtonContent: TGlassTabCustomButtonContent
+      read FCustomRightButtonContent write SetCustomRightButtonContent
+      default gtcbcGlyph;
+    property CustomLeftButtonGlyph: TGlassTabCustomButtonGlyph
+      read FCustomLeftButtonGlyph write SetCustomLeftButtonGlyph
+      default gtcbgChevronDown;
+    property CustomRightButtonGlyph: TGlassTabCustomButtonGlyph
+      read FCustomRightButtonGlyph write SetCustomRightButtonGlyph
+      default gtcbgChevronDown;
+    property CustomLeftButtonImageIndex: System.UITypes.TImageIndex
+      read FCustomLeftButtonImageIndex write SetCustomLeftButtonImageIndex
+      default -1;
+    property CustomRightButtonImageIndex: System.UITypes.TImageIndex
+      read FCustomRightButtonImageIndex write SetCustomRightButtonImageIndex
+      default -1;
+    property CustomLeftButtonHint: string read FCustomLeftButtonHint
+      write FCustomLeftButtonHint;
+    property CustomRightButtonHint: string read FCustomRightButtonHint
+      write FCustomRightButtonHint;
     property TrailingReservedSpace: Integer read FTrailingReservedSpace
-      write SetTrailingReservedSpace default CDefaultTrailingReservedSpace;
+      write SetTrailingReservedSpace default cDefaultTrailingReservedSpace;
     property ButtonHoverGlow: Boolean read FButtonHoverGlow
       write SetButtonHoverGlow default False;
     property ButtonHoverBackground: Boolean read FButtonHoverBackground
       write SetButtonHoverBackground default True;
+    property GlyphButtonNormalColor: TColor read FGlyphButtonNormalColor
+      write SetGlyphButtonNormalColor;
+    property GlyphButtonHotColor: TColor read FGlyphButtonHotColor
+      write SetGlyphButtonHotColor;
+    property GlyphButtonDisabledColor: TColor read FGlyphButtonDisabledColor
+      write SetGlyphButtonDisabledColor;
+    property CustomButtonGlyphSize: Integer read FCustomButtonGlyphSize
+      write SetCustomButtonGlyphSize default cDefaultCustomButtonGlyphSize;
     property LeftInset: Integer read FLeftInset write SetLeftInset
-      default CDefaultLeftInset;
+      default cDefaultLeftInset;
     property OnChange: TTabChangingEvent read FOnChange write FOnChange;
     property OnCloseTab: TTabCloseEvent read FOnCloseTab write FOnCloseTab;
     property OnAddButtonClick: TNotifyEvent read FOnAddButtonClick
       write FOnAddButtonClick;
-    property OnChevronButtonClick: TNotifyEvent read FOnChevronButtonClick
-      write FOnChevronButtonClick;
+    property OnCustomLeftButtonClick: TNotifyEvent
+      read FOnCustomLeftButtonClick write FOnCustomLeftButtonClick;
+    property OnCustomRightButtonClick: TNotifyEvent
+      read FOnCustomRightButtonClick write FOnCustomRightButtonClick;
+    property OnCustomButtonDraw: TGlassTabCustomButtonDrawEvent
+      read FOnCustomButtonDraw write FOnCustomButtonDraw;
     property OnBackgroundMouseDown: TMouseEvent read FOnBackgroundMouseDown
       write FOnBackgroundMouseDown;
     property OnBackgroundDblClick: TMouseEvent read FOnBackgroundDblClick
@@ -337,21 +428,19 @@ procedure DrawTwoLineGlow(AGraphics: TGPGraphics;
   AAccent: TColor; AScale: Single);
 begin
   var LOuter := TGPPen.Create(ToArgb(AAccent, 24), 5.0 * AScale);
+  var LInner: TGPPen := nil;
   try
-    var LInner := TGPPen.Create(ToArgb(AAccent, 76), 2.8 * AScale);
-    try
-      LOuter.SetStartCap(LineCapRound);
-      LOuter.SetEndCap(LineCapRound);
-      LInner.SetStartCap(LineCapRound);
-      LInner.SetEndCap(LineCapRound);
-      AGraphics.DrawLine(LOuter, AX1, AY1, AX2, AY2);
-      AGraphics.DrawLine(LOuter, BX1, BY1, BX2, BY2);
-      AGraphics.DrawLine(LInner, AX1, AY1, AX2, AY2);
-      AGraphics.DrawLine(LInner, BX1, BY1, BX2, BY2);
-    finally
-      LInner.Free;
-    end;
+    LInner := TGPPen.Create(ToArgb(AAccent, 76), 2.8 * AScale);
+    LOuter.SetStartCap(LineCapRound);
+    LOuter.SetEndCap(LineCapRound);
+    LInner.SetStartCap(LineCapRound);
+    LInner.SetEndCap(LineCapRound);
+    AGraphics.DrawLine(LOuter, AX1, AY1, AX2, AY2);
+    AGraphics.DrawLine(LOuter, BX1, BY1, BX2, BY2);
+    AGraphics.DrawLine(LInner, AX1, AY1, AX2, AY2);
+    AGraphics.DrawLine(LInner, BX1, BY1, BX2, BY2);
   finally
+    LInner.Free;
     LOuter.Free;
   end;
 end;
@@ -361,30 +450,28 @@ procedure FillRoundedHover(AGraphics: TGPGraphics; const ABounds: TRect;
 begin
   var LDiameter := ARadius * 2;
   var LPath := TGPGraphicsPath.Create;
+  var LBrush: TGPSolidBrush := nil;
   try
-    var LBrush := TGPSolidBrush.Create(ToArgb(AColor, 238));
-    try
-      LPath.AddArc(ABounds.Left, ABounds.Top, LDiameter, LDiameter, 180, 90);
-      LPath.AddLine(ABounds.Left + ARadius, ABounds.Top,
-        ABounds.Right - ARadius, ABounds.Top);
-      LPath.AddArc(ABounds.Right - LDiameter, ABounds.Top,
-        LDiameter, LDiameter, 270, 90);
-      LPath.AddLine(ABounds.Right, ABounds.Top + ARadius,
-        ABounds.Right, ABounds.Bottom - ARadius);
-      LPath.AddArc(ABounds.Right - LDiameter, ABounds.Bottom - LDiameter,
-        LDiameter, LDiameter, 0, 90);
-      LPath.AddLine(ABounds.Right - ARadius, ABounds.Bottom,
-        ABounds.Left + ARadius, ABounds.Bottom);
-      LPath.AddArc(ABounds.Left, ABounds.Bottom - LDiameter,
-        LDiameter, LDiameter, 90, 90);
-      LPath.AddLine(ABounds.Left, ABounds.Bottom - ARadius,
-        ABounds.Left, ABounds.Top + ARadius);
-      LPath.CloseFigure;
-      AGraphics.FillPath(LBrush, LPath);
-    finally
-      LBrush.Free;
-    end;
+    LBrush := TGPSolidBrush.Create(ToArgb(AColor, 238));
+    LPath.AddArc(ABounds.Left, ABounds.Top, LDiameter, LDiameter, 180, 90);
+    LPath.AddLine(ABounds.Left + ARadius, ABounds.Top,
+      ABounds.Right - ARadius, ABounds.Top);
+    LPath.AddArc(ABounds.Right - LDiameter, ABounds.Top,
+      LDiameter, LDiameter, 270, 90);
+    LPath.AddLine(ABounds.Right, ABounds.Top + ARadius,
+      ABounds.Right, ABounds.Bottom - ARadius);
+    LPath.AddArc(ABounds.Right - LDiameter, ABounds.Bottom - LDiameter,
+      LDiameter, LDiameter, 0, 90);
+    LPath.AddLine(ABounds.Right - ARadius, ABounds.Bottom,
+      ABounds.Left + ARadius, ABounds.Bottom);
+    LPath.AddArc(ABounds.Left, ABounds.Bottom - LDiameter,
+      LDiameter, LDiameter, 90, 90);
+    LPath.AddLine(ABounds.Left, ABounds.Bottom - ARadius,
+      ABounds.Left, ABounds.Top + ARadius);
+    LPath.CloseFigure;
+    AGraphics.FillPath(LBrush, LPath);
   finally
+    LBrush.Free;
     LPath.Free;
   end;
 end;
@@ -475,10 +562,10 @@ end;
 
 constructor TGlassTabStrip.Create(AOwner: TComponent);
 const
-  CDefaultMinTabWidth = 154;
-  CDefaultMaxTabWidth = 224;
-  CDefaultTabOverlap = 1;
-  CDefaultAddButtonSpacing = 5;
+  cDefaultMinTabWidth = 154;
+  cDefaultMaxTabWidth = 224;
+  cDefaultTabOverlap = 1;
+  cDefaultAddButtonSpacing = 5;
 begin
   inherited;
   ControlStyle := ControlStyle + [csOpaque, csDoubleClicks];
@@ -488,31 +575,45 @@ begin
   FImageChangeLink := TChangeLink.Create;
   FImageChangeLink.OnChange := ImagesChanged;
   FPalette := DefaultPalette;
+  FGlyphButtonNormalColor := FPalette.InactiveText;
+  FGlyphButtonHotColor := FPalette.Accent;
+  FGlyphButtonDisabledColor := BlendColor(FPalette.InactiveText,
+    FPalette.StripBottom, cGlyphButtonDisabledAlpha);
   FActiveIndex := -1; FHotIndex := -1; FHotCloseIndex := -1;
   FPressedCloseIndex := -1; FShowAddButton := True;
   FHotAddButton := False;
   FPressedAddButton := False;
-  FShowChevronButton := True;
-  FChevronButtonPosition := gcpRight;
-  FTrailingReservedSpace := CDefaultTrailingReservedSpace;
-  FHotChevronButton := False;
-  FPressedChevronButton := False;
+  FShowCustomLeftButton := False;
+  FShowCustomRightButton := True;
+  FTrailingReservedSpace := cDefaultTrailingReservedSpace;
+  FHotCustomLeftButton := False;
+  FHotCustomRightButton := False;
+  FPressedCustomLeftButton := False;
+  FPressedCustomRightButton := False;
+  FCustomLeftButtonContent := gtcbcGlyph;
+  FCustomRightButtonContent := gtcbcGlyph;
+  FCustomLeftButtonGlyph := gtcbgChevronDown;
+  FCustomRightButtonGlyph := gtcbgChevronDown;
+  FCustomLeftButtonImageIndex := -1;
+  FCustomRightButtonImageIndex := -1;
   FButtonHoverGlow := False;
   FButtonHoverBackground := True;
+  FCustomButtonGlyphSize := cDefaultCustomButtonGlyphSize;
   FBackgroundGradientDirection := ggdVertical;
   FTabGradientDirection := ggdVertical;
-  FLeftInset := CDefaultLeftInset;
-  FTabHeight := CDefaultTabHeight;
-  FMinTabWidth := CDefaultMinTabWidth;
-  FMaxTabWidth := CDefaultMaxTabWidth;
-  FTabOverlap := CDefaultTabOverlap;
-  FAddButtonSpacing := CDefaultAddButtonSpacing;
+  FLeftInset := cDefaultLeftInset;
+  FTabHeight := cDefaultTabHeight;
+  FMinTabWidth := cDefaultMinTabWidth;
+  FMaxTabWidth := cDefaultMaxTabWidth;
+  FTabOverlap := cDefaultTabOverlap;
+  FAddButtonSpacing := cDefaultAddButtonSpacing;
   FFirstVisibleIndex := 0;
   FHotLeftNavigation := False;
   FHotRightNavigation := False;
   FTabWidthCache := TList<Integer>.Create;
   FTabPositionCache := TList<Integer>.Create;
   FTabWidthCacheValid := False;
+  ShowHint := True;
   Height := ScaleValue(FTabHeight);
 end;
 
@@ -539,7 +640,7 @@ end;
 
 procedure TGlassTabStrip.EnsureTabWidthCache;
 const
-  CTabFixedContentWidth = 72;
+  cTabFixedContentWidth = 72;
 begin
   if FTabWidthCacheValid and (FTabWidthCachePPI = CurrentPPI) and
     (FTabWidthCache.Count = FItems.Count) then
@@ -550,13 +651,13 @@ begin
   FTabPositionCache.Add(0);
   Canvas.Font.Assign(Font);
   Canvas.Font.Name := 'Segoe UI';
-  Canvas.Font.Height := -ScaleValue(CTextHeight);
+  Canvas.Font.Height := -ScaleValue(cTextHeight);
   var LPosition := 0;
   for var LIndex := 0 to FItems.Count - 1 do
   begin
     var LCaptionWidth := Canvas.TextWidth(FItems[LIndex].Caption);
     var LTabWidth := EnsureRange(
-      ScaleValue(CTabFixedContentWidth) + LCaptionWidth,
+      ScaleValue(cTabFixedContentWidth) + LCaptionWidth,
       ScaleValue(FMinTabWidth), ScaleValue(FMaxTabWidth));
     FTabWidthCache.Add(LTabWidth);
     Inc(LPosition, LTabWidth - ScaleValue(FTabOverlap));
@@ -582,10 +683,16 @@ begin
     FOnAddButtonClick(Self);
 end;
 
-procedure TGlassTabStrip.DoChevronButtonClick;
+procedure TGlassTabStrip.DoCustomLeftButtonClick;
 begin
-  if Assigned(FOnChevronButtonClick) then
-    FOnChevronButtonClick(Self);
+  if Assigned(FOnCustomLeftButtonClick) then
+    FOnCustomLeftButtonClick(Self);
+end;
+
+procedure TGlassTabStrip.DoCustomRightButtonClick;
+begin
+  if Assigned(FOnCustomRightButtonClick) then
+    FOnCustomRightButtonClick(Self);
 end;
 
 procedure TGlassTabStrip.DoAfterPaintBackground(ACanvas: TCanvas;
@@ -636,6 +743,10 @@ end;
 procedure TGlassTabStrip.SetPalette(const AValue: TGlassTabPalette);
 begin
   FPalette := AValue;
+  FGlyphButtonNormalColor := FPalette.InactiveText;
+  FGlyphButtonHotColor := FPalette.Accent;
+  FGlyphButtonDisabledColor := BlendColor(FPalette.InactiveText,
+    FPalette.StripBottom, cGlyphButtonDisabledAlpha);
   Invalidate;
 end;
 
@@ -731,9 +842,9 @@ end;
 
 procedure TGlassTabStrip.SetTabHeight(const AValue: Integer);
 const
-  CMinimumTabHeight = 16;
+  cMinimumTabHeight = 16;
 begin
-  var LValue := Max(CMinimumTabHeight, AValue);
+  var LValue := Max(cMinimumTabHeight, AValue);
   if GetTabHeight = LValue then
     Exit;
   FTabHeight := LValue;
@@ -760,35 +871,97 @@ begin
   begin
     FHotAddButton := False;
     FPressedAddButton := False;
-    FHotChevronButton := False;
-    FPressedChevronButton := False;
   end;
   EnsureActiveTabVisible;
   Invalidate;
 end;
 
-procedure TGlassTabStrip.SetShowChevronButton(const AValue: Boolean);
+procedure TGlassTabStrip.SetShowCustomLeftButton(const AValue: Boolean);
 begin
-  if FShowChevronButton = AValue then
+  if FShowCustomLeftButton = AValue then
     Exit;
-  FShowChevronButton := AValue;
-  if not FShowChevronButton then
+  FShowCustomLeftButton := AValue;
+  if not FShowCustomLeftButton then
   begin
-    FHotChevronButton := False;
-    FPressedChevronButton := False;
+    FHotCustomLeftButton := False;
+    FPressedCustomLeftButton := False;
   end;
   EnsureActiveTabVisible;
   Invalidate;
 end;
 
-procedure TGlassTabStrip.SetChevronButtonPosition(
-  const AValue: TGlassChevronButtonPosition);
+procedure TGlassTabStrip.SetShowCustomRightButton(const AValue: Boolean);
 begin
-  if FChevronButtonPosition = AValue then
+  if FShowCustomRightButton = AValue then
     Exit;
-  FChevronButtonPosition := AValue;
+  FShowCustomRightButton := AValue;
+  if not FShowCustomRightButton then
+  begin
+    FHotCustomRightButton := False;
+    FPressedCustomRightButton := False;
+  end;
   EnsureActiveTabVisible;
   Invalidate;
+end;
+
+procedure TGlassTabStrip.SetCustomLeftButtonContent(
+  const AValue: TGlassTabCustomButtonContent);
+begin
+  if FCustomLeftButtonContent <> AValue then
+  begin
+    FCustomLeftButtonContent := AValue;
+    Invalidate;
+  end;
+end;
+
+procedure TGlassTabStrip.SetCustomRightButtonContent(
+  const AValue: TGlassTabCustomButtonContent);
+begin
+  if FCustomRightButtonContent <> AValue then
+  begin
+    FCustomRightButtonContent := AValue;
+    Invalidate;
+  end;
+end;
+
+procedure TGlassTabStrip.SetCustomLeftButtonGlyph(
+  const AValue: TGlassTabCustomButtonGlyph);
+begin
+  if FCustomLeftButtonGlyph <> AValue then
+  begin
+    FCustomLeftButtonGlyph := AValue;
+    Invalidate;
+  end;
+end;
+
+procedure TGlassTabStrip.SetCustomRightButtonGlyph(
+  const AValue: TGlassTabCustomButtonGlyph);
+begin
+  if FCustomRightButtonGlyph <> AValue then
+  begin
+    FCustomRightButtonGlyph := AValue;
+    Invalidate;
+  end;
+end;
+
+procedure TGlassTabStrip.SetCustomLeftButtonImageIndex(
+  const AValue: System.UITypes.TImageIndex);
+begin
+  if FCustomLeftButtonImageIndex <> AValue then
+  begin
+    FCustomLeftButtonImageIndex := AValue;
+    Invalidate;
+  end;
+end;
+
+procedure TGlassTabStrip.SetCustomRightButtonImageIndex(
+  const AValue: System.UITypes.TImageIndex);
+begin
+  if FCustomRightButtonImageIndex <> AValue then
+  begin
+    FCustomRightButtonImageIndex := AValue;
+    Invalidate;
+  end;
 end;
 
 procedure TGlassTabStrip.SetTrailingReservedSpace(const AValue: Integer);
@@ -815,6 +988,43 @@ begin
   if FButtonHoverBackground <> AValue then
   begin
     FButtonHoverBackground := AValue;
+    Invalidate;
+  end;
+end;
+
+procedure TGlassTabStrip.SetGlyphButtonNormalColor(const AValue: TColor);
+begin
+  if FGlyphButtonNormalColor <> AValue then
+  begin
+    FGlyphButtonNormalColor := AValue;
+    Invalidate;
+  end;
+end;
+
+procedure TGlassTabStrip.SetGlyphButtonHotColor(const AValue: TColor);
+begin
+  if FGlyphButtonHotColor <> AValue then
+  begin
+    FGlyphButtonHotColor := AValue;
+    Invalidate;
+  end;
+end;
+
+procedure TGlassTabStrip.SetGlyphButtonDisabledColor(const AValue: TColor);
+begin
+  if FGlyphButtonDisabledColor <> AValue then
+  begin
+    FGlyphButtonDisabledColor := AValue;
+    Invalidate;
+  end;
+end;
+
+procedure TGlassTabStrip.SetCustomButtonGlyphSize(const AValue: Integer);
+begin
+  var LValue := Max(1, AValue);
+  if FCustomButtonGlyphSize <> LValue then
+  begin
+    FCustomButtonGlyphSize := LValue;
     Invalidate;
   end;
 end;
@@ -873,10 +1083,13 @@ begin
   if FItems.Count = 0 then
     Exit(False);
   EnsureTabWidthCache;
-  var LRequiredWidth := ScaleValue(FLeftInset + CSelectedShoulderWidth);
+  var LRequiredWidth := ScaleValue(FLeftInset + cSelectedShoulderWidth);
+  if IsCustomLeftButtonVisible then
+    Inc(LRequiredWidth, ScaleValue(cCustomButtonWidth +
+      FAddButtonSpacing - cSelectedShoulderWidth));
   Inc(LRequiredWidth, FTabPositionCache[FItems.Count] +
     ScaleValue(FTabOverlap));
-  if FShowAddButton then
+  if HasTrailingActionButtons then
   begin
     Inc(LRequiredWidth, ScaleValue(FAddButtonSpacing));
     Inc(LRequiredWidth, GetActionButtonsWidth);
@@ -887,16 +1100,16 @@ end;
 
 function TGlassTabStrip.GetActionButtonsWidth: Integer;
 begin
-  if not FShowAddButton then
-    Exit(0);
-  Result := ScaleValue(CAddButtonWidth);
-  if FShowChevronButton then
-    Inc(Result, ScaleValue(CChevronButtonWidth));
+  Result := 0;
+  if FShowAddButton then
+    Inc(Result, ScaleValue(cAddButtonWidth));
+  if IsCustomRightButtonVisible then
+    Inc(Result, ScaleValue(cCustomButtonWidth));
 end;
 
 function TGlassTabStrip.GetActionAreaRect: TRect;
 begin
-  if not FShowAddButton then
+  if not HasTrailingActionButtons then
     Exit(TRect.Empty);
   var LWidth := GetActionButtonsWidth +
     ScaleValue(FTrailingReservedSpace);
@@ -905,15 +1118,19 @@ end;
 
 function TGlassTabStrip.GetActionButtonsLeft: Integer;
 const
-  CEmptyAddCenterOffset = 14;
-  CAddButtonHalfWidth = 18;
+  cEmptyAddCenterOffset = 14;
+  cAddButtonHalfWidth = 18;
 begin
   if IsOverflowing then
     Exit(GetRightNavigationRect.Right);
   if FItems.Count = 0 then
   begin
-    var LCenterX := ScaleValue(FLeftInset + CEmptyAddCenterOffset);
-    Exit(Max(0, LCenterX - ScaleValue(CAddButtonHalfWidth)));
+    var LMinimumLeft := 0;
+    if IsCustomLeftButtonVisible then
+      LMinimumLeft := GetCustomLeftButtonRect.Right +
+        ScaleValue(FAddButtonSpacing);
+    var LCenterX := ScaleValue(FLeftInset + cEmptyAddCenterOffset);
+    Exit(Max(LMinimumLeft, LCenterX - ScaleValue(cAddButtonHalfWidth)));
   end;
   Result := GetTabRect(FItems.Count - 1).Right +
     ScaleValue(FAddButtonSpacing);
@@ -921,29 +1138,36 @@ end;
 
 function TGlassTabStrip.GetTabsViewport: TRect;
 const
-  CNavigationButtonWidth = 40;
+  cNavigationButtonWidth = 40;
 begin
   Result := ClientRect;
-  if not IsOverflowing then
-    Exit;
-  var LAvailableRight := Width;
-  if FShowAddButton then
-    LAvailableRight := GetActionAreaRect.Left;
-  var LButtonWidth := Min(LAvailableRight div 2,
-    ScaleValue(CNavigationButtonWidth));
-  Result.Left := LButtonWidth;
-  Result.Right := Max(Result.Left, LAvailableRight - LButtonWidth);
+  if IsOverflowing then
+  begin
+    var LAvailableRight := Width;
+    if HasTrailingActionButtons then
+      LAvailableRight := GetActionAreaRect.Left;
+    var LButtonWidth := Min(LAvailableRight div 2,
+      ScaleValue(cNavigationButtonWidth));
+    Result.Left := LButtonWidth;
+    Result.Right := Max(Result.Left, LAvailableRight - LButtonWidth);
+  end;
+  if IsCustomLeftButtonVisible then
+    Result.Left := Min(Result.Right,
+      Max(Result.Left, GetCustomLeftButtonRect.Right +
+        ScaleValue(FAddButtonSpacing - cSelectedShoulderWidth)));
 end;
 
 function TGlassTabStrip.GetAvailableBackgroundRect: TRect;
 begin
   var LViewport := GetTabsViewport;
   Result := LViewport;
-  if IsOverflowing and FShowAddButton then
+  if IsOverflowing and HasTrailingActionButtons then
   begin
-    var LButtonsRight := GetAddButtonRect.Right;
-    if IsChevronButtonVisible then
-      LButtonsRight := Max(LButtonsRight, GetChevronButtonRect.Right);
+    var LButtonsRight := 0;
+    if IsAddButtonVisible then
+      LButtonsRight := GetAddButtonRect.Right;
+    if IsCustomRightButtonVisible then
+      LButtonsRight := Max(LButtonsRight, GetCustomRightButtonRect.Right);
     Exit(Rect(Min(Width, LButtonsRight), 0, Width, Height));
   end;
   var LContentRight := LViewport.Left;
@@ -957,42 +1181,48 @@ begin
       Break;
     var LTabRight := LTabRect.Right;
     if LIndex = FActiveIndex then
-      Inc(LTabRight, ScaleValue(CSelectedShoulderWidth));
+      Inc(LTabRight, ScaleValue(cSelectedShoulderWidth));
     LContentRight := Max(LContentRight,
       Min(LTabRight, LViewport.Right));
   end;
-  if IsChevronButtonVisible then
+  if IsCustomRightButtonVisible then
     LContentRight := Max(LContentRight,
-      Min(GetChevronButtonRect.Right, LViewport.Right))
-  else if IsAddButtonVisible then
+      Min(GetCustomRightButtonRect.Right, LViewport.Right));
+  if IsAddButtonVisible then
     LContentRight := Max(LContentRight,
       Min(GetAddButtonRect.Right, LViewport.Right));
   Result.Left := Min(Result.Right, LContentRight);
 end;
 
 function TGlassTabStrip.GetLeftNavigationRect: TRect;
+const
+  cNavigationButtonWidth = 40;
 begin
   if not IsOverflowing then
     Exit(TRect.Empty);
-  var LViewport := GetTabsViewport;
-  Result := Rect(0, ScaleValue(CTabTop), LViewport.Left, Height);
+  var LAvailableRight := Width;
+  if HasTrailingActionButtons then
+    LAvailableRight := GetActionAreaRect.Left;
+  var LButtonWidth := Min(LAvailableRight div 2,
+    ScaleValue(cNavigationButtonWidth));
+  Result := Rect(0, ScaleValue(cTabTop), LButtonWidth, Height);
 end;
 
 function TGlassTabStrip.GetRightNavigationRect: TRect;
 const
-  CNavigationButtonWidth = 40;
-  CNavigationControlSpacing = 4;
+  cNavigationButtonWidth = 40;
+  cNavigationControlSpacing = 4;
 begin
   if not IsOverflowing then
     Exit(TRect.Empty);
   var LMaximumRight := Width;
-  if FShowAddButton then
+  if HasTrailingActionButtons then
     LMaximumRight := GetActionAreaRect.Left;
   var LButtonWidth := Min(LMaximumRight,
-    ScaleValue(CNavigationButtonWidth));
+    ScaleValue(cNavigationButtonWidth));
   var LLeft := Min(Max(0, LMaximumRight - LButtonWidth),
-    GetVisibleTabsRight + ScaleValue(CNavigationControlSpacing));
-  Result := Rect(LLeft, ScaleValue(CTabTop),
+    GetVisibleTabsRight + ScaleValue(cNavigationControlSpacing));
+  Result := Rect(LLeft, ScaleValue(cTabTop),
     LLeft + LButtonWidth, Height);
 end;
 
@@ -1010,19 +1240,17 @@ begin
       Break;
     var LTabRight := LTabRect.Right;
     if LIndex = FActiveIndex then
-      Inc(LTabRight, ScaleValue(CSelectedShoulderWidth));
+      Inc(LTabRight, ScaleValue(cSelectedShoulderWidth));
     Result := Max(Result, Min(LTabRight, LViewport.Right));
   end;
 end;
 
 function TGlassTabStrip.GetTabRect(AIndex: Integer): TRect;
-const
-  CNavigationTabSpacing = 10;
 begin
   if (AIndex < 0) or (AIndex >= FItems.Count) then
     Exit(TRect.Empty);
   var LFirstIndex := 0;
-  var LLeft := ScaleValue(FLeftInset + CSelectedShoulderWidth);
+  var LLeft := ScaleValue(FLeftInset + cSelectedShoulderWidth);
   if IsOverflowing then
   begin
     LFirstIndex := EnsureRange(FFirstVisibleIndex, 0,
@@ -1030,46 +1258,58 @@ begin
     if AIndex < LFirstIndex then
       Exit(TRect.Empty);
     var LViewport := GetTabsViewport;
-    var LNavigationCenterX := LViewport.Left div 2;
-    LLeft := LNavigationCenterX +
-      ScaleValue(CButtonHoverHalfWidth + CNavigationTabSpacing);
+    LLeft := LViewport.Left + ScaleValue(cSelectedShoulderWidth);
   end;
+  if IsCustomLeftButtonVisible then
+    LLeft := Max(LLeft, GetCustomLeftButtonRect.Right +
+      ScaleValue(FAddButtonSpacing));
   EnsureTabWidthCache;
   Inc(LLeft, FTabPositionCache[AIndex] - FTabPositionCache[LFirstIndex]);
-  Result := Rect(LLeft, ScaleValue(CTabTop),
+  Result := Rect(LLeft, ScaleValue(cTabTop),
     LLeft + FTabWidthCache[AIndex], Height);
 end;
 
 function TGlassTabStrip.GetCloseRect(AIndex: Integer): TRect;
 const
-  CCloseLeftInset = 30;
-  CCloseRightInset = 8;
-  CCloseHitHalfHeight = 11;
+  cCloseLeftInset = 30;
+  cCloseRightInset = 8;
+  cCloseHitHalfHeight = 11;
 begin
   var LTab := GetTabRect(AIndex);
   var LCenterY := LTab.Top + LTab.Height div 2;
-  Result := Rect(LTab.Right - ScaleValue(CCloseLeftInset),
-    LCenterY - ScaleValue(CCloseHitHalfHeight),
-    LTab.Right - ScaleValue(CCloseRightInset),
-    LCenterY + ScaleValue(CCloseHitHalfHeight));
+  Result := Rect(LTab.Right - ScaleValue(cCloseLeftInset),
+    LCenterY - ScaleValue(cCloseHitHalfHeight),
+    LTab.Right - ScaleValue(cCloseRightInset),
+    LCenterY + ScaleValue(cCloseHitHalfHeight));
 end;
 
 function TGlassTabStrip.GetAddButtonRect: TRect;
 begin
   var LLeft := GetActionButtonsLeft;
-  if FShowChevronButton and (FChevronButtonPosition = gcpLeft) then
-    Inc(LLeft, ScaleValue(CChevronButtonWidth));
-  Result := Rect(LLeft, ScaleValue(CTabTop),
-    LLeft + ScaleValue(CAddButtonWidth), Height);
+  Result := Rect(LLeft, ScaleValue(cTabTop),
+    LLeft + ScaleValue(cAddButtonWidth), Height);
 end;
 
-function TGlassTabStrip.GetChevronButtonRect: TRect;
+function TGlassTabStrip.GetCustomLeftButtonRect: TRect;
 begin
+  if not IsCustomLeftButtonVisible then
+    Exit(TRect.Empty);
+  var LLeft := ScaleValue(FLeftInset);
+  if IsOverflowing then
+    LLeft := GetLeftNavigationRect.Right + ScaleValue(FAddButtonSpacing);
+  Result := Rect(LLeft, ScaleValue(cTabTop),
+    LLeft + ScaleValue(cCustomButtonWidth), Height);
+end;
+
+function TGlassTabStrip.GetCustomRightButtonRect: TRect;
+begin
+  if not IsCustomRightButtonVisible then
+    Exit(TRect.Empty);
   var LLeft := GetActionButtonsLeft;
-  if FChevronButtonPosition = gcpRight then
-    Inc(LLeft, ScaleValue(CAddButtonWidth));
-  Result := Rect(LLeft, ScaleValue(CTabTop),
-    LLeft + ScaleValue(CChevronButtonWidth), Height);
+  if FShowAddButton then
+    Inc(LLeft, ScaleValue(cAddButtonWidth));
+  Result := Rect(LLeft, ScaleValue(cTabTop),
+    LLeft + ScaleValue(cCustomButtonWidth), Height);
 end;
 
 function TGlassTabStrip.IsAddButtonVisible: Boolean;
@@ -1077,9 +1317,19 @@ begin
   Result := FShowAddButton;
 end;
 
-function TGlassTabStrip.IsChevronButtonVisible: Boolean;
+function TGlassTabStrip.IsCustomLeftButtonVisible: Boolean;
 begin
-  Result := FShowChevronButton and IsAddButtonVisible;
+  Result := FShowCustomLeftButton;
+end;
+
+function TGlassTabStrip.IsCustomRightButtonVisible: Boolean;
+begin
+  Result := FShowCustomRightButton;
+end;
+
+function TGlassTabStrip.HasTrailingActionButtons: Boolean;
+begin
+  Result := FShowAddButton or IsCustomRightButtonVisible;
 end;
 
 function TGlassTabStrip.CanNavigateLeft: Boolean;
@@ -1114,7 +1364,7 @@ begin
   begin
     var LActiveRect := GetTabRect(FActiveIndex);
     var LRequiredRight := LActiveRect.Right +
-      ScaleValue(CSelectedShoulderWidth);
+      ScaleValue(cSelectedShoulderWidth);
     if LRequiredRight <= LViewport.Right then
       Break;
     Inc(FFirstVisibleIndex);
@@ -1132,6 +1382,63 @@ begin
   FImages.CheckIndexAndName(Result, LImageName);
   if (Result < 0) or (Result >= FImages.Count) then
     Result := -1;
+end;
+
+function TGlassTabStrip.ResolveCustomButtonImageIndex(
+  AImageIndex: System.UITypes.TImageIndex): System.UITypes.TImageIndex;
+begin
+  Result := -1;
+  if Assigned(FImages) and (AImageIndex >= 0) and
+    (AImageIndex < FImages.Count) then
+    Result := AImageIndex;
+end;
+
+function TGlassTabStrip.ButtonDrawState(
+  AHot: Boolean): TGlassTabButtonDrawState;
+begin
+  if not Enabled then
+    Result := gtbdsDisabled
+  else if AHot then
+    Result := gtbdsHot
+  else
+    Result := gtbdsNormal;
+end;
+
+function TGlassTabStrip.GlyphButtonColor(
+  AState: TGlassTabButtonDrawState): TColor;
+begin
+  case AState of
+    gtbdsHot:
+      Result := FGlyphButtonHotColor;
+    gtbdsDisabled:
+      Result := FGlyphButtonDisabledColor;
+  else
+    Result := FGlyphButtonNormalColor;
+  end;
+end;
+
+function TGlassTabStrip.GetCustomButtonGlyphRect(
+  const ARect: TRect): TRect;
+begin
+  var LSize := ScaleValue(FCustomButtonGlyphSize);
+  LSize := Min(LSize, Min(ARect.Width, ARect.Height));
+  var LCenterX := (ARect.Left + ARect.Right) div 2;
+  var LCenterY := (ARect.Top + ARect.Bottom) div 2;
+  Result := Rect(LCenterX - LSize div 2, LCenterY - LSize div 2,
+    LCenterX - LSize div 2 + LSize, LCenterY - LSize div 2 + LSize);
+end;
+
+procedure TGlassTabStrip.UpdateCustomButtonHint(const APoint: TPoint);
+begin
+  var LHint := '';
+  if IsCustomLeftButtonVisible and
+    PtInRect(GetCustomLeftButtonRect, APoint) then
+    LHint := FCustomLeftButtonHint
+  else if IsCustomRightButtonVisible and
+    PtInRect(GetCustomRightButtonRect, APoint) then
+    LHint := FCustomRightButtonHint;
+  if Hint <> LHint then
+    Hint := LHint;
 end;
 
 function TGlassTabStrip.TabAt(const APoint: TPoint): Integer;
@@ -1178,27 +1485,27 @@ procedure TGlassTabStrip.DrawTab(ACanvas: TCanvas; AGraphics: TGPGraphics;
   ABaselinePath: TGPGraphicsPath; AInactiveOutlinePen,
   AClosePen, AHotClosePen: TGPPen; AIndex: Integer; ASelected: Boolean);
 const
-  CSelectedShoulderControlOffset = 5;
-  CSelectedShoulderRise = 4;
-  CSelectedShoulderHeight = 7;
-  CFirstTabShoulderBlendOffset = 2;
-  CFirstTabShoulderBottomAlpha = 12;
-  CSelectedCornerDiameter = 14;
-  CSelectedCornerRadius = 7;
-  CInactiveCornerDiameter = 16;
-  CInactiveCornerRadius = 8;
-  CImageLeftInset = 15;
-  CImageTextSpacing = 9;
-  CTextLeftInset = 15;
-  CTextRightSpacing = 6;
-  CTextVerticalOffset = 1;
-  CCloseGlyphInset = 7;
-  CAccentFadeWidth = 72;
-  CBaselineFadeWidth = 64;
-  CBaselineFadeMidAlpha = 48;
-  CSelectedGlowWidth = 2.0;
-  CSelectedOutlineWidth = 1.0;
-  CBaselineWidth = 1.0;
+  cSelectedShoulderControlOffset = 5;
+  cSelectedShoulderRise = 4;
+  cSelectedShoulderHeight = 7;
+  cFirstTabShoulderBlendOffset = 2;
+  cFirstTabShoulderBottomAlpha = 12;
+  cSelectedCornerDiameter = 14;
+  cSelectedCornerRadius = 7;
+  cInactiveCornerDiameter = 16;
+  cInactiveCornerRadius = 8;
+  cImageLeftInset = 15;
+  cImageTextSpacing = 9;
+  cTextLeftInset = 15;
+  cTextRightSpacing = 6;
+  cTextVerticalOffset = 1;
+  cCloseGlyphInset = 7;
+  cAccentFadeWidth = 72;
+  cBaselineFadeWidth = 64;
+  cBaselineFadeMidAlpha = 48;
+  cSelectedGlowWidth = 2.0;
+  cSelectedOutlineWidth = 1.0;
+  cBaselineWidth = 1.0;
 begin
   var LClose, LHoverRect: TRect;
   var LTextRect: TRect;
@@ -1220,7 +1527,7 @@ begin
   var LBaseY: Single;
   var LTab := GetTabRect(AIndex);
   var LIsFirstSelected := ASelected and (AIndex = 0);
-  var LLeftShoulder := LTab.Left - ScaleValue(CSelectedShoulderWidth);
+  var LLeftShoulder := LTab.Left - ScaleValue(cSelectedShoulderWidth);
   LBaselineLeft := 0;
   LBaselineRight := Width;
   if IsOverflowing then
@@ -1270,77 +1577,77 @@ begin
     begin
       { The selected tab deliberately has no bottom outline: its two lower
         Bezier shoulders flow into the content plane, like the reference UI. }
-      LShape.AddBezier(LTab.Left - ScaleValue(CSelectedShoulderWidth),
+      LShape.AddBezier(LTab.Left - ScaleValue(cSelectedShoulderWidth),
         LTab.Bottom,
-        LTab.Left - ScaleValue(CSelectedShoulderControlOffset), LTab.Bottom,
-        LTab.Left, LTab.Bottom - ScaleValue(CSelectedShoulderRise),
-        LTab.Left, LTab.Bottom - ScaleValue(CSelectedShoulderHeight));
+        LTab.Left - ScaleValue(cSelectedShoulderControlOffset), LTab.Bottom,
+        LTab.Left, LTab.Bottom - ScaleValue(cSelectedShoulderRise),
+        LTab.Left, LTab.Bottom - ScaleValue(cSelectedShoulderHeight));
       LShape.AddLine(LTab.Left,
-        LTab.Bottom - ScaleValue(CSelectedShoulderHeight), LTab.Left,
-        LTab.Top + ScaleValue(CSelectedCornerRadius));
+        LTab.Bottom - ScaleValue(cSelectedShoulderHeight), LTab.Left,
+        LTab.Top + ScaleValue(cSelectedCornerRadius));
       LShape.AddArc(LTab.Left, LTab.Top,
-        ScaleValue(CSelectedCornerDiameter),
-        ScaleValue(CSelectedCornerDiameter), 180, 90);
-      LShape.AddLine(LTab.Left + ScaleValue(CSelectedCornerRadius),
-        LTab.Top, LTab.Right - ScaleValue(CSelectedCornerRadius), LTab.Top);
-      LShape.AddArc(LTab.Right - ScaleValue(CSelectedCornerDiameter),
-        LTab.Top, ScaleValue(CSelectedCornerDiameter),
-        ScaleValue(CSelectedCornerDiameter), 270, 90);
+        ScaleValue(cSelectedCornerDiameter),
+        ScaleValue(cSelectedCornerDiameter), 180, 90);
+      LShape.AddLine(LTab.Left + ScaleValue(cSelectedCornerRadius),
+        LTab.Top, LTab.Right - ScaleValue(cSelectedCornerRadius), LTab.Top);
+      LShape.AddArc(LTab.Right - ScaleValue(cSelectedCornerDiameter),
+        LTab.Top, ScaleValue(cSelectedCornerDiameter),
+        ScaleValue(cSelectedCornerDiameter), 270, 90);
       LShape.AddLine(LTab.Right,
-        LTab.Top + ScaleValue(CSelectedCornerRadius), LTab.Right,
-        LTab.Bottom - ScaleValue(CSelectedShoulderHeight));
+        LTab.Top + ScaleValue(cSelectedCornerRadius), LTab.Right,
+        LTab.Bottom - ScaleValue(cSelectedShoulderHeight));
       LShape.AddBezier(LTab.Right,
-        LTab.Bottom - ScaleValue(CSelectedShoulderHeight), LTab.Right,
-        LTab.Bottom - ScaleValue(CSelectedShoulderRise),
-        LTab.Right + ScaleValue(CSelectedShoulderControlOffset), LTab.Bottom,
-        LTab.Right + ScaleValue(CSelectedShoulderWidth), LTab.Bottom);
-      LShape.AddLine(LTab.Right + ScaleValue(CSelectedShoulderWidth),
-        LTab.Bottom, LTab.Left - ScaleValue(CSelectedShoulderWidth),
+        LTab.Bottom - ScaleValue(cSelectedShoulderHeight), LTab.Right,
+        LTab.Bottom - ScaleValue(cSelectedShoulderRise),
+        LTab.Right + ScaleValue(cSelectedShoulderControlOffset), LTab.Bottom,
+        LTab.Right + ScaleValue(cSelectedShoulderWidth), LTab.Bottom);
+      LShape.AddLine(LTab.Right + ScaleValue(cSelectedShoulderWidth),
+        LTab.Bottom, LTab.Left - ScaleValue(cSelectedShoulderWidth),
         LTab.Bottom);
       LShape.CloseFigure;
 
-      LBaseY := LTab.Bottom - ScaleValue(CBaselineOffset);
+      LBaseY := LTab.Bottom - ScaleValue(cBaselineOffset);
       if LIsFirstSelected then
       begin
         LFirstShoulderBlendY := LTab.Top + LTab.Height div 2 +
-          ScaleValue(CFirstTabShoulderBlendOffset);
+          ScaleValue(cFirstTabShoulderBlendOffset);
         LStrokePath.AddLine(LTab.Left, LFirstShoulderBlendY, LTab.Left,
-          LTab.Top + ScaleValue(CSelectedCornerRadius));
+          LTab.Top + ScaleValue(cSelectedCornerRadius));
         LFirstShoulderPath.AddLine(LTab.Left, LFirstShoulderBlendY,
-          LTab.Left, LBaseY - ScaleValue(CSelectedShoulderHeight));
+          LTab.Left, LBaseY - ScaleValue(cSelectedShoulderHeight));
         LFirstShoulderPath.AddBezier(LTab.Left,
-          LBaseY - ScaleValue(CSelectedShoulderHeight), LTab.Left,
-          LBaseY - ScaleValue(CSelectedShoulderRise),
-          LTab.Left - ScaleValue(CSelectedShoulderControlOffset), LBaseY,
-          LTab.Left - ScaleValue(CSelectedShoulderWidth), LBaseY);
+          LBaseY - ScaleValue(cSelectedShoulderHeight), LTab.Left,
+          LBaseY - ScaleValue(cSelectedShoulderRise),
+          LTab.Left - ScaleValue(cSelectedShoulderControlOffset), LBaseY,
+          LTab.Left - ScaleValue(cSelectedShoulderWidth), LBaseY);
       end
       else
       begin
         LStrokePath.AddBezier(
-          LTab.Left - ScaleValue(CSelectedShoulderWidth), LBaseY,
-          LTab.Left - ScaleValue(CSelectedShoulderControlOffset), LBaseY,
-          LTab.Left, LBaseY - ScaleValue(CSelectedShoulderRise), LTab.Left,
-          LBaseY - ScaleValue(CSelectedShoulderHeight));
+          LTab.Left - ScaleValue(cSelectedShoulderWidth), LBaseY,
+          LTab.Left - ScaleValue(cSelectedShoulderControlOffset), LBaseY,
+          LTab.Left, LBaseY - ScaleValue(cSelectedShoulderRise), LTab.Left,
+          LBaseY - ScaleValue(cSelectedShoulderHeight));
         LStrokePath.AddLine(LTab.Left,
-          LBaseY - ScaleValue(CSelectedShoulderHeight), LTab.Left,
-          LTab.Top + ScaleValue(CSelectedCornerRadius));
+          LBaseY - ScaleValue(cSelectedShoulderHeight), LTab.Left,
+          LTab.Top + ScaleValue(cSelectedCornerRadius));
       end;
       LStrokePath.AddArc(LTab.Left, LTab.Top,
-        ScaleValue(CSelectedCornerDiameter),
-        ScaleValue(CSelectedCornerDiameter), 180, 90);
-      LStrokePath.AddLine(LTab.Left + ScaleValue(CSelectedCornerRadius),
-        LTab.Top, LTab.Right - ScaleValue(CSelectedCornerRadius), LTab.Top);
-      LStrokePath.AddArc(LTab.Right - ScaleValue(CSelectedCornerDiameter),
-        LTab.Top, ScaleValue(CSelectedCornerDiameter),
-        ScaleValue(CSelectedCornerDiameter), 270, 90);
+        ScaleValue(cSelectedCornerDiameter),
+        ScaleValue(cSelectedCornerDiameter), 180, 90);
+      LStrokePath.AddLine(LTab.Left + ScaleValue(cSelectedCornerRadius),
+        LTab.Top, LTab.Right - ScaleValue(cSelectedCornerRadius), LTab.Top);
+      LStrokePath.AddArc(LTab.Right - ScaleValue(cSelectedCornerDiameter),
+        LTab.Top, ScaleValue(cSelectedCornerDiameter),
+        ScaleValue(cSelectedCornerDiameter), 270, 90);
       LStrokePath.AddLine(LTab.Right,
-        LTab.Top + ScaleValue(CSelectedCornerRadius), LTab.Right,
-        LBaseY - ScaleValue(CSelectedShoulderHeight));
+        LTab.Top + ScaleValue(cSelectedCornerRadius), LTab.Right,
+        LBaseY - ScaleValue(cSelectedShoulderHeight));
       LStrokePath.AddBezier(LTab.Right,
-        LBaseY - ScaleValue(CSelectedShoulderHeight), LTab.Right,
-        LBaseY - ScaleValue(CSelectedShoulderRise),
-        LTab.Right + ScaleValue(CSelectedShoulderControlOffset), LBaseY,
-        LTab.Right + ScaleValue(CSelectedShoulderWidth), LBaseY);
+        LBaseY - ScaleValue(cSelectedShoulderHeight), LTab.Right,
+        LBaseY - ScaleValue(cSelectedShoulderRise),
+        LTab.Right + ScaleValue(cSelectedShoulderControlOffset), LBaseY,
+        LTab.Right + ScaleValue(cSelectedShoulderWidth), LBaseY);
       if not LIsFirstSelected and (LLeftShoulder > LBaselineLeft) then
       begin
         LBaselinePath.AddLine(LBaselineLeft, LBaseY,
@@ -1348,23 +1655,23 @@ begin
         LBaselinePath.StartFigure;
       end;
       LBaselinePath.AddLine(
-        LTab.Right + ScaleValue(CSelectedShoulderWidth), LBaseY,
+        LTab.Right + ScaleValue(cSelectedShoulderWidth), LBaseY,
         LBaselineRight, LBaseY);
     end
     else
     begin
       LShape.AddLine(LTab.Left, LTab.Bottom, LTab.Left,
-        LTab.Top + ScaleValue(CInactiveCornerRadius));
+        LTab.Top + ScaleValue(cInactiveCornerRadius));
       LShape.AddArc(LTab.Left, LTab.Top,
-        ScaleValue(CInactiveCornerDiameter),
-        ScaleValue(CInactiveCornerDiameter), 180, 90);
-      LShape.AddLine(LTab.Left + ScaleValue(CInactiveCornerRadius), LTab.Top,
-        LTab.Right - ScaleValue(CInactiveCornerRadius), LTab.Top);
-      LShape.AddArc(LTab.Right - ScaleValue(CInactiveCornerDiameter),
-        LTab.Top, ScaleValue(CInactiveCornerDiameter),
-        ScaleValue(CInactiveCornerDiameter), 270, 90);
+        ScaleValue(cInactiveCornerDiameter),
+        ScaleValue(cInactiveCornerDiameter), 180, 90);
+      LShape.AddLine(LTab.Left + ScaleValue(cInactiveCornerRadius), LTab.Top,
+        LTab.Right - ScaleValue(cInactiveCornerRadius), LTab.Top);
+      LShape.AddArc(LTab.Right - ScaleValue(cInactiveCornerDiameter),
+        LTab.Top, ScaleValue(cInactiveCornerDiameter),
+        ScaleValue(cInactiveCornerDiameter), 270, 90);
       LShape.AddLine(LTab.Right,
-        LTab.Top + ScaleValue(CInactiveCornerRadius), LTab.Right,
+        LTab.Top + ScaleValue(cInactiveCornerRadius), LTab.Right,
         LTab.Bottom);
       LShape.AddLine(LTab.Right, LTab.Bottom, LTab.Left, LTab.Bottom);
       LShape.CloseFigure;
@@ -1375,7 +1682,7 @@ begin
     if ASelected then
     begin
       LGradientStart := 0;
-      LFadeStart := Max(LGradientStart, Width - ScaleValue(CAccentFadeWidth));
+      LFadeStart := Max(LGradientStart, Width - ScaleValue(cAccentFadeWidth));
       LGradientRect := MakeRect(LGradientStart, 0,
         Max(1, Width - LGradientStart), Height);
       var LAccentGradient := TGPLinearGradientBrush.Create(LGradientRect,
@@ -1411,10 +1718,10 @@ begin
             joining the shoulder while they are still semi-transparent. }
           var LBaselineSpan := Max(1, LBaselineRight - LBaselineLeft);
           LBaselineLeftFadeEnd := Min(
-            LBaselineLeft + ScaleValue(CBaselineFadeWidth),
+            LBaselineLeft + ScaleValue(cBaselineFadeWidth),
             Max(LBaselineLeft + 1, LLeftShoulder));
           LBaselineRightFadeStart := Max(LBaselineLeftFadeEnd,
-            LBaselineRight - ScaleValue(CBaselineFadeWidth));
+            LBaselineRight - ScaleValue(cBaselineFadeWidth));
           LBaselinePositions[0] := 0;
           LBaselinePositions[1] := EnsureRange(
             ((LBaselineLeftFadeEnd - LBaselineLeft) div 2) /
@@ -1432,18 +1739,18 @@ begin
           LBaselinePositions[5] := 1;
           LBaselineColors[0] := ToArgb(FPalette.Accent, 0);
           LBaselineColors[1] := ToArgb(FPalette.Accent,
-            CBaselineFadeMidAlpha);
+            cBaselineFadeMidAlpha);
           LBaselineColors[2] := ToArgb(FPalette.Accent);
           LBaselineColors[3] := ToArgb(FPalette.Accent);
           LBaselineColors[4] := ToArgb(FPalette.Accent,
-            CBaselineFadeMidAlpha);
+            cBaselineFadeMidAlpha);
           LBaselineColors[5] := ToArgb(FPalette.Accent, 0);
 
           var LGlowPen := TGPPen.Create(LGlowGradient,
-            ScaleValue(CSelectedGlowWidth));
+            ScaleValue(cSelectedGlowWidth));
           try
             var LOutlinePen := TGPPen.Create(LAccentGradient,
-              ScaleValue(CSelectedOutlineWidth));
+              ScaleValue(cSelectedOutlineWidth));
             try
               var LBaselineGradient := TGPLinearGradientBrush.Create(
                 MakeRect(LBaselineLeft, 0, LBaselineSpan, Height),
@@ -1453,7 +1760,7 @@ begin
                 LBaselineGradient.SetInterpolationColors(@LBaselineColors[0],
                   @LBaselinePositions[0], Length(LBaselineColors));
                 var LBaselinePen := TGPPen.Create(LBaselineGradient,
-                  ScaleValue(CBaselineWidth));
+                  ScaleValue(cBaselineWidth));
                 try
                   if LIsFirstSelected then
                     LGlowPen.SetStartCap(LineCapFlat)
@@ -1474,9 +1781,9 @@ begin
                   if LIsFirstSelected then
                   begin
                     var LFirstShoulderRect := MakeRect(
-                      LTab.Left - ScaleValue(CSelectedShoulderWidth),
+                      LTab.Left - ScaleValue(cSelectedShoulderWidth),
                       LFirstShoulderBlendY,
-                      ScaleValue(CSelectedShoulderWidth) + 1,
+                      ScaleValue(cSelectedShoulderWidth) + 1,
                       Max(1, Round(LBaseY) - LFirstShoulderBlendY + 1));
                     var LFirstShoulderGlow := TGPLinearGradientBrush.Create(
                       LFirstShoulderRect,
@@ -1486,7 +1793,7 @@ begin
                       LinearGradientModeVertical);
                     try
                       var LFirstShoulderGlowPen := TGPPen.Create(
-                        LFirstShoulderGlow, ScaleValue(CSelectedGlowWidth));
+                        LFirstShoulderGlow, ScaleValue(cSelectedGlowWidth));
                       try
                         LFirstShoulderGlowPen.SetStartCap(LineCapFlat);
                         LFirstShoulderGlowPen.SetEndCap(LineCapFlat);
@@ -1503,12 +1810,12 @@ begin
                       TGPLinearGradientBrush.Create(LFirstShoulderRect,
                         ToArgb(FPalette.Accent),
                         ToArgb(FPalette.Accent,
-                          CFirstTabShoulderBottomAlpha),
+                          cFirstTabShoulderBottomAlpha),
                         LinearGradientModeVertical);
                     try
                       var LFirstShoulderOutlinePen := TGPPen.Create(
                         LFirstShoulderOutline,
-                        ScaleValue(CSelectedOutlineWidth));
+                        ScaleValue(cSelectedOutlineWidth));
                       try
                         LFirstShoulderOutlinePen.SetStartCap(LineCapFlat);
                         LFirstShoulderOutlinePen.SetEndCap(LineCapFlat);
@@ -1549,15 +1856,15 @@ begin
 
     LGraphics.Flush(FlushIntentionSync);
     LContentCenterY := LTab.Top + LTab.Height div 2;
-    var LTextLeft := LTab.Left + ScaleValue(CTextLeftInset);
+    var LTextLeft := LTab.Left + ScaleValue(cTextLeftInset);
     var LImageIndex := ResolveImageIndex(FItems[AIndex]);
     if LImageIndex >= 0 then
     begin
-      var LImageLeft := LTab.Left + ScaleValue(CImageLeftInset);
+      var LImageLeft := LTab.Left + ScaleValue(cImageLeftInset);
       var LImageTop := LContentCenterY - FImages.Height div 2;
       FImages.Draw(ACanvas, LImageLeft, LImageTop, LImageIndex, Enabled);
       LTextLeft := LImageLeft + FImages.Width +
-        ScaleValue(CImageTextSpacing);
+        ScaleValue(cImageTextSpacing);
     end;
 
     LClose := GetCloseRect(AIndex);
@@ -1566,14 +1873,14 @@ begin
       ACanvas.Font.Name := 'Segoe UI Semibold'
     else
       ACanvas.Font.Name := 'Segoe UI';
-    ACanvas.Font.Height := -ScaleValue(CTextHeight);
+    ACanvas.Font.Height := -ScaleValue(cTextHeight);
     ACanvas.Font.Style := [];
     LOldBkMode := SetBkMode(ACanvas.Handle, TRANSPARENT);
     LOldTextColor := SetTextColor(ACanvas.Handle, ColorToRGB(LTextColor));
     LTextRect := Rect(LTextLeft,
-      LTab.Top - ScaleValue(CTextVerticalOffset),
-      LClose.Left - ScaleValue(CTextRightSpacing),
-      LTab.Bottom - ScaleValue(CTextVerticalOffset));
+      LTab.Top - ScaleValue(cTextVerticalOffset),
+      LClose.Left - ScaleValue(cTextRightSpacing),
+      LTab.Bottom - ScaleValue(cTextVerticalOffset));
     LFlags := DT_LEFT or DT_VCENTER or DT_SINGLELINE or DT_END_ELLIPSIS or DT_NOPREFIX;
     DrawText(ACanvas.Handle, PChar(FItems[AIndex].Caption), -1, LTextRect, LFlags);
     SetTextColor(ACanvas.Handle, LOldTextColor);
@@ -1586,40 +1893,40 @@ begin
         if FButtonHoverBackground then
         begin
           LHoverRect := Rect((LClose.Left + LClose.Right) div 2 -
-            ScaleValue(CButtonHoverHalfWidth),
-            LContentCenterY - ScaleValue(CButtonHoverHalfHeight),
+            ScaleValue(cButtonHoverHalfWidth),
+            LContentCenterY - ScaleValue(cButtonHoverHalfHeight),
             (LClose.Left + LClose.Right) div 2 +
-            ScaleValue(CButtonHoverHalfWidth),
-            LContentCenterY + ScaleValue(CButtonHoverHalfHeight));
+            ScaleValue(cButtonHoverHalfWidth),
+            LContentCenterY + ScaleValue(cButtonHoverHalfHeight));
           FillRoundedHover(LGraphics, LHoverRect,
-            ScaleValue(CButtonHoverRadius),
+            ScaleValue(cButtonHoverRadius),
             FPalette.CloseHover);
         end;
         if FButtonHoverGlow then
           DrawTwoLineGlow(LGraphics,
-            LClose.Left + ScaleValue(CCloseGlyphInset),
-            LClose.Top + ScaleValue(CCloseGlyphInset),
-            LClose.Right - ScaleValue(CCloseGlyphInset),
-            LClose.Bottom - ScaleValue(CCloseGlyphInset),
-            LClose.Right - ScaleValue(CCloseGlyphInset),
-            LClose.Top + ScaleValue(CCloseGlyphInset),
-            LClose.Left + ScaleValue(CCloseGlyphInset),
-            LClose.Bottom - ScaleValue(CCloseGlyphInset),
+            LClose.Left + ScaleValue(cCloseGlyphInset),
+            LClose.Top + ScaleValue(cCloseGlyphInset),
+            LClose.Right - ScaleValue(cCloseGlyphInset),
+            LClose.Bottom - ScaleValue(cCloseGlyphInset),
+            LClose.Right - ScaleValue(cCloseGlyphInset),
+            LClose.Top + ScaleValue(cCloseGlyphInset),
+            LClose.Left + ScaleValue(cCloseGlyphInset),
+            LClose.Bottom - ScaleValue(cCloseGlyphInset),
             FPalette.Accent, ScaleValue(1.0));
       end;
       var LGlyphPen := AClosePen;
       if FHotCloseIndex = AIndex then
         LGlyphPen := AHotClosePen;
       LGraphics.DrawLine(LGlyphPen,
-          LClose.Left + ScaleValue(CCloseGlyphInset),
-          LClose.Top + ScaleValue(CCloseGlyphInset),
-          LClose.Right - ScaleValue(CCloseGlyphInset),
-          LClose.Bottom - ScaleValue(CCloseGlyphInset));
+          LClose.Left + ScaleValue(cCloseGlyphInset),
+          LClose.Top + ScaleValue(cCloseGlyphInset),
+          LClose.Right - ScaleValue(cCloseGlyphInset),
+          LClose.Bottom - ScaleValue(cCloseGlyphInset));
       LGraphics.DrawLine(LGlyphPen,
-          LClose.Right - ScaleValue(CCloseGlyphInset),
-          LClose.Top + ScaleValue(CCloseGlyphInset),
-          LClose.Left + ScaleValue(CCloseGlyphInset),
-          LClose.Bottom - ScaleValue(CCloseGlyphInset));
+          LClose.Right - ScaleValue(cCloseGlyphInset),
+          LClose.Top + ScaleValue(cCloseGlyphInset),
+          LClose.Left + ScaleValue(cCloseGlyphInset),
+          LClose.Bottom - ScaleValue(cCloseGlyphInset));
     end;
   finally
     LFill.Free;
@@ -1629,64 +1936,62 @@ end;
 procedure TGlassTabStrip.DrawNavigationButton(AGraphics: TGPGraphics;
   const ARect: TRect; ALeft, AHot, AEnabled: Boolean);
 const
-  CNavigationGlyphHalfWidth = 3;
-  CNavigationGlyphHalfHeight = 5;
-  CNavigationLineWidth = 1.5;
-  CNavigationDisabledAlpha = 72;
+  cNavigationGlyphHalfWidth = 3;
+  cNavigationGlyphHalfHeight = 5;
+  cNavigationLineWidth = 1.5;
 begin
   var LGraphics := AGraphics;
   LGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
   LGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);
+
+    var LState: TGlassTabButtonDrawState;
+    if not AEnabled then
+      LState := gtbdsDisabled
+    else
+      LState := ButtonDrawState(AHot);
 
     var LCenterX := (ARect.Left + ARect.Right) div 2;
     var LCenterY := (ARect.Top + ARect.Bottom) div 2;
     var LX1, LY1, LX2, LY2, LX3, LY3: Single;
     if ALeft then
     begin
-      LX1 := LCenterX + ScaleValue(CNavigationGlyphHalfWidth);
-      LY1 := LCenterY - ScaleValue(CNavigationGlyphHalfHeight);
-      LX2 := LCenterX - ScaleValue(CNavigationGlyphHalfWidth);
+      LX1 := LCenterX + ScaleValue(cNavigationGlyphHalfWidth);
+      LY1 := LCenterY - ScaleValue(cNavigationGlyphHalfHeight);
+      LX2 := LCenterX - ScaleValue(cNavigationGlyphHalfWidth);
       LY2 := LCenterY;
       LX3 := LX1;
-      LY3 := LCenterY + ScaleValue(CNavigationGlyphHalfHeight);
+      LY3 := LCenterY + ScaleValue(cNavigationGlyphHalfHeight);
     end
     else
     begin
-      LX1 := LCenterX - ScaleValue(CNavigationGlyphHalfWidth);
-      LY1 := LCenterY - ScaleValue(CNavigationGlyphHalfHeight);
-      LX2 := LCenterX + ScaleValue(CNavigationGlyphHalfWidth);
+      LX1 := LCenterX - ScaleValue(cNavigationGlyphHalfWidth);
+      LY1 := LCenterY - ScaleValue(cNavigationGlyphHalfHeight);
+      LX2 := LCenterX + ScaleValue(cNavigationGlyphHalfWidth);
       LY2 := LCenterY;
       LX3 := LX1;
-      LY3 := LCenterY + ScaleValue(CNavigationGlyphHalfHeight);
+      LY3 := LCenterY + ScaleValue(cNavigationGlyphHalfHeight);
     end;
 
-    if AHot and AEnabled then
+    if LState = gtbdsHot then
     begin
       if FButtonHoverBackground then
       begin
         var LHoverRect := Rect(
-          LCenterX - ScaleValue(CButtonHoverHalfWidth),
-          LCenterY - ScaleValue(CButtonHoverHalfHeight),
-          LCenterX + ScaleValue(CButtonHoverHalfWidth),
-          LCenterY + ScaleValue(CButtonHoverHalfHeight));
+          LCenterX - ScaleValue(cButtonHoverHalfWidth),
+          LCenterY - ScaleValue(cButtonHoverHalfHeight),
+          LCenterX + ScaleValue(cButtonHoverHalfWidth),
+          LCenterY + ScaleValue(cButtonHoverHalfHeight));
         FillRoundedHover(LGraphics, LHoverRect,
-          ScaleValue(CButtonHoverRadius), FPalette.CloseHover);
+          ScaleValue(cButtonHoverRadius), FPalette.CloseHover);
       end;
       if FButtonHoverGlow then
         DrawTwoLineGlow(LGraphics, LX1, LY1, LX2, LY2,
           LX2, LY2, LX3, LY3, FPalette.Accent, ScaleValue(1.0));
     end;
 
-    var LColor: TColor;
-    if not AEnabled then
-      LColor := BlendColor(FPalette.InactiveText, FPalette.StripBottom,
-        CNavigationDisabledAlpha)
-    else if AHot then
-      LColor := FPalette.Accent
-    else
-      LColor := FPalette.InactiveText;
+    var LColor := GlyphButtonColor(LState);
     var LChevronPen := TGPPen.Create(ToArgb(LColor),
-      ScaleValue(CNavigationLineWidth));
+      ScaleValue(cNavigationLineWidth));
     try
       LChevronPen.SetStartCap(LineCapRound);
       LChevronPen.SetEndCap(LineCapRound);
@@ -1698,65 +2003,179 @@ begin
     end;
 end;
 
-procedure TGlassTabStrip.DrawChevronButton(AGraphics: TGPGraphics;
-  const ARect: TRect; AHot: Boolean);
+procedure TGlassTabStrip.DrawButtonGlyph(AGraphics: TGPGraphics;
+  const ARect: TRect; AGlyph: TGlassTabCustomButtonGlyph;
+  AState: TGlassTabButtonDrawState);
 const
-  CChevronGlyphHalfWidth = 4;
-  CChevronGlyphHalfHeight = 2;
-  CChevronLineWidth = 1.35;
+  cChevronGlyphHalfWidth = 4;
+  { Preserve the compact chevron geometry used by the original drop-down
+    button: its 4 x 2 shape deliberately reads differently from the larger
+    plus and close glyphs. }
+  cChevronGlyphHalfHeight = 2;
+  cPlusGlyphHalfSize = 5;
+  cCloseGlyphHalfSize = 4;
+  cGlyphLineWidth = 1.35;
 begin
   var LGraphics := AGraphics;
   LGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
   LGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);
-    var LCenterX := (ARect.Left + ARect.Right) div 2;
-    var LCenterY := (ARect.Top + ARect.Bottom) div 2;
-    var LX1 := LCenterX - ScaleValue(CChevronGlyphHalfWidth);
-    var LY1 := LCenterY - ScaleValue(CChevronGlyphHalfHeight);
-    var LX2 := LCenterX;
-    var LY2 := LCenterY + ScaleValue(CChevronGlyphHalfHeight);
-    var LX3 := LCenterX + ScaleValue(CChevronGlyphHalfWidth);
-    var LY3 := LY1;
-
-    if AHot then
-    begin
-      if FButtonHoverBackground then
+  var LCenterX := (ARect.Left + ARect.Right) div 2;
+  var LCenterY := (ARect.Top + ARect.Bottom) div 2;
+  var LX1, LY1, LX2, LY2, LX3, LY3: Single;
+  case AGlyph of
+    gtcbgChevronLeft:
       begin
-        var LHoverRect := Rect(
-          LCenterX - ScaleValue(CButtonHoverHalfWidth),
-          LCenterY - ScaleValue(CButtonHoverHalfHeight),
-          LCenterX + ScaleValue(CButtonHoverHalfWidth),
-          LCenterY + ScaleValue(CButtonHoverHalfHeight));
-        FillRoundedHover(LGraphics, LHoverRect,
-          ScaleValue(CButtonHoverRadius), FPalette.CloseHover);
+        LX1 := LCenterX + ScaleValue(cChevronGlyphHalfWidth);
+        LY1 := LCenterY - ScaleValue(cChevronGlyphHalfHeight);
+        LX2 := LCenterX - ScaleValue(cChevronGlyphHalfWidth);
+        LY2 := LCenterY;
+        LX3 := LX1;
+        LY3 := LCenterY + ScaleValue(cChevronGlyphHalfHeight);
       end;
-      if FButtonHoverGlow then
-        DrawTwoLineGlow(LGraphics, LX1, LY1, LX2, LY2,
-          LX2, LY2, LX3, LY3, FPalette.Accent, ScaleValue(1.0));
+    gtcbgChevronRight:
+      begin
+        LX1 := LCenterX - ScaleValue(cChevronGlyphHalfWidth);
+        LY1 := LCenterY - ScaleValue(cChevronGlyphHalfHeight);
+        LX2 := LCenterX + ScaleValue(cChevronGlyphHalfWidth);
+        LY2 := LCenterY;
+        LX3 := LX1;
+        LY3 := LCenterY + ScaleValue(cChevronGlyphHalfHeight);
+      end;
+    gtcbgChevronUp:
+      begin
+        LX1 := LCenterX - ScaleValue(cChevronGlyphHalfWidth);
+        LY1 := LCenterY + ScaleValue(cChevronGlyphHalfHeight);
+        LX2 := LCenterX;
+        LY2 := LCenterY - ScaleValue(cChevronGlyphHalfHeight);
+        LX3 := LCenterX + ScaleValue(cChevronGlyphHalfWidth);
+        LY3 := LY1;
+      end;
+    gtcbgPlus:
+      begin
+        LX1 := LCenterX - ScaleValue(cPlusGlyphHalfSize);
+        LY1 := LCenterY;
+        LX2 := LCenterX + ScaleValue(cPlusGlyphHalfSize);
+        LY2 := LCenterY;
+        LX3 := LCenterX;
+        LY3 := LCenterY - ScaleValue(cPlusGlyphHalfSize);
+      end;
+    gtcbgClose:
+      begin
+        LX1 := LCenterX - ScaleValue(cCloseGlyphHalfSize);
+        LY1 := LCenterY - ScaleValue(cCloseGlyphHalfSize);
+        LX2 := LCenterX + ScaleValue(cCloseGlyphHalfSize);
+        LY2 := LCenterY + ScaleValue(cCloseGlyphHalfSize);
+        LX3 := LCenterX + ScaleValue(cCloseGlyphHalfSize);
+        LY3 := LCenterY - ScaleValue(cCloseGlyphHalfSize);
+      end;
+  else
+    begin
+      LX1 := LCenterX - ScaleValue(cChevronGlyphHalfWidth);
+      LY1 := LCenterY - ScaleValue(cChevronGlyphHalfHeight);
+      LX2 := LCenterX;
+      LY2 := LCenterY + ScaleValue(cChevronGlyphHalfHeight);
+      LX3 := LCenterX + ScaleValue(cChevronGlyphHalfWidth);
+      LY3 := LY1;
     end;
+  end;
 
-    var LColor := FPalette.InactiveText;
-    if AHot then
-      LColor := FPalette.Accent;
-    var LChevronPen := TGPPen.Create(ToArgb(LColor),
-      ScaleValue(CChevronLineWidth));
-    try
-      LChevronPen.SetStartCap(LineCapRound);
-      LChevronPen.SetEndCap(LineCapRound);
-      LChevronPen.SetLineJoin(LineJoinRound);
-      LGraphics.DrawLine(LChevronPen, LX1, LY1, LX2, LY2);
-      LGraphics.DrawLine(LChevronPen, LX2, LY2, LX3, LY3);
-    finally
-      LChevronPen.Free;
+  if AState = gtbdsHot then
+  begin
+    if FButtonHoverBackground then
+    begin
+      var LHoverRect := Rect(
+        LCenterX - ScaleValue(cButtonHoverHalfWidth),
+        LCenterY - ScaleValue(cButtonHoverHalfHeight),
+        LCenterX + ScaleValue(cButtonHoverHalfWidth),
+        LCenterY + ScaleValue(cButtonHoverHalfHeight));
+      FillRoundedHover(LGraphics, LHoverRect,
+        ScaleValue(cButtonHoverRadius), FPalette.CloseHover);
     end;
+    if FButtonHoverGlow then
+    begin
+      if AGlyph = gtcbgPlus then
+        DrawTwoLineGlow(LGraphics, LX1, LY1, LX2, LY2, LX3, LY3,
+          LX3, LCenterY + ScaleValue(cPlusGlyphHalfSize), FPalette.Accent,
+          ScaleValue(1.0))
+      else if AGlyph = gtcbgClose then
+        DrawTwoLineGlow(LGraphics, LX1, LY1, LX2, LY2, LX3, LY3,
+          LCenterX - ScaleValue(cCloseGlyphHalfSize),
+          LCenterY + ScaleValue(cCloseGlyphHalfSize), FPalette.Accent,
+          ScaleValue(1.0))
+      else
+        DrawTwoLineGlow(LGraphics, LX1, LY1, LX2, LY2, LX2, LY2, LX3,
+          LY3, FPalette.Accent, ScaleValue(1.0));
+    end;
+  end;
+
+  var LColor := GlyphButtonColor(AState);
+  var LGlyphPen := TGPPen.Create(ToArgb(LColor),
+    ScaleValue(cGlyphLineWidth));
+  try
+    LGlyphPen.SetStartCap(LineCapRound);
+    LGlyphPen.SetEndCap(LineCapRound);
+    LGlyphPen.SetLineJoin(LineJoinRound);
+    LGraphics.DrawLine(LGlyphPen, LX1, LY1, LX2, LY2);
+    if AGlyph = gtcbgPlus then
+      LGraphics.DrawLine(LGlyphPen, LX3, LY3, LX3,
+        LCenterY + ScaleValue(cPlusGlyphHalfSize))
+    else if AGlyph = gtcbgClose then
+      LGraphics.DrawLine(LGlyphPen, LX3, LY3,
+        LCenterX - ScaleValue(cCloseGlyphHalfSize),
+        LCenterY + ScaleValue(cCloseGlyphHalfSize))
+    else
+      LGraphics.DrawLine(LGlyphPen, LX2, LY2, LX3, LY3);
+  finally
+    LGlyphPen.Free;
+  end;
+end;
+
+procedure TGlassTabStrip.DrawCustomButton(ACanvas: TCanvas;
+  AGraphics: TGPGraphics; const ARect: TRect;
+  AButton: TGlassTabCustomButton; AState: TGlassTabButtonDrawState;
+  AContent: TGlassTabCustomButtonContent;
+  AGlyph: TGlassTabCustomButtonGlyph;
+  AImageIndex: System.UITypes.TImageIndex);
+begin
+  var LCenterX := (ARect.Left + ARect.Right) div 2;
+  var LCenterY := (ARect.Top + ARect.Bottom) div 2;
+  if (AState = gtbdsHot) and FButtonHoverBackground then
+  begin
+    var LHoverRect := Rect(
+      LCenterX - ScaleValue(cButtonHoverHalfWidth),
+      LCenterY - ScaleValue(cButtonHoverHalfHeight),
+      LCenterX + ScaleValue(cButtonHoverHalfWidth),
+      LCenterY + ScaleValue(cButtonHoverHalfHeight));
+    FillRoundedHover(AGraphics, LHoverRect, ScaleValue(cButtonHoverRadius),
+      FPalette.CloseHover);
+  end;
+
+  AGraphics.Flush(FlushIntentionSync);
+  var LHandled := False;
+  if Assigned(FOnCustomButtonDraw) then
+    FOnCustomButtonDraw(Self, AButton, ACanvas, ARect,
+      GetCustomButtonGlyphRect(ARect), AState, GlyphButtonColor(AState),
+      LHandled);
+  if LHandled then
+    Exit;
+
+  var LImageIndex := -1;
+  if AContent = gtcbcImage then
+    LImageIndex := ResolveCustomButtonImageIndex(AImageIndex);
+  if LImageIndex < 0 then
+  begin
+    DrawButtonGlyph(AGraphics, ARect, AGlyph, AState);
+    Exit;
+  end;
+
+  FImages.Draw(ACanvas, LCenterX - FImages.Width div 2,
+    LCenterY - FImages.Height div 2, LImageIndex, AState <> gtbdsDisabled);
 end;
 
 procedure TGlassTabStrip.Paint;
 const
-  CPlusGlyphHalfSize = 5;
-  CPlusHotLineWidth = 1.45;
-  CPlusLineWidth = 1.35;
-  CInactiveOutlineWidth = 1.0;
-  CCloseLineWidth = 1.25;
+  cInactiveOutlineWidth = 1.0;
+  cCloseLineWidth = 1.25;
 begin
   { Draw directly to VCL's double-buffered paint surface. Rendering into a
     second TBitmap here softens ClearType and path edges on scaled displays. }
@@ -1804,11 +2223,11 @@ begin
         var LBaselinePath := TGPGraphicsPath.Create;
         var LInactiveOutlinePen := TGPPen.Create(
           ToArgb(FPalette.StripBorder, 180),
-          ScaleValue(CInactiveOutlineWidth));
+          ScaleValue(cInactiveOutlineWidth));
         var LClosePen := TGPPen.Create(ToArgb(FPalette.InactiveText),
-          ScaleValue(CCloseLineWidth));
+          ScaleValue(cCloseLineWidth));
         var LHotClosePen := TGPPen.Create(ToArgb(FPalette.Accent),
-          ScaleValue(CCloseLineWidth));
+          ScaleValue(cCloseLineWidth));
         try
           LTabGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
           LTabGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);
@@ -1858,56 +2277,19 @@ begin
     end;
 
     if IsAddButtonVisible then
-    begin
-      var LAdd := GetAddButtonRect;
-      var LPlusPen: TGPPen;
-      if FHotAddButton then
-        LPlusPen := TGPPen.Create(ToArgb(FPalette.Accent),
-          ScaleValue(CPlusHotLineWidth))
-      else
-        LPlusPen := TGPPen.Create(ToArgb(FPalette.InactiveText),
-          ScaleValue(CPlusLineWidth));
-      try
-        LGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
-        LGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);
-        var LCenterX := (LAdd.Left + LAdd.Right) div 2;
-        var LCenterY := (LAdd.Top + LAdd.Bottom) div 2;
-        if FHotAddButton then
-        begin
-          if FButtonHoverBackground then
-          begin
-            var LHoverRect := Rect(
-              LCenterX - ScaleValue(CButtonHoverHalfWidth),
-              LCenterY - ScaleValue(CButtonHoverHalfHeight),
-              LCenterX + ScaleValue(CButtonHoverHalfWidth),
-              LCenterY + ScaleValue(CButtonHoverHalfHeight));
-            FillRoundedHover(LGraphics, LHoverRect,
-              ScaleValue(CButtonHoverRadius),
-              FPalette.CloseHover);
-          end;
-          if FButtonHoverGlow then
-            DrawTwoLineGlow(LGraphics,
-              LCenterX - ScaleValue(CPlusGlyphHalfSize), LCenterY,
-              LCenterX + ScaleValue(CPlusGlyphHalfSize), LCenterY,
-              LCenterX, LCenterY - ScaleValue(CPlusGlyphHalfSize),
-              LCenterX, LCenterY + ScaleValue(CPlusGlyphHalfSize),
-              FPalette.Accent, ScaleValue(1.0));
-        end;
-        LPlusPen.SetStartCap(LineCapRound);
-        LPlusPen.SetEndCap(LineCapRound);
-        LGraphics.DrawLine(LPlusPen,
-          LCenterX - ScaleValue(CPlusGlyphHalfSize), LCenterY,
-          LCenterX + ScaleValue(CPlusGlyphHalfSize), LCenterY);
-        LGraphics.DrawLine(LPlusPen, LCenterX,
-          LCenterY - ScaleValue(CPlusGlyphHalfSize), LCenterX,
-          LCenterY + ScaleValue(CPlusGlyphHalfSize));
-      finally
-        LPlusPen.Free;
-      end;
-    end;
+      DrawButtonGlyph(LGraphics, GetAddButtonRect, gtcbgPlus,
+        ButtonDrawState(FHotAddButton));
 
-    if IsChevronButtonVisible then
-      DrawChevronButton(LGraphics, GetChevronButtonRect, FHotChevronButton);
+    if IsCustomLeftButtonVisible then
+      DrawCustomButton(Canvas, LGraphics, GetCustomLeftButtonRect,
+        gtcbLeft, ButtonDrawState(FHotCustomLeftButton),
+        FCustomLeftButtonContent,
+        FCustomLeftButtonGlyph, FCustomLeftButtonImageIndex);
+    if IsCustomRightButtonVisible then
+      DrawCustomButton(Canvas, LGraphics, GetCustomRightButtonRect,
+        gtcbRight, ButtonDrawState(FHotCustomRightButton),
+        FCustomRightButtonContent,
+        FCustomRightButtonGlyph, FCustomRightButtonImageIndex);
 
     if IsOverflowing then
     begin
@@ -1955,9 +2337,17 @@ begin
     Invalidate;
     Exit;
   end;
-  if IsChevronButtonVisible and PtInRect(GetChevronButtonRect, LPoint) then
+  if IsCustomLeftButtonVisible and
+    PtInRect(GetCustomLeftButtonRect, LPoint) then
   begin
-    FPressedChevronButton := True;
+    FPressedCustomLeftButton := True;
+    Invalidate;
+    Exit;
+  end;
+  if IsCustomRightButtonVisible and
+    PtInRect(GetCustomRightButtonRect, LPoint) then
+  begin
+    FPressedCustomRightButton := True;
     Invalidate;
     Exit;
   end;
@@ -1985,26 +2375,31 @@ begin
   var LClose := CloseAt(LPoint);
   var LHotAdd := IsAddButtonVisible and
     PtInRect(GetAddButtonRect, LPoint);
-  var LHotChevron := IsChevronButtonVisible and
-    PtInRect(GetChevronButtonRect, LPoint);
+  var LHotCustomLeft := IsCustomLeftButtonVisible and
+    PtInRect(GetCustomLeftButtonRect, LPoint);
+  var LHotCustomRight := IsCustomRightButtonVisible and
+    PtInRect(GetCustomRightButtonRect, LPoint);
   var LHotLeft := CanNavigateLeft and
     PtInRect(GetLeftNavigationRect, LPoint);
   var LHotRight := CanNavigateRight and
     PtInRect(GetRightNavigationRect, LPoint);
   if (LTab <> FHotIndex) or (LClose <> FHotCloseIndex) or
     (LHotAdd <> FHotAddButton) or
-    (LHotChevron <> FHotChevronButton) or
+    (LHotCustomLeft <> FHotCustomLeftButton) or
+    (LHotCustomRight <> FHotCustomRightButton) or
     (LHotLeft <> FHotLeftNavigation) or
     (LHotRight <> FHotRightNavigation) then
   begin
     FHotIndex := LTab;
     FHotCloseIndex := LClose;
     FHotAddButton := LHotAdd;
-    FHotChevronButton := LHotChevron;
+    FHotCustomLeftButton := LHotCustomLeft;
+    FHotCustomRightButton := LHotCustomRight;
     FHotLeftNavigation := LHotLeft;
     FHotRightNavigation := LHotRight;
     Invalidate;
   end;
+  UpdateCustomButtonHint(LPoint);
 end;
 
 procedure TGlassTabStrip.MouseUp(Button: TMouseButton; Shift: TShiftState;
@@ -2021,13 +2416,22 @@ begin
       DoAddButtonClick;
     Exit;
   end;
-  if FPressedChevronButton then
+  if FPressedCustomLeftButton then
   begin
-    FPressedChevronButton := False;
+    FPressedCustomLeftButton := False;
     Invalidate;
-    if IsChevronButtonVisible and
-      PtInRect(GetChevronButtonRect, LPoint) then
-      DoChevronButtonClick;
+    if IsCustomLeftButtonVisible and
+      PtInRect(GetCustomLeftButtonRect, LPoint) then
+      DoCustomLeftButtonClick;
+    Exit;
+  end;
+  if FPressedCustomRightButton then
+  begin
+    FPressedCustomRightButton := False;
+    Invalidate;
+    if IsCustomRightButtonVisible and
+      PtInRect(GetCustomRightButtonRect, LPoint) then
+      DoCustomRightButtonClick;
     Exit;
   end;
   var LClose := CloseAt(LPoint);
@@ -2045,7 +2449,9 @@ begin
   FHotIndex := -1;
   FHotCloseIndex := -1;
   FHotAddButton := False;
-  FHotChevronButton := False;
+  FHotCustomLeftButton := False;
+  FHotCustomRightButton := False;
+  Hint := '';
   FHotLeftNavigation := False;
   FHotRightNavigation := False;
   FPressedCloseIndex := -1;

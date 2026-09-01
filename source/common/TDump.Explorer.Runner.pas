@@ -215,42 +215,38 @@ end;
 procedure CheckReportFileSize(const AFileName: string);
 begin
   var LSize := TFile.GetSize(AFileName);
-  if LSize > CMaxTDumpReportSize then
+  if LSize > cMaxTDumpReportSize then
     raise ERangeError.CreateFmt('TDUMP output exceeds the %d MiB size limit: %s',
-      [CMaxTDumpReportSize div (1024 * 1024), AFileName]);
+      [cMaxTDumpReportSize div (1024 * 1024), AFileName]);
 end;
 
 function CombineReportFiles(const AFirstFileName,
   ASecondFileName: string): string;
 const
-  CLineBreak: array[0..1] of Byte = (13, 10);
+  cLineBreak: array[0..1] of Byte = (13, 10);
 begin
   var LCombinedSize := TFile.GetSize(AFirstFileName) +
     TFile.GetSize(ASecondFileName) + 2;
-  if LCombinedSize > CMaxTDumpReportSize then
+  if LCombinedSize > cMaxTDumpReportSize then
     raise ERangeError.CreateFmt('Combined TDUMP output exceeds the %d MiB size limit.',
-      [CMaxTDumpReportSize div (1024 * 1024)]);
+      [cMaxTDumpReportSize div (1024 * 1024)]);
 
   Result := TPath.GetTempFileName;
   try
     var LOutput := TFileStream.Create(Result, fmCreate or fmShareDenyWrite);
+    var LFirstInput: TFileStream := nil;
+    var LSecondInput: TFileStream := nil;
     try
-      var LInput := TFileStream.Create(AFirstFileName,
+      LFirstInput := TFileStream.Create(AFirstFileName,
         fmOpenRead or fmShareDenyNone);
-      try
-        LOutput.CopyFrom(LInput, 0);
-      finally
-        LInput.Free;
-      end;
-      LOutput.WriteBuffer(CLineBreak, SizeOf(CLineBreak));
-      LInput := TFileStream.Create(ASecondFileName,
+      LOutput.CopyFrom(LFirstInput, 0);
+      LOutput.WriteBuffer(cLineBreak, SizeOf(cLineBreak));
+      LSecondInput := TFileStream.Create(ASecondFileName,
         fmOpenRead or fmShareDenyNone);
-      try
-        LOutput.CopyFrom(LInput, 0);
-      finally
-        LInput.Free;
-      end;
+      LOutput.CopyFrom(LSecondInput, 0);
     finally
+      LSecondInput.Free;
+      LFirstInput.Free;
       LOutput.Free;
     end;
   except

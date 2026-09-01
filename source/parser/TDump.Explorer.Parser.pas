@@ -1279,10 +1279,10 @@ function BorlandTypeCaption(const ARecord: TDumpGlobalTypeRecord): string;
 implementation
 
 const
-  CBorlandLazyRecordLineThreshold = 250000;
-  SOldExecutableHeader = 'Old Executable Header';
-  SPortableExecutableHeader = 'Portable Executable (PE) File';
-  SGlobalSymbolHeaderLabels: array[0..8] of string = ('cbSymbols:',
+  cBorlandLazyRecordLineThreshold = 250000;
+  cOldExecutableHeader = 'Old Executable Header';
+  cPortableExecutableHeader = 'Portable Executable (PE) File';
+  cGlobalSymbolHeaderLabels: array[0..8] of string = ('cbSymbols:',
     'cNamespaces:', 'cUDTs:', 'cOthers:', 'Total:', 'SymHash:',
     'cbSymHash:', 'AddrHash:', 'cbAddrHash:');
 
@@ -1492,12 +1492,12 @@ end;
 
 function IsTDumpBinaryFile(const AFileName: string): Boolean;
 const
-  CBinaryExtensions: array[0..19] of string = ('.exe', '.dll', '.bpl',
+  cBinaryExtensions: array[0..19] of string = ('.exe', '.dll', '.bpl',
     '.dpl', '.ocx', '.cpl', '.scr', '.com', '.sys', '.obj', '.lib', '.dcu',
     '.elf', '.ar', '.o', '.a', '.so', '.dylib', '.bundle', '.mach');
 begin
   var LExtension := LowerCase(ExtractFileExt(AFileName));
-  for var LBinaryExtension in CBinaryExtensions do
+  for var LBinaryExtension in cBinaryExtensions do
     if LExtension = LBinaryExtension then
       Exit(True);
   Result := False;
@@ -2415,7 +2415,7 @@ begin
     ParseResourceSection;
     ParseRelocationSection;
     FDocument.BorlandLazyRecords :=
-      FLines.Count > CBorlandLazyRecordLineThreshold;
+      FLines.Count > cBorlandLazyRecordLineThreshold;
     if FDocument.BorlandLazyRecords then
       ParseBorlandSymbolIndex
     else
@@ -3008,14 +3008,14 @@ begin
     end;
 
   var LHeader := TDumpHeader.Create;
-  LHeader.Name := SOldExecutableHeader;
+  LHeader.Name := cOldExecutableHeader;
   LHeader.StartLine := LHeaderStart + 1;
   LHeader.EndLine := LHeaderEnd + 1;
   FDocument.Headers.Add(LHeader);
   if FDocument.FileKind = dfUnknown then
     FDocument.FileKind := dfDOS;
 
-  var LNode := AddNode(nkHeader, SOldExecutableHeader, LHeader.StartLine, LHeader.EndLine);
+  var LNode := AddNode(nkHeader, cOldExecutableHeader, LHeader.StartLine, LHeader.EndLine);
   for var LIndex := LHeaderStart to LHeaderEnd do
   begin
       var LLine := FLines[LIndex];
@@ -3052,13 +3052,13 @@ begin
     end;
 
   var LHeader := TDumpHeader.Create;
-  LHeader.Name := SPortableExecutableHeader;
+  LHeader.Name := cPortableExecutableHeader;
   LHeader.StartLine := LHeaderStart + 1;
   LHeader.EndLine := LHeaderEnd + 1;
   FDocument.Headers.Add(LHeader);
   FDocument.FileKind := dfPE;
 
-  var LHeaderNode := AddNode(nkHeader, SPortableExecutableHeader,
+  var LHeaderNode := AddNode(nkHeader, cPortableExecutableHeader,
     LHeader.StartLine, LHeader.EndLine);
   var LDirectoryNode: TDumpNode := nil;
   var LInDirectoryTable := False;
@@ -3526,27 +3526,31 @@ begin
         if StartsWithText(LOrdinalText, 'ord:') then
           LOrdinalText := Trim(Copy(LOrdinalText, Length('ord:') + 1, MaxInt));
         var LCompactExport := TDumpExport.Create;
-        LCompactExport.RawText := LLine;
-        LCompactExport.StartLine := LIndex + 1;
-        LCompactExport.SourceSpan.SyntaxHint := rshCppBuilderMethod;
-        LCompactExport.HasOrdinal := TryParseHexUIntToken(LOrdinalText,
-          LCompactExport.Ordinal);
-        if LEqualsPos > 0 then
-          LCompactExport.Name := Trim(Copy(LExportText, LEqualsPos + 1, MaxInt));
-        if (Length(LCompactExport.Name) >= 2) and (LCompactExport.Name[1] = '''') and
-          (LCompactExport.Name[Length(LCompactExport.Name)] = '''') then
-          LCompactExport.Name := Copy(LCompactExport.Name, 2,
-            Length(LCompactExport.Name) - 2);
-        LCompactExport.MangledName := LCompactExport.Name;
-        if not LCompactExport.HasOrdinal then
-        begin
+        try
+          LCompactExport.RawText := LLine;
+          LCompactExport.StartLine := LIndex + 1;
+          LCompactExport.SourceSpan.SyntaxHint := rshCppBuilderMethod;
+          LCompactExport.HasOrdinal := TryParseHexUIntToken(LOrdinalText,
+            LCompactExport.Ordinal);
+          if LEqualsPos > 0 then
+            LCompactExport.Name := Trim(Copy(LExportText, LEqualsPos + 1, MaxInt));
+          if (Length(LCompactExport.Name) >= 2) and (LCompactExport.Name[1] = '''') and
+            (LCompactExport.Name[Length(LCompactExport.Name)] = '''') then
+            LCompactExport.Name := Copy(LCompactExport.Name, 2,
+              Length(LCompactExport.Name) - 2);
+          LCompactExport.MangledName := LCompactExport.Name;
+          if not LCompactExport.HasOrdinal then
+          begin
+            AddUnsupportedStructure(uskUnknownHeading, LIndex + 1,
+              'Malformed compact export entry.');
+            AddDiagnostic(dsWarning, LIndex + 1, 'Malformed compact export entry.', LLine);
+            Continue;
+          end;
+          FDocument.ExportList.Add(LCompactExport);
+          LCompactExport := nil;
+        finally
           LCompactExport.Free;
-          AddUnsupportedStructure(uskUnknownHeading, LIndex + 1,
-            'Malformed compact export entry.');
-          AddDiagnostic(dsWarning, LIndex + 1, 'Malformed compact export entry.', LLine);
-          Continue;
         end;
-        FDocument.ExportList.Add(LCompactExport);
         Continue;
       end;
       var LMetadataProperty: TDumpProperty;
@@ -4458,7 +4462,7 @@ begin
         if StartsWithText(LTrimmed, 'cbSymbols:') or
           StartsWithText(LTrimmed, 'SymHash:') then
         begin
-          for var LLabel in SGlobalSymbolHeaderLabels do
+          for var LLabel in cGlobalSymbolHeaderLabels do
           begin
             var LRawValue := ValueForLabel(LLine, LLabel);
             if LRawValue = '' then
@@ -5386,19 +5390,24 @@ begin
     LLoadCommandsLine := FLines.Count;
 
   var LMachHeader := TDumpHeader.Create;
-  LMachHeader.Name := 'Mach Header';
-  LMachHeader.StartLine := LHeaderLine + 1;
-  LMachHeader.EndLine := LLoadCommandsLine;
-  for var LIndex := LHeaderLine + 1 to LLoadCommandsLine - 1 do
-  begin
-    var LProperty: TDumpProperty;
-    if TryParseMachPropertyLine(FLines[LIndex], LIndex + 1, LProperty) then
-      LMachHeader.Properties.Add(LProperty);
-  end;
-  if LMachHeader.Properties.Count > 0 then
-    FDocument.Headers.Add(LMachHeader)
-  else
+  try
+    LMachHeader.Name := 'Mach Header';
+    LMachHeader.StartLine := LHeaderLine + 1;
+    LMachHeader.EndLine := LLoadCommandsLine;
+    for var LIndex := LHeaderLine + 1 to LLoadCommandsLine - 1 do
+    begin
+      var LProperty: TDumpProperty;
+      if TryParseMachPropertyLine(FLines[LIndex], LIndex + 1, LProperty) then
+        LMachHeader.Properties.Add(LProperty);
+    end;
+    if LMachHeader.Properties.Count > 0 then
+    begin
+      FDocument.Headers.Add(LMachHeader);
+      LMachHeader := nil;
+    end;
+  finally
     LMachHeader.Free;
+  end;
   AddNode(nkHeader, 'Mach Header', LHeaderLine + 1, LLoadCommandsLine);
 
   var LCurrentCommand: TDumpMachLoadCommand := nil;

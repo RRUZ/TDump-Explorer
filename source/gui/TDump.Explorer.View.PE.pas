@@ -145,7 +145,7 @@ end;
 class procedure TPEView.PopulateRelocationBlock(AControl: THighlighterControl;
   ABlock: TDumpRelocationBlock);
 const
-  RelocationsPerRow = 4;
+  cRelocationsPerRow = 4;
 begin
   if (AControl = nil) or (ABlock = nil) then Exit;
   AControl.ParserMode := tpmTDumpValues;
@@ -165,7 +165,7 @@ begin
       tpmTDumpValues, tpmTDumpValues, tpmTDumpValues, tpmTDumpValues]);
 
     var LColumns: TArray<string>;
-    SetLength(LColumns, RelocationsPerRow * 2);
+    SetLength(LColumns, cRelocationsPerRow * 2);
     for var LEntryIndex := 0 to ABlock.Entries.Count - 1 do
     begin
       var LRelocation := ABlock.Entries[LEntryIndex];
@@ -173,18 +173,18 @@ begin
       if (LOffset = '') and LRelocation.HasOffset then
         LOffset := IntToHex(LRelocation.Offset, 4);
 
-      var LColumnIndex := (LEntryIndex mod RelocationsPerRow) * 2;
+      var LColumnIndex := (LEntryIndex mod cRelocationsPerRow) * 2;
       LColumns[LColumnIndex] := LRelocation.RelocationType;
       LColumns[LColumnIndex + 1] := LOffset;
-      if (LEntryIndex mod RelocationsPerRow) = RelocationsPerRow - 1 then
+      if (LEntryIndex mod cRelocationsPerRow) = cRelocationsPerRow - 1 then
       begin
         AControl.AddColumns(LColumns);
         LColumns := nil;
-        SetLength(LColumns, RelocationsPerRow * 2);
+        SetLength(LColumns, cRelocationsPerRow * 2);
       end;
     end;
 
-    if (ABlock.Entries.Count mod RelocationsPerRow) <> 0 then
+    if (ABlock.Entries.Count mod cRelocationsPerRow) <> 0 then
       AControl.AddColumns(LColumns);
   finally
     AControl.EndUpdate;

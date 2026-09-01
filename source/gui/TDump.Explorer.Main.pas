@@ -39,8 +39,8 @@ type
   end;
 
 const
-  CWMAnalysisProgress = WM_APP + $241;
-  CWMAnalysisCompleted = WM_APP + $242;
+  cWMAnalysisProgress = WM_APP + $241;
+  cWMAnalysisCompleted = WM_APP + $242;
 
 type
   TFrmMain = class(TForm)
@@ -74,6 +74,8 @@ type
     FTabImages: TVirtualImageList;
     FExplorerPopupMenu: TExplorerPopupMenuForm;
     FExplorerPopupImages: TVirtualImageList;
+    FRecentFilesPopupMenu: TExplorerPopupMenuForm;
+    FRecentFilesPopupFiles: TStringList;
     FDocumentStagingPanel: TCardPanel;
     FDeferredTabActivationTimer: TTimer;
     FPendingDocumentCards: TList<TCard>;
@@ -88,6 +90,8 @@ type
     procedure ApplyExplorerPopupMenuTheme;
     procedure ApplyEmptyStateTheme;
     procedure AddAnalysisProgressItem;
+    procedure AddRecentFile(const AFileName: string);
+    procedure AddOpenDocumentFilesToRecentItems;
     procedure AdvanceAnalysisProgress;
     procedure BeginAnalysis(ARequest: TAnalysisRequest);
     procedure CardsChanged(Sender: TObject; PrevCard, NextCard: TCard);
@@ -106,6 +110,7 @@ type
     procedure DrainAnalysisMessages;
     function HasPendingAnalysis: Boolean;
     function IsPendingDocumentCard(ACard: TCard): Boolean;
+    function IsDocumentOpen(const AFileName: string): Boolean;
     function CreateAnalysisRequest(const AFileName: string;
       AKind: TAnalysisKind): TAnalysisRequest;
     procedure CreateTabs;
@@ -124,7 +129,13 @@ type
     procedure ExplorerPopupMenuItemClick(Sender: TObject; AItemIndex: Integer);
     procedure InitializeExplorerPopupMenuImages;
     procedure PopulateExplorerPopupMenu;
+    procedure PopulateRecentFilesPopupMenu;
     procedure PopupMenuSettingsClick(Sender: TObject);
+    procedure RecentFilesPopupMenuItemClick(Sender: TObject;
+      AItemIndex: Integer);
+    procedure RecentFilesPopupMenuShortcut(Sender: TObject; AShortcut: Char);
+    function RecentFileShortcutCaption(AIndex: Integer): string;
+    function RecentFileShortcutIndex(AShortcut: Char): Integer;
     procedure TabsAddButtonClick(Sender: TObject);
     procedure TabsAfterPaintBackground(ACanvas: TCanvas;
       const ARect: TRect);
@@ -133,17 +144,22 @@ type
     procedure TabsBackgroundDblClick(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
     procedure TabsChanged(Sender: TObject; ANewIndex: Integer);
-    procedure TabsChevronButtonClick(Sender: TObject);
+    procedure TabsCustomButtonDraw(Sender: TObject;
+      AButton: TGlassTabCustomButton; ACanvas: TCanvas; const ARect,
+      AGlyphRect: TRect; AState: TGlassTabButtonDrawState;
+      AGlyphColor: TColor; var AHandled: Boolean);
+    procedure TabsCustomLeftButtonClick(Sender: TObject);
+    procedure TabsCustomRightButtonClick(Sender: TObject);
     procedure UpdateOverallProgress;
     procedure UpdateEmptyState;
     procedure TabsClosing(Sender: TObject; AIndex: Integer;
       var ACanClose: Boolean);
     procedure CMStyleChanged(var AMessage: TMessage); message CM_STYLECHANGED;
     procedure WMAnalysisCompleted(var AMessage: TMessage);
-      message CWMAnalysisCompleted;
+      message cWMAnalysisCompleted;
     procedure WMAnalysisProgress(var AMessage: TMessage);
-      message CWMAnalysisProgress;
-    procedure WMSettingsChanged(var AMessage: TMessage);  message WM_TDUMP_SETTINGS_CHANGED;
+      message cWMAnalysisProgress;
+    procedure WMSettingsChanged(var AMessage: TMessage);  message cWmTDumpSettingsChanged;
     procedure WMDropFiles(var AMessage: TWMDropFiles); message WM_DROPFILES;
   protected
     procedure CreateParams(var Params: TCreateParams); override;
@@ -168,17 +184,17 @@ uses
 {$R *.dfm}
 
 const
-  CTextProbeSize = 8192;
-  CReportValidationProbeSize = 64 * 1024;
-  CTitleBarHeight = 40;
-  CTitleBarButtonMargin = 150;
-  CTabIconSize = 16;
-  CCaptionFontSize = 11;
-  CBorderBlend = 0.82;
-  CInactiveTopBlend = 0.97;
-  CHoverTopBlend = 0.82;
-  CInactiveTextBlend = 0.35;
-  CCloseHoverBlend = 0.72;
+  cTextProbeSize = 8192;
+  cReportValidationProbeSize = 64 * 1024;
+  cTitleBarHeight = 40;
+  cTitleBarButtonMargin = 150;
+  cTabIconSize = 16;
+  cCaptionFontSize = 11;
+  cBorderBlend = 0.82;
+  cInactiveTopBlend = 0.97;
+  cHoverTopBlend = 0.82;
+  cInactiveTextBlend = 0.35;
+  cCloseHoverBlend = 0.72;
 
 { TEmptyStateDropZone }
 
@@ -218,7 +234,7 @@ function IsTDumpReportFile(const AFileName: string): Boolean;
 begin
   var LStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyWrite);
   try
-    var LReadCount := CReportValidationProbeSize;
+    var LReadCount := cReportValidationProbeSize;
     if LStream.Size < LReadCount then
       LReadCount := Integer(LStream.Size);
     if LReadCount <= 0 then
@@ -236,20 +252,20 @@ function ExplorerTabPalette(const ATheme: TExplorerTheme): TGlassTabPalette;
 begin
   Result.StripTop := ATheme.BackgroundColor;
   Result.StripBottom := ATheme.BackgroundColor;
-  Result.StripBorder := ColorBlendRGB(ATheme.TextColor, ATheme.BackgroundColor, CBorderBlend);
+  Result.StripBorder := ColorBlendRGB(ATheme.TextColor, ATheme.BackgroundColor, cBorderBlend);
   Result.BackgroundTopLine := ATheme.BackgroundColor;
   Result.TabTop := ATheme.BackgroundColor;
   Result.TabBottom := ATheme.BackgroundColor;
-  Result.InactiveTop := ColorBlendRGB(ATheme.TextColor,  ATheme.BackgroundColor, CInactiveTopBlend);
+  Result.InactiveTop := ColorBlendRGB(ATheme.TextColor,  ATheme.BackgroundColor, cInactiveTopBlend);
   Result.InactiveBottom := ATheme.BackgroundColor;
-  Result.HoverTop := ColorBlendRGB(ATheme.SelectionColor,  ATheme.BackgroundColor, CHoverTopBlend);
+  Result.HoverTop := ColorBlendRGB(ATheme.SelectionColor,  ATheme.BackgroundColor, cHoverTopBlend);
   Result.HoverBottom := ATheme.BackgroundColor;
   Result.Accent := ATheme.SelectionColor;
 
   Result.Text := ATheme.TextColor;
   Result.InactiveText := ATheme.InactiveText;
 
-  Result.CloseHover := ColorBlendRGB(ATheme.SelectionColor, ATheme.BackgroundColor, CCloseHoverBlend);
+  Result.CloseHover := ColorBlendRGB(ATheme.SelectionColor, ATheme.BackgroundColor, cCloseHoverBlend);
 end;
 
 type
@@ -360,7 +376,7 @@ begin
   LUpdate.Phase := APhase;
   LUpdate.CompletedLines := ACompletedLines;
   LUpdate.TotalLines := ATotalLines;
-  if not PostMessage(AWindowHandle, CWMAnalysisProgress, 0,
+  if not PostMessage(AWindowHandle, cWMAnalysisProgress, 0,
     LPARAM(LUpdate)) then
     LUpdate.Free;
 end;
@@ -384,7 +400,7 @@ begin
   LCompletion.DiagnosticCount := ADiagnosticCount;
   LCompletion.TDumpParameters := ATDumpParameters;
   LCompletion.Document := ADocument;
-  if not PostMessage(AWindowHandle, CWMAnalysisCompleted, 0,
+  if not PostMessage(AWindowHandle, cWMAnalysisCompleted, 0,
     LPARAM(LCompletion)) then
     LCompletion.Free;
 end;
@@ -449,7 +465,7 @@ begin
   ADiagnosticCount := 0;
   ATDumpParameters := '';
   ADocument := nil;
-  if TFile.GetSize(AFileName) > CMaxTDumpReportSize then
+  if TFile.GetSize(AFileName) > cMaxTDumpReportSize then
   begin
     Result := Format('%s exceeds the 100 MB file limit.', [AFileName]);
     Exit;
@@ -523,7 +539,7 @@ begin
     FTabs.Items[LIndex].ImageName := LImageName;
 
   CustomTitleBar.SystemHeight := False;
-  CustomTitleBar.Height := ScaleValue(CTitleBarHeight);
+  CustomTitleBar.Height := ScaleValue(cTitleBarHeight);
   CustomTitleBar.SystemColors := False;
   CustomTitleBar.StyleColors := False;
   CustomTitleBar.SystemButtons := False;
@@ -550,18 +566,21 @@ begin
 end;
 
 procedure TFrmMain.ApplyExplorerPopupMenuTheme;
-begin
-  if not Assigned(FExplorerPopupMenu) then
-    Exit;
+  procedure ApplyTo(APopupMenu: TExplorerPopupMenuForm);
+  begin
+    if not Assigned(APopupMenu) then
+      Exit;
 
-  var LTheme := TExplorerTheme.ActiveTheme;
-  FExplorerPopupMenu.Color := LTheme.BackgroundColor;
-  //FExplorerPopupMenu.CustomTitleBar.BackgroundColor := LTheme.BackgroundColor;
-  //FExplorerPopupMenu.CustomTitleBar.InactiveBackgroundColor := LTheme.BackgroundColor;
-  FExplorerPopupMenu.MenuItems.ControlList1.BorderStyle := bsNone;
-  FExplorerPopupMenu.MenuItems.Color := LTheme.BackgroundColor;
-  FExplorerPopupMenu.MenuItems.HighlightColor := ColorBlendRGB(
-    LTheme.SelectionColor, LTheme.BackgroundColor, 0.95);
+    var LTheme := TExplorerTheme.ActiveTheme;
+    APopupMenu.Color := LTheme.BackgroundColor;
+    APopupMenu.MenuItems.ControlList1.BorderStyle := bsNone;
+    APopupMenu.MenuItems.Color := LTheme.BackgroundColor;
+    APopupMenu.MenuItems.HighlightColor := ColorBlendRGB(
+      LTheme.SelectionColor, LTheme.BackgroundColor, 0.95);
+  end;
+begin
+  ApplyTo(FExplorerPopupMenu);
+  ApplyTo(FRecentFilesPopupMenu);
 end;
 
 procedure TFrmMain.ApplicationEvents1Idle(Sender: TObject; var Done: Boolean);
@@ -631,24 +650,29 @@ end;
 procedure TFrmMain.CreateTabs;
 begin
   FTabImages := TVirtualImageList.Create(Self);
-  FTabImages.Width := CTabIconSize;
-  FTabImages.Height := CTabIconSize;
+  FTabImages.Width := cTabIconSize;
+  FTabImages.Height := cTabIconSize;
 
   FTabs := TGlassTabStrip.Create(Self);
   FTabs.Parent := TitleBarPanel1;
   FTabs.Images := FTabImages;
   FTabs.Margins.Left := 0;
   FTabs.Margins.Top := 0;
-  FTabs.Margins.Right := ScaleValue(CTitleBarButtonMargin);
+  FTabs.Margins.Right := ScaleValue(cTitleBarButtonMargin);
   FTabs.Margins.Bottom := 0;
   FTabs.AlignWithMargins := True;
   FTabs.Align := alBottom;
-  FTabs.TabHeight := CTitleBarHeight;
+  FTabs.TabHeight := cTitleBarHeight;
   FTabs.Font.Assign(Font);
   FTabs.ShowAddButton := True;
-  FTabs.ShowChevronButton := True;
+  FTabs.ShowCustomLeftButton := True;
+  FTabs.ShowCustomRightButton := True;
+  FTabs.CustomLeftButtonHint := 'Explorer menu';
+  FTabs.CustomRightButtonHint := 'Recent files';
   FTabs.OnAddButtonClick := TabsAddButtonClick;
-  FTabs.OnChevronButtonClick := TabsChevronButtonClick;
+  FTabs.OnCustomButtonDraw := TabsCustomButtonDraw;
+  FTabs.OnCustomLeftButtonClick := TabsCustomLeftButtonClick;
+  FTabs.OnCustomRightButtonClick := TabsCustomRightButtonClick;
   FTabs.OnChange := TabsChanged;
   FTabs.OnCloseTab := TabsClosing;
   FTabs.OnBackgroundMouseDown := TabsBackgroundMouseDown;
@@ -656,7 +680,7 @@ begin
   FTabs.OnAfterPaintBackground := TabsAfterPaintBackground;
   FTabs.SendToBack;
 
-  TitleBarPanel1.Height := ScaleValue(CTitleBarHeight);
+  TitleBarPanel1.Height := ScaleValue(cTitleBarHeight);
   CardPanel1.Caption := '';
   CardPanel1.OnCardChange := CardsChanged;
   ApplyTheme;
@@ -756,7 +780,7 @@ begin
   FPhosphorIcon := TPhosphorIcon.Create(Self);
   FPhosphorIcon.Align := alClient;
   FPhosphorIcon.StyleElements := FPhosphorIcon.StyleElements - [seClient];
-  FPhosphorIcon.IconCode := ph_binary;
+  FPhosphorIcon.IconCode := cPhBinary;
   FPhosphorIcon.Weight := pfwRegular;
   FEmptyStateIconHost.ControlCollection.AddControl(FPhosphorIcon, 1, 0);
 
@@ -929,6 +953,95 @@ begin
   end;
 end;
 
+procedure TFrmMain.PopulateRecentFilesPopupMenu;
+begin
+  if not Assigned(FRecentFilesPopupMenu) then
+    Exit;
+
+  var LIconName := 'binary_dark';
+  if IsLightThemeActive then
+    LIconName := 'binary_light';
+
+  var LInactiveItems := TList<Integer>.Create;
+  try
+    var LMenuItems := FRecentFilesPopupMenu.MenuItems;
+    LMenuItems.BeginUpdate;
+    try
+      LMenuItems.ControlList1.ItemHeight := ScaleValue(24);
+      LMenuItems.Clear;
+      FRecentFilesPopupFiles.Clear;
+      for var LIndex := 0 to TSettings.Instance.RecentItemCount - 1 do
+      begin
+        var LFileName := TSettings.Instance.RecentItem(LIndex);
+        if IsDocumentOpen(LFileName) then
+          Continue;
+        var LVisibleIndex := FRecentFilesPopupFiles.Count;
+        FRecentFilesPopupFiles.Add(LFileName);
+        LMenuItems.Add(Format('%s  %s', [
+          RecentFileShortcutCaption(LVisibleIndex), LFileName]), LIconName);
+        if not FileExists(LFileName) then
+          LInactiveItems.Add(LVisibleIndex);
+      end;
+      if LMenuItems.Count = 0 then
+      begin
+        LMenuItems.Add('No recent files');
+        LInactiveItems.Add(0);
+      end;
+    finally
+      LMenuItems.EndUpdate;
+    end;
+    LMenuItems.SetInactiveItems(LInactiveItems.ToArray);
+  finally
+    LInactiveItems.Free;
+  end;
+end;
+
+procedure TFrmMain.RecentFilesPopupMenuItemClick(Sender: TObject;
+  AItemIndex: Integer);
+begin
+  if (AItemIndex < 0) or
+    (AItemIndex >= FRecentFilesPopupFiles.Count) then
+    Exit;
+
+  var LFileName := FRecentFilesPopupFiles[AItemIndex];
+  if not FileExists(LFileName) then
+  begin
+    TSettings.Instance.RemoveRecentItem(LFileName);
+    TSettings.Instance.Save;
+    Exit;
+  end;
+  OpenInputFile(LFileName);
+end;
+
+function TFrmMain.RecentFileShortcutCaption(AIndex: Integer): string;
+begin
+  if AIndex < 9 then
+    Exit((AIndex + 1).ToString);
+  if AIndex < 35 then
+    Exit(Chr(Ord('A') + AIndex - 9));
+  Result := '';
+end;
+
+function TFrmMain.RecentFileShortcutIndex(AShortcut: Char): Integer;
+begin
+  AShortcut := UpCase(AShortcut);
+  if CharInSet(AShortcut, ['1'..'9']) then
+    Exit(Ord(AShortcut) - Ord('1'));
+  if CharInSet(AShortcut, ['A'..'Z']) then
+    Exit(9 + Ord(AShortcut) - Ord('A'));
+  Result := -1;
+end;
+
+procedure TFrmMain.RecentFilesPopupMenuShortcut(Sender: TObject;
+  AShortcut: Char);
+begin
+  var LIndex := RecentFileShortcutIndex(AShortcut);
+  if (LIndex < 0) or (LIndex >= FRecentFilesPopupFiles.Count) then
+    Exit;
+  FRecentFilesPopupMenu.Hide;
+  RecentFilesPopupMenuItemClick(Self, LIndex);
+end;
+
 procedure TFrmMain.PopupMenuAboutClick(Sender: TObject);
 begin
   // About action stub.
@@ -964,7 +1077,7 @@ begin
     LOriginalFont.Assign(ACanvas.Font);
     ACanvas.Font.Assign(Font);
     ACanvas.Font.Name := TExplorerTheme.FontName;
-    ACanvas.Font.Height := -ScaleValue(CCaptionFontSize);
+    ACanvas.Font.Height := -ScaleValue(cCaptionFontSize);
     ACanvas.Font.Style := [];
     ACanvas.Font.Color := FTabs.Palette.InactiveText;
     var LOldBackgroundMode := SetBkMode(ACanvas.Handle, TRANSPARENT);
@@ -1017,7 +1130,21 @@ begin
   end;
 end;
 
-procedure TFrmMain.TabsChevronButtonClick(Sender: TObject);
+procedure TFrmMain.TabsCustomButtonDraw(Sender: TObject;
+  AButton: TGlassTabCustomButton; ACanvas: TCanvas; const ARect,
+  AGlyphRect: TRect; AState: TGlassTabButtonDrawState;
+  AGlyphColor: TColor; var AHandled: Boolean);
+begin
+  AHandled := False;
+  if AButton <> gtcbRight then
+    Exit;
+
+  PhosphorFont.DrawIcon(ACanvas.Handle, cPhClockCounterClockwise,
+    AGlyphRect, AGlyphColor, pfwRegular);
+  AHandled := True;
+end;
+
+procedure TFrmMain.TabsCustomLeftButtonClick(Sender: TObject);
 begin
   if FExplorerPopupMenu = nil then
   begin
@@ -1032,12 +1159,27 @@ begin
   FExplorerPopupMenu.ShowAt(Mouse.CursorPos);
 end;
 
+procedure TFrmMain.TabsCustomRightButtonClick(Sender: TObject);
+begin
+  if FRecentFilesPopupMenu = nil then
+  begin
+    FRecentFilesPopupMenu := TExplorerPopupMenuForm.Create(Self);
+    FRecentFilesPopupMenu.MenuItems.Images := FTabImages;
+    FRecentFilesPopupMenu.OnItemClick := RecentFilesPopupMenuItemClick;
+    FRecentFilesPopupMenu.OnShortcut := RecentFilesPopupMenuShortcut;
+  end;
+  ApplyExplorerPopupMenuTheme;
+  PopulateRecentFilesPopupMenu;
+  FRecentFilesPopupMenu.ShowAt(Mouse.CursorPos);
+end;
+
 procedure TFrmMain.TabsClosing(Sender: TObject; AIndex: Integer;
   var ACanClose: Boolean);
 begin
   ACanClose := (AIndex >= 0) and (AIndex < CardPanel1.CardCount);
   if not ACanClose then
     Exit;
+  AddRecentFile(CardPanel1.Cards[AIndex].Hint);
   RemoveDocumentCard(CardPanel1.Cards[AIndex], False);
 end;
 
@@ -1047,6 +1189,7 @@ begin
   Splitter1.OnPaint := SplitterPaint;
   FPendingFiles := TQueue<TAnalysisRequest>.Create;
   FPendingDocumentCards := TList<TCard>.Create;
+  FRecentFilesPopupFiles := TStringList.Create;
   FDocumentStagingPanel := TCardPanel.Create(Self);
   FDocumentStagingPanel.Visible := False;
   FDocumentStagingPanel.SetBounds(-1, -1, 1, 1);
@@ -1287,24 +1430,27 @@ begin
     FAnalysisTask := nil;
   end;
   DrainAnalysisMessages;
+  AddOpenDocumentFilesToRecentItems;
   FActiveRequest.Free;
   while FPendingFiles.Count > 0 do
     FPendingFiles.Dequeue.Free;
   FPendingFiles.Free;
   FPendingDocumentCards.Free;
+  FRecentFilesPopupFiles.Free;
   inherited;
 end;
 
 procedure TFrmMain.DrainAnalysisMessages;
 begin
   var LMessage: TMsg;
-  while PeekMessage(LMessage, Handle, CWMAnalysisProgress,
-    CWMAnalysisCompleted, PM_REMOVE) do
+  while PeekMessage(LMessage, Handle, cWMAnalysisProgress,
+    cWMAnalysisCompleted, PM_REMOVE) do
     DispatchMessage(LMessage);
 end;
 
 procedure TFrmMain.FormCreate(Sender: TObject);
 begin
+  TSettings.Instance.Load;
   SyncActiveTheme;
 end;
 
@@ -1331,7 +1477,7 @@ function TFrmMain.IsTextFile(const AFileName: string): Boolean;
 begin
   var LStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyWrite);
   try
-    var LReadCount := CTextProbeSize;
+    var LReadCount := cTextProbeSize;
     if LStream.Size < LReadCount then
       LReadCount := Integer(LStream.Size);
     if LReadCount = 0 then
@@ -1458,10 +1604,57 @@ begin
   Result := FPendingDocumentCards.Contains(ACard);
 end;
 
+function TFrmMain.IsDocumentOpen(const AFileName: string): Boolean;
+begin
+  for var LIndex := 0 to CardPanel1.CardCount - 1 do
+    if SameText(CardPanel1.Cards[LIndex].Hint, AFileName) then
+      Exit(True);
+  for var LCard in FPendingDocumentCards do
+    if SameText(LCard.Hint, AFileName) then
+      Exit(True);
+  if Assigned(FActiveRequest) and not FActiveRequest.Discarded and
+    SameText(FActiveRequest.FileName, AFileName) then
+    Exit(True);
+  for var LRequest in FPendingFiles do
+    if not LRequest.Discarded and SameText(LRequest.FileName, AFileName) then
+      Exit(True);
+  Result := False;
+end;
+
 procedure TFrmMain.AddAnalysisProgressItem;
 begin
   Inc(FProgressTotalFiles);
   UpdateOverallProgress;
+end;
+
+procedure TFrmMain.AddRecentFile(const AFileName: string);
+begin
+  if AFileName = '' then
+    Exit;
+  TSettings.Instance.AddRecentItem(AFileName);
+  TSettings.Instance.Save;
+end;
+
+procedure TFrmMain.AddOpenDocumentFilesToRecentItems;
+begin
+  var LAddedItems := False;
+  for var LIndex := 0 to CardPanel1.CardCount - 1 do
+  begin
+    var LFileName := CardPanel1.Cards[LIndex].Hint;
+    if LFileName <> '' then
+    begin
+      TSettings.Instance.AddRecentItem(LFileName);
+      LAddedItems := True;
+    end;
+  end;
+  for var LCard in FPendingDocumentCards do
+    if LCard.Hint <> '' then
+    begin
+      TSettings.Instance.AddRecentItem(LCard.Hint);
+      LAddedItems := True;
+    end;
+  if LAddedItems then
+    TSettings.Instance.Save;
 end;
 
 procedure TFrmMain.AdvanceAnalysisProgress;
@@ -1563,7 +1756,7 @@ begin
   var LExpandedFileName := ExpandFileName(AFileName);
   var LKind: TAnalysisKind;
   try
-    if TFile.GetSize(LExpandedFileName) > CMaxTDumpReportSize then
+    if TFile.GetSize(LExpandedFileName) > cMaxTDumpReportSize then
     begin
       LogControl1.Add(Format('%s exceeds the 100 MB file limit.',
         [LExpandedFileName]), letWarning);

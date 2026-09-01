@@ -49,6 +49,7 @@ type
       FHighlightColor: TColor;
       FMatchColor: TColor;
       FHighlightedItems: TList<Integer>;
+      FInactiveItems: TList<Integer>;
       FHighlightedRangeStart: Integer;
       FHighlightedRangeEnd: Integer;
       FLineNumbers: TList<Integer>;
@@ -64,6 +65,7 @@ type
     function ItemText(AItemIndex: Integer): string;
     function ItemParserMode(AItemIndex: Integer): Integer;
     function IsItemHighlighted(AItemIndex: Integer): Boolean;
+    function IsItemInactive(AItemIndex: Integer): Boolean;
     procedure SetMatchColor(const AValue: TColor);
     procedure SetImages(const AValue: TCustomImageList);
     function ColumnCount(const AText: string): Integer;
@@ -131,6 +133,7 @@ type
     procedure SetText(const AText: string);
     procedure SetItemProvider(const AProvider: IHighlighterRowProvider);
     procedure SetHighlightedItems(const AItemIndexes: array of Integer);
+    procedure SetInactiveItems(const AItemIndexes: array of Integer);
     procedure SetHighlightedRange(AStartItemIndex, AEndItemIndex: Integer);
     procedure SelectItem(AItemIndex: Integer);
     procedure ScrollItemToTop(AItemIndex: Integer);
@@ -173,6 +176,7 @@ begin
   FColumnHeaders := TStringList.Create;
   FMeasureBitmap := TBitmap.Create;
   FHighlightedItems := TList<Integer>.Create;
+  FInactiveItems := TList<Integer>.Create;
   FHighlightedRangeStart := -1;
   FHighlightedRangeEnd := -1;
   FLineNumbers := TList<Integer>.Create;
@@ -202,6 +206,7 @@ begin
   FItemImageNames.Free;
   FItemParserModes.Free;
   FLineNumbers.Free;
+  FInactiveItems.Free;
   FHighlightedItems.Free;
   FColumnHeaders.Free;
   FItems.Free;
@@ -450,6 +455,7 @@ begin
   FItemImageNames.Clear;
   FItemParserModes.Clear;
   FLineNumbers.Clear;
+  FInactiveItems.Clear;
   FColumnHeaders.Clear;
   SetLength(FColumnDataTypes, 0);
   SetLength(FColumnParserModes, 0);
@@ -538,6 +544,7 @@ begin
   FItemProvider := nil;
   var LPreviousItemIndex := ControlList1.ItemIndex;
   ClearHighlightedItems;
+  FInactiveItems.Clear;
   FColumnHeaders.Clear;
   SetLength(FColumnDataTypes, 0);
   SetLength(FColumnParserModes, 0);
@@ -694,6 +701,11 @@ begin
   Result := False;
 end;
 
+function THighlighterControl.IsItemInactive(AItemIndex: Integer): Boolean;
+begin
+  Result := FInactiveItems.Contains(AItemIndex);
+end;
+
 procedure THighlighterControl.CMStyleChanged(var AMessage: TMessage);
 begin
   inherited;
@@ -719,6 +731,18 @@ begin
     LUniqueItems.Free;
   end;
   FHighlightedItems.Sort;
+  ControlList1.Invalidate;
+end;
+
+procedure THighlighterControl.SetInactiveItems(
+  const AItemIndexes: array of Integer);
+begin
+  FInactiveItems.Clear;
+  for var LItemIndex in AItemIndexes do
+    if (LItemIndex >= 0) and (LItemIndex < ItemCount) and
+      not FInactiveItems.Contains(LItemIndex) then
+      FInactiveItems.Add(LItemIndex);
+  FInactiveItems.Sort;
   ControlList1.Invalidate;
 end;
 
@@ -784,9 +808,13 @@ procedure THighlighterControl.ControlList1BeforeDrawItem(AIndex: Integer;
 var
   LFillColor: TColor;
   LTextFormat: TTextFormat;
+  LSelected: Boolean;
+  LBrushStyle: TBrushStyle;
 begin
   if (AIndex < 0) or (AIndex >= ItemCount) then
     Exit;
+
+  LSelected := odSelected in AState;
 
   if IsItemHighlighted(AIndex) then
   begin
@@ -796,7 +824,7 @@ begin
     ACanvas.FillRect(LMarkerRect);
   end;
 
-  if (odSelected in AState) then
+  if LSelected then
   begin
     LFillColor := ColorBlendRGB(TExplorerTheme.ActiveTheme.SelectionColor, TExplorerTheme.ActiveTheme.BackgroundColor, 0.9);
     if IsWindows11 then
@@ -820,18 +848,33 @@ begin
 
   var LTextRect := ARect;
   InflateRect(LTextRect, -CTextPadding, 0);
-  ACanvas.Font.Name := Font.Name;//TExplorerTheme.FontName;
-  ACanvas.Font.Size := Font.Size;//TExplorerTheme.FontSize;
+  ACanvas.Font.Name := Font.Name;
+  ACanvas.Font.Size := Font.Size;
+  LBrushStyle := ACanvas.Brush.Style;
+  if LSelected then
+    ACanvas.Brush.Style := bsClear;
+
   if FShowLineNumbers then
   begin
     var LGutterWidth := LineNumberGutterWidth;
     var LGutterRect := ARect;
     LGutterRect.Right := Min(LGutterRect.Right, LGutterRect.Left + LGutterWidth);
     InflateRect(LGutterRect, -CTextPadding, 0);
-    FHighlighter.TextRect(ACanvas, LGutterRect, IntToHex(DisplayLineNumber(AIndex), 8) + ':',
-      FThemeKind, [tfRight, tfVerticalCenter, tfSingleLine, tfNoPrefix], tpmTDumpValues, thdtHexadecimal);
+    if LSelected then
+    begin
+      ACanvas.Font.Color := TExplorerTheme.ActiveTheme.SelectionColor;
+      var LGutterText := IntToHex(DisplayLineNumber(AIndex), 8) + ':';
+      ACanvas.TextRect(LGutterRect, LGutterText,
+        [tfRight, tfVerticalCenter, tfSingleLine, tfNoPrefix]);
+    end
+    else
+      FHighlighter.TextRect(ACanvas, LGutterRect,
+        IntToHex(DisplayLineNumber(AIndex), 8) + ':', FThemeKind,
+        [tfRight, tfVerticalCenter, tfSingleLine, tfNoPrefix],
+        tpmTDumpValues, thdtHexadecimal);
     LTextRect.Left := Min(LTextRect.Right, LTextRect.Left + LGutterWidth);
   end;
+
   if FImages <> nil then
   begin
     var LImageName := ItemImageName(AIndex);
@@ -848,6 +891,32 @@ begin
       end;
     end;
   end;
+
+  if IsItemInactive(AIndex) and not LSelected then
+  begin
+    ACanvas.Font.Color := TExplorerTheme.ActiveTheme.InactiveText;
+    var LInactiveLeft := LTextRect.Left;
+    for var LColumnIndex := 0 to FColumnCount - 1 do
+    begin
+      var LInactiveRect := LTextRect;
+      LInactiveRect.Left := LInactiveLeft;
+      LInactiveRect.Right := LInactiveRect.Left +
+        ColumnWidth(LColumnIndex, LTextRect.Width);
+      if LColumnIndex = FColumnCount - 1 then
+        LInactiveRect.Right := LTextRect.Right;
+      if LInactiveRect.Left >= LTextRect.Right then
+        Break;
+      var LInactiveFormat: TTextFormat := [tfLeft, tfVerticalCenter,
+        tfSingleLine, tfNoPrefix];
+      if FUseEndEllipsis then
+        Include(LInactiveFormat, tfEndEllipsis);
+      var LInactiveText := ColumnText(AIndex, LColumnIndex);
+      ACanvas.TextRect(LInactiveRect, LInactiveText, LInactiveFormat);
+      LInactiveLeft := LInactiveRect.Right;
+    end;
+    Exit;
+  end;
+
   var LLeft := LTextRect.Left;
   for var LColumnIndex := 0 to FColumnCount - 1 do
   begin
@@ -867,11 +936,20 @@ begin
     if FUseEndEllipsis then
       Include(LTextFormat, tfEndEllipsis);
     var LColumnText := ColumnText(AIndex, LColumnIndex);
-    FHighlighter.TextRect(ACanvas, LColumnRect, LColumnText, FThemeKind, LTextFormat,
-      LParserMode, ColumnDataType(LColumnIndex));
-    DrawFilterMatches(ACanvas, LColumnRect, LColumnText);
+    if LSelected then
+    begin
+      ACanvas.Font.Color := TExplorerTheme.ActiveTheme.SelectionColor;
+      ACanvas.TextRect(LColumnRect, LColumnText, LTextFormat);
+    end
+    else
+    begin
+      FHighlighter.TextRect(ACanvas, LColumnRect, LColumnText, FThemeKind,
+        LTextFormat, LParserMode, ColumnDataType(LColumnIndex));
+      DrawFilterMatches(ACanvas, LColumnRect, LColumnText);
+    end;
     LLeft := LColumnRect.Right;
   end;
+  ACanvas.Brush.Style := LBrushStyle;
 end;
 
 procedure THighlighterControl.ControlList1KeyDown(Sender: TObject;

@@ -418,20 +418,18 @@ class procedure TDocumentTreeBuilder.Populate(ATree: TVirtualStringTree;
 begin
   if ATree = nil then
     Exit;
+  var LBuilder: TDocumentTreeBuilder := nil;
   ATree.BeginUpdate;
   try
     ATree.Clear;
     if ADocument = nil then
       Exit;
-    var LBuilder := TDocumentTreeBuilder.Create(ATree);
-    try
-      var LRootNode := LBuilder.Build(ADocument);
-      LBuilder.CacheSourceSpans(ADocument);
-      ATree.Expanded[LRootNode] := True;
-    finally
-      LBuilder.Free;
-    end;
+    LBuilder := TDocumentTreeBuilder.Create(ATree);
+    var LRootNode := LBuilder.Build(ADocument);
+    LBuilder.CacheSourceSpans(ADocument);
+    ATree.Expanded[LRootNode] := True;
   finally
+    LBuilder.Free;
     ATree.EndUpdate;
   end;
 end;

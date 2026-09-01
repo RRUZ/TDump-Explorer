@@ -11,7 +11,7 @@ uses
   TDump.Explorer.Runner in '..\source\common\TDump.Explorer.Runner.pas';
 
 const
-  CDefaultInputFile = '..\binaries\Package.Win64.bpl';
+  cDefaultInputFile = '..\binaries\Package.Win64.bpl';
 
 procedure WriteUsage;
 begin
@@ -43,7 +43,7 @@ end;
 begin
   ReportMemoryLeaksOnShutdown := True;
   try
-    var LInputFileName := CDefaultInputFile;
+    var LInputFileName := cDefaultInputFile;
     if ParamCount >= 1 then
       LInputFileName := ParamStr(1);
 

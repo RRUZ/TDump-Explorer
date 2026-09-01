@@ -14,12 +14,12 @@ uses
   TDump.Explorer.Runner in '..\source\common\TDump.Explorer.Runner.pas';
 
 const
-  CGeneratedFixtureDirectory = 'C:\dev\TDump-Explorer\fixtures\generated';
-  CTestResultsDirectory = 'C:\dev\TDump-Explorer\tests\test-results';
-  CTestResultsFile = CTestResultsDirectory + '\TDumpParserTests.nunit.xml';
-  CTurboDumpBannerFixture =
+  cGeneratedFixtureDirectory = 'C:\dev\TDump-Explorer\fixtures\generated';
+  cTestResultsDirectory = 'C:\dev\TDump-Explorer\tests\test-results';
+  cTestResultsFile = cTestResultsDirectory + '\TDumpParserTests.nunit.xml';
+  cTurboDumpBannerFixture =
     'C:\dev\TDump-Explorer\fixtures\PlainVanilla.Delphi.Package.bpl.tdump';
-  CLargeVCLFixture =
+  cLargeVCLFixture =
     'C:\dev\TDump-Explorer\fixtures\PlainVanilla.VCL.Application.tdump';
 
 type
@@ -69,7 +69,7 @@ function ParseGeneratedFixture(const AFileName: string): TDumpDocument;
 begin
   var LParser := TDumpParser.Create;
   try
-    Result := LParser.ParseFile(TPath.Combine(CGeneratedFixtureDirectory,
+    Result := LParser.ParseFile(TPath.Combine(cGeneratedFixtureDirectory,
       AFileName));
   finally
     LParser.Free;
@@ -113,7 +113,7 @@ end;
 
 procedure TestTDumpReportRecognition;
 begin
-  var LFixtureFiles := TDirectory.GetFiles(CGeneratedFixtureDirectory,
+  var LFixtureFiles := TDirectory.GetFiles(cGeneratedFixtureDirectory,
     '*.tdump', TSearchOption.soAllDirectories);
   Require(Length(LFixtureFiles) > 0,
     'Generated TDUMP fixtures must be available for report recognition.');
@@ -130,13 +130,13 @@ end;
 
 procedure TestTDumpBinaryFileRecognition;
 const
-  CSupportedBinaryNames: array[0..19] of string = ('sample.exe', 'sample.dll',
+  cSupportedBinaryNames: array[0..19] of string = ('sample.exe', 'sample.dll',
     'sample.bpl', 'sample.dpl', 'sample.ocx', 'sample.cpl', 'sample.scr',
     'sample.com', 'sample.sys', 'sample.obj', 'sample.lib', 'sample.dcu',
     'sample.elf', 'sample.ar', 'sample.o', 'sample.a', 'sample.so',
     'sample.dylib', 'sample.bundle', 'sample.mach');
 begin
-  for var LFileName in CSupportedBinaryNames do
+  for var LFileName in cSupportedBinaryNames do
     Require(IsTDumpBinaryFile(LFileName), LFileName +
       ' must be recognized as a TDUMP binary input.');
   Require(IsTDumpBinaryFile('DCU.System.Win32.DCU'),
@@ -201,10 +201,10 @@ end;
 
 procedure TestDelphiUnitDiagnostics;
 const
-  CDCUFixtures: array[0..1] of string = ('DCU.System.Win32.invalid-magic.tdump',
+  cDCUFixtures: array[0..1] of string = ('DCU.System.Win32.invalid-magic.tdump',
     'DCU.Win32.invalid-magic.tdump');
 begin
-  for var LFixtureName in CDCUFixtures do
+  for var LFixtureName in cDCUFixtures do
   begin
     var LDocument := ParseGeneratedFixture(LFixtureName);
     try
@@ -273,7 +273,7 @@ procedure TestTurboDumpMetadata;
 begin
   var LParser := TDumpParser.Create;
   try
-    var LDocument := LParser.ParseFile(CTurboDumpBannerFixture);
+    var LDocument := LParser.ParseFile(cTurboDumpBannerFixture);
     try
       Require(LDocument.TurboDumpHeader =
         'Turbo Dump  Version 6.6.2.0 Copyright (c) 1988-2022 Embarcadero Technologies, Inc.',
@@ -558,7 +558,7 @@ end;
 
 procedure TestGeneratedFixtureCoverage;
 begin
-  var LFixtureFiles := TDirectory.GetFiles(CGeneratedFixtureDirectory,
+  var LFixtureFiles := TDirectory.GetFiles(cGeneratedFixtureDirectory,
     '*.tdump', TSearchOption.soAllDirectories);
   Require(Length(LFixtureFiles) > 0, 'Generated fixture corpus must not be empty.');
   for var LFixtureFileName in LFixtureFiles do
@@ -581,7 +581,7 @@ end;
 
 procedure TestGeneratedPECoreProjection;
 begin
-  var LFixtureFiles := TDirectory.GetFiles(CGeneratedFixtureDirectory,
+  var LFixtureFiles := TDirectory.GetFiles(cGeneratedFixtureDirectory,
     '*.pe-core.tdump', TSearchOption.soAllDirectories);
   Require(Length(LFixtureFiles) > 0,
     'Generated PE core fixtures must be available.');
@@ -608,7 +608,7 @@ end;
 
 procedure TestGeneratedCompactProjections;
 begin
-  var LImportFixtures := TDirectory.GetFiles(CGeneratedFixtureDirectory,
+  var LImportFixtures := TDirectory.GetFiles(cGeneratedFixtureDirectory,
     '*.imports.tdump', TSearchOption.soAllDirectories);
   Require(Length(LImportFixtures) > 0,
     'Generated compact-import fixtures must be available.');
@@ -626,7 +626,7 @@ begin
     end;
   end;
 
-  var LExportFixtures := TDirectory.GetFiles(CGeneratedFixtureDirectory,
+  var LExportFixtures := TDirectory.GetFiles(cGeneratedFixtureDirectory,
     '*.exports.tdump', TSearchOption.soAllDirectories);
   Require(Length(LExportFixtures) > 0,
     'Generated compact-export fixtures must be available.');
@@ -647,7 +647,7 @@ end;
 
 procedure TestInvalidFixtureFallback;
 begin
-  var LFixtureFiles := TDirectory.GetFiles(CGeneratedFixtureDirectory,
+  var LFixtureFiles := TDirectory.GetFiles(cGeneratedFixtureDirectory,
     '*.tdump', TSearchOption.soAllDirectories);
   var LInvalidCount := 0;
   for var LFixtureFileName in LFixtureFiles do
@@ -681,10 +681,10 @@ end;
 
 procedure TestDebugInformationProjection;
 const
-  CDebugFixtures: array[0..1] of string = (
+  cDebugFixtures: array[0..1] of string = (
     'Package.Win32.debug.tdump', 'Package.Win64.debug.tdump');
 begin
-  for var LFixtureName in CDebugFixtures do
+  for var LFixtureName in cDebugFixtures do
   begin
     var LDocument := ParseGeneratedFixture(LFixtureName);
     try
@@ -706,7 +706,7 @@ end;
 
 procedure TestGeneratedDocumentIntegrity;
 begin
-  var LFixtureFiles := TDirectory.GetFiles(CGeneratedFixtureDirectory,
+  var LFixtureFiles := TDirectory.GetFiles(cGeneratedFixtureDirectory,
     '*.tdump', TSearchOption.soAllDirectories);
   Require(Length(LFixtureFiles) >= 30,
     'The generated TDUMP fixture corpus must remain comprehensive.');
@@ -727,18 +727,18 @@ end;
 
 procedure TestGeneratedNativeFormatCoverage;
 const
-  CNativeFixtures: array[0..4] of string = ('OMF.Object.Win32.tdump',
+  cNativeFixtures: array[0..4] of string = ('OMF.Object.Win32.tdump',
     'OMF.Library.Win32.tdump', 'ELF.Object.Win64.tdump',
     'Mach.Universal.Rad23.tdump', 'Mach.Universal.Rad37.tdump');
-  CExpectedKinds: array[0..4] of TDumpFileKind = (dfOMFObject, dfOMFLibrary,
+  cExpectedKinds: array[0..4] of TDumpFileKind = (dfOMFObject, dfOMFLibrary,
     dfELFObject, dfMach, dfMach);
 begin
-  for var LIndex := Low(CNativeFixtures) to High(CNativeFixtures) do
+  for var LIndex := Low(cNativeFixtures) to High(cNativeFixtures) do
   begin
-    var LFixtureName := CNativeFixtures[LIndex];
+    var LFixtureName := cNativeFixtures[LIndex];
     var LDocument := ParseGeneratedFixture(LFixtureName);
     try
-      Require(LDocument.FileKind = CExpectedKinds[LIndex],
+      Require(LDocument.FileKind = cExpectedKinds[LIndex],
         LFixtureName + ' must retain its native format classification.');
       RequireGeneratedDocumentIntegrity(LFixtureName, LDocument);
 
@@ -774,11 +774,11 @@ end;
 
 procedure TestGeneratedBorlandDebugCoverage;
 const
-  CDebugFixtures: array[0..2] of string = (
+  cDebugFixtures: array[0..2] of string = (
     'PlainVanilla.Delphi.Package.bpl.tdump', 'Package.Win32.debug.tdump',
     'Package.Win64.debug.tdump');
 begin
-  for var LFixtureName in CDebugFixtures do
+  for var LFixtureName in cDebugFixtures do
   begin
     var LDocument := ParseGeneratedFixture(LFixtureName);
     try
@@ -972,11 +972,11 @@ end;
 
 procedure TestLargeReportStructuredProjection;
 begin
-  Require(TFile.Exists(CLargeVCLFixture),
+  Require(TFile.Exists(cLargeVCLFixture),
     'The large VCL regression fixture must be available.');
   var LParser := TDumpParser.Create;
   try
-    var LDocument := LParser.ParseFile(CLargeVCLFixture);
+    var LDocument := LParser.ParseFile(cLargeVCLFixture);
     try
       Require(LDocument.TextSource <> nil,
         'File parsing must retain an indexed text source.');
@@ -1093,7 +1093,7 @@ procedure TestRelationGraph;
 begin
   var LParser := TDumpParser.Create;
   try
-    var LDocument := LParser.ParseFile(CTurboDumpBannerFixture);
+    var LDocument := LParser.ParseFile(cTurboDumpBannerFixture);
     try
       var LBuilder := TDumpRelationBuilder.Create;
       try
@@ -1194,7 +1194,7 @@ end;
 
 procedure TestARArchiveProjection;
 const
-  CARArchiveText =
+  cARArchiveText =
     'Turbo Dump  Version 6.6.2.0 Copyright (c) Embarcadero Technologies, Inc.' +
     sLineBreak + 'Display of File sqlite.a' + sLineBreak + sLineBreak +
     'Ar 32-bit unix archive file' + sLineBreak + sLineBreak +
@@ -1211,11 +1211,11 @@ const
     '0     sqlite3_aggregate_context' + sLineBreak +
     '1     sqlite3_aggregate_count';
 begin
-  Require(IsTDumpReport(CARArchiveText),
+  Require(IsTDumpReport(cARArchiveText),
     'A TDUMP AR archive report must be recognized as report text.');
   var LParser := TDumpParser.Create;
   try
-    var LDocument := LParser.ParseText(CARArchiveText, 'sqlite.a');
+    var LDocument := LParser.ParseText(cARArchiveText, 'sqlite.a');
     try
       Require((LDocument.FileKind = dfARArchive) and
         (LDocument.ArchiveMembers.Count = 1) and
@@ -1448,8 +1448,8 @@ begin
   var LRunner := TDUnitX.CreateRunner;
   LRunner.UseRTTI := False;
   LRunner.FailsOnNoAsserts := True;
-  ForceDirectories(CTestResultsDirectory);
-  LRunner.AddLogger(TDUnitXXMLNUnitFileLogger.Create(CTestResultsFile));
+  ForceDirectories(cTestResultsDirectory);
+  LRunner.AddLogger(TDUnitXXMLNUnitFileLogger.Create(cTestResultsFile));
   var LResults := LRunner.Execute;
   if not LResults.AllPassed then
     ExitCode := EXIT_ERRORS;

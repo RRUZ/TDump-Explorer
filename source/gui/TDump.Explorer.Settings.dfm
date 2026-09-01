@@ -49,7 +49,6 @@ object FrmSettings: TFrmSettings
     ParentBackground = False
     TabOrder = 0
     StyleElements = [seFont, seBorder]
-    ExplicitHeight = 523
     object pnFooter: TPanel
       Left = 20
       Top = 459
@@ -61,7 +60,6 @@ object FrmSettings: TFrmSettings
       ParentBackground = False
       TabOrder = 3
       StyleElements = [seFont, seBorder]
-      ExplicitHeight = 50
       DesignSize = (
         545
         88)

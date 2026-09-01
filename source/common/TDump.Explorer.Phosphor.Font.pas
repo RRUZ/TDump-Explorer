@@ -65,14 +65,15 @@ type
   end;
 
 const
-  ph_tree_structure = $E67C;
-  ph_binary = $EE60;
-  ph_bug = $E5F4;
-  ph_cube = $E1DA;
-  ph_database = $E1DE;
-  ph_file_magnifying_glass = $E238;
-  ph_magnifying_glass = $E30C;
-  ph_terminal = $E47E;
+  cPhTreeStructure = $E67C;
+  cPhBinary = $EE60;
+  cPhBug = $E5F4;
+  cPhCube = $E1DA;
+  cPhDatabase = $E1DE;
+  cPhClockCounterClockwise = $E1A0;
+  cPhFileMagnifyingGlass = $E238;
+  cPhMagnifyingGlass = $E30C;
+  cPhTerminal = $E47E;
 
 var
   PhosphorFont: TPhosphorFont;
@@ -86,10 +87,10 @@ uses
 {$R TDump.Explorer.Phosphor.Font.res}
 
 const
-  CResourceNames: array[TPhosphorFontWeight] of string = (
+  cResourceNames: array[TPhosphorFontWeight] of string = (
     'PHOSPHOR_THIN', 'PHOSPHOR_LIGHT', 'PHOSPHOR_REGULAR', 'PHOSPHOR_BOLD',
     'PHOSPHOR_FILL', 'PHOSPHOR_DUOTONE');
-  CFontNames: array[TPhosphorFontWeight] of string = (
+  cFontNames: array[TPhosphorFontWeight] of string = (
     'Phosphor-Thin', 'Phosphor-Light', 'Phosphor', 'Phosphor-Bold',
     'Phosphor-Fill', 'Phosphor-Duotone');
 
@@ -115,7 +116,7 @@ end;
 
 procedure TPhosphorFont.LoadFont(AWeight: TPhosphorFontWeight);
 begin
-  var LStream := TResourceStream.Create(HInstance, CResourceNames[AWeight],
+  var LStream := TResourceStream.Create(HInstance, cResourceNames[AWeight],
     RT_RCDATA);
   try
     SetLength(FFontData[AWeight], LStream.Size);
@@ -130,49 +131,46 @@ begin
   if FFontHandles[AWeight] = 0 then
     RaiseLastOSError;
 
-  var LCollection := TGPPrivateFontCollection.Create;
-  var LStatus := LCollection.AddMemoryFont(@FFontData[AWeight][0],
-    Length(FFontData[AWeight]));
-  if LStatus <> Status.Ok then
-  begin
+  var LCollection: TGPPrivateFontCollection := nil;
+  try
+    LCollection := TGPPrivateFontCollection.Create;
+    var LStatus := LCollection.AddMemoryFont(@FFontData[AWeight][0],
+      Length(FFontData[AWeight]));
+    if LStatus <> Status.Ok then
+      RaiseLastOSError;
+    FFontCollections[AWeight] := LCollection;
+    LCollection := nil;
+  finally
     LCollection.Free;
-    RaiseLastOSError;
   end;
-  FFontCollections[AWeight] := LCollection;
 end;
 
 procedure TPhosphorFont.DrawIcon(ADC: HDC; ACode: Word;
   const ADestRect: TRect; AColor: TColor; AWeight: TPhosphorFontWeight);
 begin
   var LGraphics := TGPGraphics.Create(ADC);
+  var LFont: TGPFont := nil;
+  var LBrush: TGPSolidBrush := nil;
+  var LStringFormat: TGPStringFormat := nil;
   try
     LGraphics.SetTextRenderingHint(TextRenderingHintAntiAliasGridFit);
-    var LFont := TGPFont.Create(CFontNames[AWeight], ADestRect.Height,
+    LFont := TGPFont.Create(cFontNames[AWeight], ADestRect.Height,
       FontStyleRegular, UnitPixel,
       TGPPrivateFontCollection(FFontCollections[AWeight]));
-    try
-      var LColor := ColorToRGB(AColor);
-      var LBrush := TGPSolidBrush.Create(MakeColor(255, GetRValue(LColor),
-        GetGValue(LColor), GetBValue(LColor)));
-      try
-        var LRect := MakeRect(ADestRect.Left * 1.0, ADestRect.Top * 1.0,
-          ADestRect.Width * 1.0, ADestRect.Height * 1.0);
-        var LStringFormat := TGPStringFormat.Create;
-        try
-          LStringFormat.SetAlignment(StringAlignmentCenter);
-          LStringFormat.SetLineAlignment(StringAlignmentCenter);
-          var LText: string := Char(ACode);
-          LGraphics.DrawString(LText, -1, LFont, LRect, LStringFormat, LBrush);
-        finally
-          LStringFormat.Free;
-        end;
-      finally
-        LBrush.Free;
-      end;
-    finally
-      LFont.Free;
-    end;
+    var LColor := ColorToRGB(AColor);
+    LBrush := TGPSolidBrush.Create(MakeColor(255, GetRValue(LColor),
+      GetGValue(LColor), GetBValue(LColor)));
+    var LRect := MakeRect(ADestRect.Left * 1.0, ADestRect.Top * 1.0,
+      ADestRect.Width * 1.0, ADestRect.Height * 1.0);
+    LStringFormat := TGPStringFormat.Create;
+    LStringFormat.SetAlignment(StringAlignmentCenter);
+    LStringFormat.SetLineAlignment(StringAlignmentCenter);
+    var LText: string := Char(ACode);
+    LGraphics.DrawString(LText, -1, LFont, LRect, LStringFormat, LBrush);
   finally
+    LStringFormat.Free;
+    LBrush.Free;
+    LFont.Free;
     LGraphics.Free;
   end;
 end;
@@ -180,48 +178,46 @@ end;
 function TPhosphorFont.GetIconCodes(
   AWeight: TPhosphorFontWeight): TArray<Word>;
 const
-  CPrivateUseFirst = $E000;
-  CPrivateUseLast = $F8FF;
+  cPrivateUseFirst = $E000;
+  cPrivateUseLast = $F8FF;
 begin
   var LDC := GetDC(0);
   if LDC = 0 then
     RaiseLastOSError;
+  var LFont: HFONT := 0;
+  var LOldFont: HGDIOBJ := 0;
   try
-    var LFont := CreateFont(32, 0, 0, 0, FW_NORMAL, 0, 0, 0,
+    LFont := CreateFont(32, 0, 0, 0, FW_NORMAL, 0, 0, 0,
       DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-      ANTIALIASED_QUALITY, DEFAULT_PITCH, PChar(CFontNames[AWeight]));
+      ANTIALIASED_QUALITY, DEFAULT_PITCH, PChar(cFontNames[AWeight]));
     if LFont = 0 then
       RaiseLastOSError;
-    try
-      var LOldFont := SelectObject(LDC, LFont);
-      try
-        var LCharacterCount := CPrivateUseLast - CPrivateUseFirst + 1;
-        var LCharacters: TArray<WideChar>;
-        var LGlyphIndexes: TArray<Word>;
-        SetLength(LCharacters, LCharacterCount);
-        SetLength(LGlyphIndexes, LCharacterCount);
-        for var LIndex := 0 to LCharacterCount - 1 do
-          LCharacters[LIndex] := WideChar(CPrivateUseFirst + LIndex);
-        if GetGlyphIndicesW(LDC, PWideChar(@LCharacters[0]), LCharacterCount,
-          @LGlyphIndexes[0], GGI_MARK_NONEXISTING_GLYPHS) = GDI_ERROR then
-          RaiseLastOSError;
+    LOldFont := SelectObject(LDC, LFont);
+    var LCharacterCount := cPrivateUseLast - cPrivateUseFirst + 1;
+    var LCharacters: TArray<WideChar>;
+    var LGlyphIndexes: TArray<Word>;
+    SetLength(LCharacters, LCharacterCount);
+    SetLength(LGlyphIndexes, LCharacterCount);
+    for var LIndex := 0 to LCharacterCount - 1 do
+      LCharacters[LIndex] := WideChar(cPrivateUseFirst + LIndex);
+    if GetGlyphIndicesW(LDC, PWideChar(@LCharacters[0]), LCharacterCount,
+      @LGlyphIndexes[0], GGI_MARK_NONEXISTING_GLYPHS) = GDI_ERROR then
+      RaiseLastOSError;
 
-        SetLength(Result, LCharacterCount);
-        var LResultIndex := 0;
-        for var LIndex := 0 to LCharacterCount - 1 do
-          if LGlyphIndexes[LIndex] <> $FFFF then
-          begin
-            Result[LResultIndex] := Word(LCharacters[LIndex]);
-            Inc(LResultIndex);
-          end;
-        SetLength(Result, LResultIndex);
-      finally
-        SelectObject(LDC, LOldFont);
+    SetLength(Result, LCharacterCount);
+    var LResultIndex := 0;
+    for var LIndex := 0 to LCharacterCount - 1 do
+      if LGlyphIndexes[LIndex] <> $FFFF then
+      begin
+        Result[LResultIndex] := Word(LCharacters[LIndex]);
+        Inc(LResultIndex);
       end;
-    finally
-      DeleteObject(LFont);
-    end;
+    SetLength(Result, LResultIndex);
   finally
+    if LOldFont <> 0 then
+      SelectObject(LDC, LOldFont);
+    if LFont <> 0 then
+      DeleteObject(LFont);
     ReleaseDC(0, LDC);
   end;
 end;
@@ -233,7 +229,7 @@ begin
   inherited Create(AOwner);
   ControlStyle := ControlStyle + [csOpaque];
   Cursor := crHandPoint;
-  FIconCode := ph_tree_structure;
+  FIconCode := cPhTreeStructure;
   FIconColor := clHighlight;
   FWeight := pfwRegular;
   Color := clBtnFace;

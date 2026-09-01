@@ -100,38 +100,41 @@ begin
         end;
       var LStopwatch := TStopwatch.StartNew;
       var LDocument := LParser.ParseFile(AFileName);
-      LStopwatch.Stop;
-      var LRetainedPrivateBytes := CurrentPrivateBytes;
-      LPeakPrivateBytes := Max(LPeakPrivateBytes, LRetainedPrivateBytes);
-      if LPeakPrivateBytes > LBaselinePrivateBytes then
-        Result.PeakPrivateBytes := Max(Result.PeakPrivateBytes,
-          LPeakPrivateBytes - LBaselinePrivateBytes);
-      if LRetainedPrivateBytes > LBaselinePrivateBytes then
-        Result.RetainedPrivateBytes := Max(Result.RetainedPrivateBytes,
-          LRetainedPrivateBytes - LBaselinePrivateBytes);
-      if LProgressWritten then
-        Writeln;
-      Result.TotalMilliseconds := Result.TotalMilliseconds +
-        LStopwatch.Elapsed.TotalMilliseconds;
-      if LIteration = 1 then
-      begin
-        Result.LineCount := LDocument.Lines.Count;
-        Result.DiagnosticCount := LDocument.Diagnostics.Count;
-        Result.RelocationCount := LDocument.Relocations.Count;
-        Result.UnsupportedStructureCount := LDocument.UnsupportedStructures.Count;
-        var LSampleCount := Result.UnsupportedStructureCount;
-        if LSampleCount > 10 then
-          LSampleCount := 10;
-        SetLength(Result.UnsupportedStructures, LSampleCount);
-        for var LIndex := 0 to LSampleCount - 1 do
+      try
+        LStopwatch.Stop;
+        var LRetainedPrivateBytes := CurrentPrivateBytes;
+        LPeakPrivateBytes := Max(LPeakPrivateBytes, LRetainedPrivateBytes);
+        if LPeakPrivateBytes > LBaselinePrivateBytes then
+          Result.PeakPrivateBytes := Max(Result.PeakPrivateBytes,
+            LPeakPrivateBytes - LBaselinePrivateBytes);
+        if LRetainedPrivateBytes > LBaselinePrivateBytes then
+          Result.RetainedPrivateBytes := Max(Result.RetainedPrivateBytes,
+            LRetainedPrivateBytes - LBaselinePrivateBytes);
+        if LProgressWritten then
+          Writeln;
+        Result.TotalMilliseconds := Result.TotalMilliseconds +
+          LStopwatch.Elapsed.TotalMilliseconds;
+        if LIteration = 1 then
         begin
-          var LStructure := LDocument.UnsupportedStructures[LIndex];
-          Result.UnsupportedStructures[LIndex] := 'line ' +
-            LStructure.SourceLine.LineNumber.ToString + ': ' +
-            LStructure.Description;
+          Result.LineCount := LDocument.Lines.Count;
+          Result.DiagnosticCount := LDocument.Diagnostics.Count;
+          Result.RelocationCount := LDocument.Relocations.Count;
+          Result.UnsupportedStructureCount := LDocument.UnsupportedStructures.Count;
+          var LSampleCount := Result.UnsupportedStructureCount;
+          if LSampleCount > 10 then
+            LSampleCount := 10;
+          SetLength(Result.UnsupportedStructures, LSampleCount);
+          for var LIndex := 0 to LSampleCount - 1 do
+          begin
+            var LStructure := LDocument.UnsupportedStructures[LIndex];
+            Result.UnsupportedStructures[LIndex] := 'line ' +
+              LStructure.SourceLine.LineNumber.ToString + ': ' +
+              LStructure.Description;
+          end;
         end;
+      finally
+        LDocument.Free;
       end;
-      LDocument.Free;
     finally
       LParser.Free;
     end;

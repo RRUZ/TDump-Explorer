@@ -66,13 +66,13 @@ uses
 
 function IsWindowsLightTheme: Boolean;
 const
-  PersonalizeKey = '\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize';
+  cPersonalizeKey = '\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize';
 begin
   Result := True;
   with TRegistry.Create(KEY_READ) do
   try
     RootKey := HKEY_CURRENT_USER;
-    if OpenKeyReadOnly(PersonalizeKey) and ValueExists('SystemUsesLightTheme') then
+    if OpenKeyReadOnly(cPersonalizeKey) and ValueExists('SystemUsesLightTheme') then
       Result := ReadInteger('SystemUsesLightTheme') <> 0;
   finally
     Free;
@@ -82,19 +82,19 @@ end;
 
 function FormatByteSize(AByteCount: Int64): string;
 const
-  CUnits: array[0..4] of string = ('B', 'KiB', 'MiB', 'GiB', 'TiB');
+  cUnits: array[0..4] of string = ('B', 'KiB', 'MiB', 'GiB', 'TiB');
 begin
   var LSize := AByteCount * 1.0;
   var LUnitIndex := 0;
-  while (Abs(LSize) >= 1024.0) and (LUnitIndex < High(CUnits)) do
+  while (Abs(LSize) >= 1024.0) and (LUnitIndex < High(cUnits)) do
   begin
     LSize := LSize / 1024.0;
     Inc(LUnitIndex);
   end;
   if LUnitIndex = 0 then
-    Result := Format('%d %s', [AByteCount, CUnits[LUnitIndex]])
+    Result := Format('%d %s', [AByteCount, cUnits[LUnitIndex]])
   else
-    Result := Format('%.2f %s', [LSize, CUnits[LUnitIndex]]);
+    Result := Format('%.2f %s', [LSize, cUnits[LUnitIndex]]);
 end;
 
 function IsLightThemeActive: Boolean;
@@ -156,48 +156,41 @@ end;
 procedure DrawRoundedBar(const Canvas: TCanvas; const ARect: TRect; FillColor, BorderColor: TColor; const Radius: Single = 2.0);
 begin
   var LGPGraphics := TGPGraphics.Create(Canvas.Handle);
+  var LGPPen: TGPPen := nil;
+  var LPath: TGPGraphicsPath := nil;
+  var LSolidBrush: TGPSolidBrush := nil;
   try
     LGPGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
     LGPGraphics.SetPixelOffsetMode(PixelOffsetModeHalf); // align 1px strokes
     var LRGBColor := ColorToRGB(BorderColor);
     var LColor := MakeColor(GetRValue(LRGBColor), GetGValue(LRGBColor), GetBValue(LRGBColor));
-    var LGPPen := TGPPen.Create(LColor, 1.0);
-    try
-      //const Radius: Single = 2.0;
-      var d, L, T, R, B: Single;
-      var LGPRect := MakeRect(ARect.Left * 1.0, ARect.Top* 1.0, ARect.Width* 1.0, ARect.Height* 1.0);
-      d := Radius * 2.0;
-      L := LGPRect.X + 0.5;
-      T := LGPRect.Y + 0.5;
-      R := LGPRect.X + LGPRect.Width  - 0.5;
-      B := LGPRect.Y + LGPRect.Height - 0.5;
-      var LPath := TGPGraphicsPath.Create;
-      try
-        LPath.AddArc(L, T, d, d, 180, 90); // TL
-        LPath.AddLine(L + Radius, T, R - Radius, T);
-        LPath.AddArc(R - d, T, d, d, 270, 90); // TR
-        LPath.AddLine(R, T + Radius, R, B - Radius);
-        LPath.AddArc(R - d, B - d, d, d, 0, 90); // BR
-        LPath.AddLine(R-Radius, B, L + Radius, B);
-        LPath.AddArc(L, B - d, d, d,  90, 90); // BL
-        LPath.AddLine(L, B - Radius, L, T + Radius);
-        LPath.CloseFigure;
-        LGPGraphics.DrawPath(LGPPen, LPath);
-        LRGBColor := ColorToRGB(FillColor);
-        LColor := MakeColor(GetRValue(LRGBColor), GetGValue(LRGBColor), GetBValue(LRGBColor));
-        var LSolidBush := TGPSolidBrush.Create(LColor);
-        try
-          LGPGraphics.FillPath(LSolidBush, LPath);
-        finally
-          LSolidBush.Free;
-        end;
-      finally
-        LPath.Free;
-      end;
-    finally
-      LGPPen.Free;
-    end;
+    LGPPen := TGPPen.Create(LColor, 1.0);
+    var d, L, T, R, B: Single;
+    var LGPRect := MakeRect(ARect.Left * 1.0, ARect.Top* 1.0, ARect.Width* 1.0, ARect.Height* 1.0);
+    d := Radius * 2.0;
+    L := LGPRect.X + 0.5;
+    T := LGPRect.Y + 0.5;
+    R := LGPRect.X + LGPRect.Width  - 0.5;
+    B := LGPRect.Y + LGPRect.Height - 0.5;
+    LPath := TGPGraphicsPath.Create;
+    LPath.AddArc(L, T, d, d, 180, 90); // TL
+    LPath.AddLine(L + Radius, T, R - Radius, T);
+    LPath.AddArc(R - d, T, d, d, 270, 90); // TR
+    LPath.AddLine(R, T + Radius, R, B - Radius);
+    LPath.AddArc(R - d, B - d, d, d, 0, 90); // BR
+    LPath.AddLine(R-Radius, B, L + Radius, B);
+    LPath.AddArc(L, B - d, d, d,  90, 90); // BL
+    LPath.AddLine(L, B - Radius, L, T + Radius);
+    LPath.CloseFigure;
+    LGPGraphics.DrawPath(LGPPen, LPath);
+    LRGBColor := ColorToRGB(FillColor);
+    LColor := MakeColor(GetRValue(LRGBColor), GetGValue(LRGBColor), GetBValue(LRGBColor));
+    LSolidBrush := TGPSolidBrush.Create(LColor);
+    LGPGraphics.FillPath(LSolidBrush, LPath);
   finally
+    LSolidBrush.Free;
+    LPath.Free;
+    LGPPen.Free;
     LGPGraphics.Free;
   end;
 end;
@@ -232,41 +225,37 @@ begin
   LColor := MakeColor(GetRValue(LColorRGB), GetGValue(LColorRGB),
     GetBValue(LColorRGB));
   LGraphics := TGPGraphics.Create(ACanvas.Handle);
+  LPen := nil;
+  LPath := nil;
   try
     LGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
     LGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);
     LPen := TGPPen.Create(LColor, 2.5);
-    try
-      LDashPattern[0] := 4.0;
-      LDashPattern[1] := 2.5;
-      LPen.SetDashStyle(DashStyleCustom);
-      LPen.SetDashPattern(@LDashPattern[0], Length(LDashPattern));
-      LPen.SetDashCap(DashCapFlat);
-      LPen.SetLineJoin(LineJoinRound);
-      L := LRect.Left + 0.5;
-      T := LRect.Top + 0.5;
-      R := LRect.Right - 0.5;
-      B := LRect.Bottom - 0.5;
-      D := LRadius * 2.0;
-      LPath := TGPGraphicsPath.Create;
-      try
-        LPath.AddArc(L, T, D, D, 180, 90);
-        LPath.AddLine(L + LRadius, T, R - LRadius, T);
-        LPath.AddArc(R - D, T, D, D, 270, 90);
-        LPath.AddLine(R, T + LRadius, R, B - LRadius);
-        LPath.AddArc(R - D, B - D, D, D, 0, 90);
-        LPath.AddLine(R - LRadius, B, L + LRadius, B);
-        LPath.AddArc(L, B - D, D, D, 90, 90);
-        LPath.AddLine(L, B - LRadius, L, T + LRadius);
-        LPath.CloseFigure;
-        LGraphics.DrawPath(LPen, LPath);
-      finally
-        LPath.Free;
-      end;
-    finally
-      LPen.Free;
-    end;
+    LDashPattern[0] := 4.0;
+    LDashPattern[1] := 2.5;
+    LPen.SetDashStyle(DashStyleCustom);
+    LPen.SetDashPattern(@LDashPattern[0], Length(LDashPattern));
+    LPen.SetDashCap(DashCapFlat);
+    LPen.SetLineJoin(LineJoinRound);
+    L := LRect.Left + 0.5;
+    T := LRect.Top + 0.5;
+    R := LRect.Right - 0.5;
+    B := LRect.Bottom - 0.5;
+    D := LRadius * 2.0;
+    LPath := TGPGraphicsPath.Create;
+    LPath.AddArc(L, T, D, D, 180, 90);
+    LPath.AddLine(L + LRadius, T, R - LRadius, T);
+    LPath.AddArc(R - D, T, D, D, 270, 90);
+    LPath.AddLine(R, T + LRadius, R, B - LRadius);
+    LPath.AddArc(R - D, B - D, D, D, 0, 90);
+    LPath.AddLine(R - LRadius, B, L + LRadius, B);
+    LPath.AddArc(L, B - D, D, D, 90, 90);
+    LPath.AddLine(L, B - LRadius, L, T + LRadius);
+    LPath.CloseFigure;
+    LGraphics.DrawPath(LPen, LPath);
   finally
+    LPath.Free;
+    LPen.Free;
     LGraphics.Free;
   end;
 end;
@@ -293,25 +282,23 @@ begin
   var LColor := MakeColor(GetRValue(LRGBColor), GetGValue(LRGBColor),
     GetBValue(LRGBColor));
   var LGraphics := TGPGraphics.Create(ACanvas.Handle);
+  var LPen: TGPPen := nil;
   try
     LGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
     LGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);
-    var LPen := TGPPen.Create(LColor, 1.0);
-    try
-      if AIsVertical then
-      begin
-        var LCenter := (ARect.Left + ARect.Right) / 2.0;
-        LGraphics.DrawLine(LPen, LCenter, ARect.Top, LCenter, ARect.Bottom);
-      end
-      else
-      begin
-        var LCenter := (ARect.Top + ARect.Bottom) / 2.0;
-        LGraphics.DrawLine(LPen, ARect.Left, LCenter, ARect.Right, LCenter);
-      end;
-    finally
-      LPen.Free;
+    LPen := TGPPen.Create(LColor, 1.0);
+    if AIsVertical then
+    begin
+      var LCenter := (ARect.Left + ARect.Right) / 2.0;
+      LGraphics.DrawLine(LPen, LCenter, ARect.Top, LCenter, ARect.Bottom);
+    end
+    else
+    begin
+      var LCenter := (ARect.Top + ARect.Bottom) / 2.0;
+      LGraphics.DrawLine(LPen, ARect.Left, LCenter, ARect.Right, LCenter);
     end;
   finally
+    LPen.Free;
     LGraphics.Free;
   end;
 end;
