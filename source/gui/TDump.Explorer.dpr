@@ -34,6 +34,7 @@ uses
   TDump.Explorer.View.Borland in 'TDump.Explorer.View.Borland.pas';
 
 {$R *.res}
+{$R TDump.Explorer.rc.res}
 
 begin
   ReportMemoryLeaksOnShutdown := True;

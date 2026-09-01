@@ -21,8 +21,8 @@ set "PROFILER_EXE=%PROJECT_ROOT%\tests\TDumpParserProfiler.exe"
 set "RELATIONS_SOURCE=%PROJECT_ROOT%\tests\TDumpRelationsConsole.dpr"
 set "RELATIONS_EXE=%PROJECT_ROOT%\tests\TDumpRelationsConsole.exe"
 set "APP_PROJECT=%PROJECT_ROOT%\source\gui\TDump.Explorer.dproj"
-set "APP_EXE=%PROJECT_ROOT%\source\gui\Win32\Debug\TDump.Explorer.exe"
-set "INTERMEDIATE_ROOT=%PROJECT_ROOT%\build\dcu\win32-debug"
+set "APP_EXE=%PROJECT_ROOT%\source\gui\Win64\Release\TDump.Explorer.exe"
+set "INTERMEDIATE_ROOT=%PROJECT_ROOT%\build\dcu\win64-debug"
 set "DEFAULT_FIXTURE=%PROJECT_ROOT%\fixtures\PlainVanilla.Delphi.Package.bpl.tdump"
 
 if /I "%~1"=="" goto BUILD
@@ -59,7 +59,7 @@ if not exist "%CONSOLE_SOURCE%" (
   exit /b 1
 )
 
-echo Building TDumpParserConsole ^(Win32 Debug^)...
+echo Building TDumpParserConsole ^(Win64 Debug^)...
 set "INTERMEDIATE_DIR=%INTERMEDIATE_ROOT%\%RANDOM%%RANDOM%"
 if not exist "%INTERMEDIATE_DIR%" mkdir "%INTERMEDIATE_DIR%"
 if not exist "%INTERMEDIATE_DIR%" (
@@ -69,7 +69,7 @@ if not exist "%INTERMEDIATE_DIR%" (
 )
 pushd "%PROJECT_ROOT%\tests"
 if errorlevel 1 exit /b 1
-dcc32.exe -B -Q -N"%INTERMEDIATE_DIR%" "TDumpParserConsole.dpr"
+dcc64.exe -B -Q -N"%INTERMEDIATE_DIR%" "TDumpParserConsole.dpr"
 set "BUILD_RESULT=%ERRORLEVEL%"
 popd
 if not "%BUILD_RESULT%"=="0" exit /b %BUILD_RESULT%
@@ -97,7 +97,7 @@ if not exist "%TESTS_SOURCE%" (
   exit /b 1
 )
 
-echo Building TDumpParserTests ^(Win32 Debug^)...
+echo Building TDumpParserTests ^(Win64 Debug^)...
 set "INTERMEDIATE_DIR=%INTERMEDIATE_ROOT%\%RANDOM%%RANDOM%"
 if not exist "%INTERMEDIATE_DIR%" mkdir "%INTERMEDIATE_DIR%"
 if not exist "%INTERMEDIATE_DIR%" (
@@ -107,7 +107,7 @@ if not exist "%INTERMEDIATE_DIR%" (
 )
 pushd "%PROJECT_ROOT%\tests"
 if errorlevel 1 exit /b 1
-dcc32.exe -B -Q -N"%INTERMEDIATE_DIR%" -U"%DUNITX_SOURCE%" "TDumpParserTests.dpr"
+dcc64.exe -B -Q -N"%INTERMEDIATE_DIR%" -U"%DUNITX_SOURCE%" "TDumpParserTests.dpr"
 set "BUILD_RESULT=%ERRORLEVEL%"
 popd
 if not "%BUILD_RESULT%"=="0" exit /b %BUILD_RESULT%
@@ -131,7 +131,7 @@ if not exist "%RUNNER_SOURCE%" (
   exit /b 1
 )
 
-echo Building TDumpRunnerConsole ^(Win32 Debug^)...
+echo Building TDumpRunnerConsole ^(Win64 Debug^)...
 set "INTERMEDIATE_DIR=%INTERMEDIATE_ROOT%\%RANDOM%%RANDOM%"
 if not exist "%INTERMEDIATE_DIR%" mkdir "%INTERMEDIATE_DIR%"
 if not exist "%INTERMEDIATE_DIR%" (
@@ -141,7 +141,7 @@ if not exist "%INTERMEDIATE_DIR%" (
 )
 pushd "%PROJECT_ROOT%\tests"
 if errorlevel 1 exit /b 1
-dcc32.exe -B -Q -N"%INTERMEDIATE_DIR%" "TDumpRunnerConsole.dpr"
+dcc64.exe -B -Q -N"%INTERMEDIATE_DIR%" "TDumpRunnerConsole.dpr"
 set "BUILD_RESULT=%ERRORLEVEL%"
 popd
 if not "%BUILD_RESULT%"=="0" exit /b %BUILD_RESULT%
@@ -165,7 +165,7 @@ if not exist "%FINDER_SOURCE%" (
   exit /b 1
 )
 
-echo Building TDumpFinderConsole ^(Win32 Debug^)...
+echo Building TDumpFinderConsole ^(Win64 Debug^)...
 set "INTERMEDIATE_DIR=%INTERMEDIATE_ROOT%\%RANDOM%%RANDOM%"
 if not exist "%INTERMEDIATE_DIR%" mkdir "%INTERMEDIATE_DIR%"
 if not exist "%INTERMEDIATE_DIR%" (
@@ -175,7 +175,7 @@ if not exist "%INTERMEDIATE_DIR%" (
 )
 pushd "%PROJECT_ROOT%\tests"
 if errorlevel 1 exit /b 1
-dcc32.exe -B -Q -N"%INTERMEDIATE_DIR%" "TDumpFinderConsole.dpr"
+dcc64.exe -B -Q -N"%INTERMEDIATE_DIR%" "TDumpFinderConsole.dpr"
 set "BUILD_RESULT=%ERRORLEVEL%"
 popd
 if not "%BUILD_RESULT%"=="0" exit /b %BUILD_RESULT%
@@ -199,7 +199,7 @@ if not exist "%RELATIONS_SOURCE%" (
   exit /b 1
 )
 
-echo Building TDumpRelationsConsole ^(Win32 Debug^)...
+echo Building TDumpRelationsConsole ^(Win64 Debug^)...
 set "INTERMEDIATE_DIR=%INTERMEDIATE_ROOT%\%RANDOM%%RANDOM%"
 if not exist "%INTERMEDIATE_DIR%" mkdir "%INTERMEDIATE_DIR%"
 if not exist "%INTERMEDIATE_DIR%" (
@@ -209,7 +209,7 @@ if not exist "%INTERMEDIATE_DIR%" (
 )
 pushd "%PROJECT_ROOT%\tests"
 if errorlevel 1 exit /b 1
-dcc32.exe -B -Q -N"%INTERMEDIATE_DIR%" "TDumpRelationsConsole.dpr"
+dcc64.exe -B -Q -N"%INTERMEDIATE_DIR%" "TDumpRelationsConsole.dpr"
 set "BUILD_RESULT=%ERRORLEVEL%"
 popd
 if not "%BUILD_RESULT%"=="0" exit /b %BUILD_RESULT%
@@ -233,7 +233,7 @@ if not exist "%PROFILER_SOURCE%" (
   exit /b 1
 )
 
-echo Building TDumpParserProfiler ^(Win32 Debug^)...
+echo Building TDumpParserProfiler ^(Win64 Debug^)...
 set "INTERMEDIATE_DIR=%INTERMEDIATE_ROOT%\%RANDOM%%RANDOM%"
 if not exist "%INTERMEDIATE_DIR%" mkdir "%INTERMEDIATE_DIR%"
 if not exist "%INTERMEDIATE_DIR%" (
@@ -243,7 +243,7 @@ if not exist "%INTERMEDIATE_DIR%" (
 )
 pushd "%PROJECT_ROOT%\tests"
 if errorlevel 1 exit /b 1
-dcc32.exe -B -Q -N"%INTERMEDIATE_DIR%" "TDumpParserProfiler.dpr"
+dcc64.exe -B -Q -N"%INTERMEDIATE_DIR%" "TDumpParserProfiler.dpr"
 set "BUILD_RESULT=%ERRORLEVEL%"
 popd
 if not "%BUILD_RESULT%"=="0" exit /b %BUILD_RESULT%
@@ -315,7 +315,7 @@ if not exist "%TINY_PARSER_TESTS_SOURCE%" (
   exit /b 1
 )
 
-echo Building TDumpTinyParserTests ^(Win32 Debug^)...
+echo Building TDumpTinyParserTests ^(Win64 Debug^)...
 set "INTERMEDIATE_DIR=%INTERMEDIATE_ROOT%\%RANDOM%%RANDOM%"
 if not exist "%INTERMEDIATE_DIR%" mkdir "%INTERMEDIATE_DIR%"
 if not exist "%INTERMEDIATE_DIR%" (
@@ -325,7 +325,7 @@ if not exist "%INTERMEDIATE_DIR%" (
 )
 pushd "%PROJECT_ROOT%\tests"
 if errorlevel 1 exit /b 1
-dcc32.exe -B -Q -N"%INTERMEDIATE_DIR%" -U"%DUNITX_SOURCE%" "TDumpTinyParserTests.dpr"
+dcc64.exe -B -Q -N"%INTERMEDIATE_DIR%" -U"%DUNITX_SOURCE%" "TDumpTinyParserTests.dpr"
 set "BUILD_RESULT=%ERRORLEVEL%"
 popd
 if not "%BUILD_RESULT%"=="0" exit /b %BUILD_RESULT%
@@ -386,8 +386,8 @@ if not exist "%APP_PROJECT%" (
   echo   %APP_PROJECT%
   exit /b 1
 )
-echo Rebuilding TDump Explorer application ^(Win32 Debug^)...
-msbuild.exe "%APP_PROJECT%" /t:Rebuild /p:Config=Debug /p:Platform=Win32 /nologo /verbosity:minimal
+echo Rebuilding TDump Explorer application ^(Win64 Release^)...
+msbuild.exe "%APP_PROJECT%" /t:Rebuild /p:Config=Release /p:Platform=Win64 /nologo /verbosity:minimal
 if errorlevel 1 exit /b %ERRORLEVEL%
 if not exist "%APP_EXE%" (
   echo Build completed, but the expected application executable was not found:
@@ -400,7 +400,7 @@ exit /b 0
 :USAGE
 echo Usage: build.bat [build^|run [fixture]^|runner [input-file] [32^|64] [tdump-options]^|finder^|test^|tinyparser^|profile [fixture-file-or-directory] [iterations]^|relations [fixture]^|app]
 echo.
-echo   build  Build the Win32 Debug console harness ^(default^).
+echo   build  Build the Win64 Debug console harness ^(default^).
 echo   run    Build, then run the console harness with an optional fixture.
 echo   runner Build, run, capture, and parse one binary using the newest installed TDUMP.
 echo   finder Enumerate installed TDUMP tools and print the recommended default.
@@ -410,5 +410,5 @@ echo   profile Build and profile every *.tdump under fixtures, optionally using 
 echo           fixture directory and positive iteration count.
 echo   relations Build and exercise the cross-reference relation layer against an
 echo             optional TDUMP fixture.
-echo   app    Full rebuild of the Win32 Debug VCL application.
+echo   app    Full rebuild of the Win64 Release VCL application.
 exit /b 1

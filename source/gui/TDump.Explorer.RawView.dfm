@@ -14,6 +14,7 @@ object RawViewFrame: TRawViewFrame
     BevelOuter = bvNone
     ParentBackground = False
     TabOrder = 0
+    StyleElements = [seFont, seBorder]
     object Label1: TLabel
       Left = 8
       Top = 9

@@ -13,6 +13,7 @@ uses
 
 const
   cWmRawFilterReady = WM_USER + $541;
+  cWmRawFilterItemDblClick = WM_USER + $542;
 
 type
   TRawViewSourceLineSelectedEvent = procedure(Sender: TObject;
@@ -48,6 +49,7 @@ type
     function FindLastVisibleIndexAtOrBefore(ASourceIndex: Integer): Integer;
     procedure cbFollowSelectionClick(Sender: TObject);
     procedure HighlighterControlItemClick(Sender: TObject);
+    procedure HighlighterControlItemDblClick(Sender: TObject);
     procedure SearchFilterBoxChange(Sender: TObject);
     procedure FilterTimerTimer(Sender: TObject);
     procedure SearchFilterBoxKeyDown(Sender: TObject; var Key: Word;
@@ -56,6 +58,8 @@ type
     procedure CMStyleChanged(var AMessage: TMessage); message CM_STYLECHANGED;
     procedure WMRawFilterReady(var AMessage: TMessage);
       message cWmRawFilterReady;
+    procedure WMRawFilterItemDblClick(var AMessage: TMessage);
+      message cWmRawFilterItemDblClick;
     procedure ApplyTheme;
   public
     constructor Create(AOwner: TComponent); override;
@@ -109,6 +113,7 @@ begin
   FHighlighterControl.Font.Size := TExplorerTheme.FixedWidthFontSize;
   FHighlighterControl.ControlList1.MultiSelect := True;
   FHighlighterControl.OnItemClick := HighlighterControlItemClick;
+  FHighlighterControl.ControlList1.OnItemDblClick := HighlighterControlItemDblClick;
   cbFollowSelection.OnClick := cbFollowSelectionClick;
   SearchFilterBox.OnChange := SearchFilterBoxChange;
   SearchFilterBox.OnKeyDown := SearchFilterBoxKeyDown;
@@ -345,6 +350,28 @@ begin
   // Tree source spans are one-based; the raw provider exposes the mapped
   // zero-based source index used by its line-number gutter.
   FOnSourceLineSelected(Self, LSourceIndex + 1);
+end;
+
+procedure TRawViewFrame.HighlighterControlItemDblClick(Sender: TObject);
+begin
+  PostMessage(Handle, cWmRawFilterItemDblClick, 0, 0);
+end;
+
+procedure TRawViewFrame.WMRawFilterItemDblClick(var AMessage: TMessage);
+begin
+  if not FUsingFilteredIndexes or (FDocument = nil) or
+    (FDocument.TextSource = nil) then
+    Exit;
+
+  var LSourceIndex := FHighlighterControl.SelectedItemLineNumber;
+  if (LSourceIndex < 0) or (LSourceIndex >= FDocument.TextSource.LineCount) then
+    Exit;
+
+  SearchFilterBox.Text := '';
+  FFilterTimer.Enabled := False;
+  DisplayFullSource;
+  FHighlighterControl.SelectItem(LSourceIndex);
+  FHighlighterControl.ScrollItemToTop(LSourceIndex);
 end;
 
 procedure TRawViewFrame.SearchFilterBoxChange(Sender: TObject);

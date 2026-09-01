@@ -1,0 +1,28 @@
+1 VERSIONINFO
+ FILEVERSION 1,0,0,0
+ PRODUCTVERSION 1,0,0,0
+ FILEFLAGSMASK 0x3fL
+ FILEFLAGS 0x0L
+ FILEOS 0x40004L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "CompanyName", "The Road to Delphi\0"
+      VALUE "FileDescription", "TDump Explorer\0"
+      VALUE "FileVersion", "1.0.0.0\0"
+      VALUE "InternalName", "TDump.Explorer\0"
+      VALUE "LegalCopyright", "Copyright (C) 2026 Rodrigo Ruz V.\0"
+      VALUE "OriginalFilename", "TDump.Explorer.exe\0"
+      VALUE "ProductName", "TDump Explorer\0"
+      VALUE "ProductVersion", "1.0.0.0\0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x0409, 1200
+  END
+END

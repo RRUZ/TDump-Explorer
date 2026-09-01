@@ -4,7 +4,7 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
-  System.Generics.Collections,
+  System.Generics.Collections, System.Math, System.StrUtils,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls,
   Vcl.ExtCtrls, Vcl.ControlList, Vcl.WinXCtrls, Vcl.Clipbrd;
 
@@ -27,16 +27,26 @@ type
   private
     var
       FEntries: TLogEntryList;
+      FVisibleEntryIndexes: TList<Integer>;
+      FUsingFilteredIndexes: Boolean;
+    procedure ApplyFilter;
     procedure ControlList1BeforeDrawItem(AIndex: Integer; ACanvas: TCanvas;
       ARect: TRect; AState: TOwnerDrawState);
+    procedure ControlList1DblClick(Sender: TObject);
     procedure ControlList1KeyDown(Sender: TObject; var Key: Word;
       Shift: TShiftState);
     procedure CopySelectedItemsToClipboard;
+    procedure DrawFilterMatches(ACanvas: TCanvas; const ARect: TRect;
+      const AText: string);
     function EntryTypeColor(AEntryType: TLogEntryType): TColor;
     function EntryText(const AEntry: TLogEntry): string;
     function EntryTypeText(AEntryType: TLogEntryType): string;
+    function VisibleEntryIndex(AIndex: Integer): Integer;
+    procedure SearchFilterBoxChange(Sender: TObject);
     procedure UpdateControlList;
     procedure CMStyleChanged(var AMessage: TMessage); message CM_STYLECHANGED;
+    procedure WMLogFilterItemDblClick(var AMessage: TMessage);
+      message WM_USER + $541;
     procedure ApplyTheme;
   public
     constructor Create(AOwner: TComponent); override;
@@ -57,21 +67,26 @@ uses
 
 const
   cMaximumRetainedLogEntries = 10000;
+  cWmLogFilterItemDblClick = WM_USER + $541;
 
 constructor TLogControl.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   FEntries := TLogEntryList.Create;
+  FVisibleEntryIndexes := TList<Integer>.Create;
   ControlList1.MultiSelect := True;
   ControlList1.OnBeforeDrawItem := ControlList1BeforeDrawItem;
+  ControlList1.OnItemDblClick := ControlList1DblClick;
   ControlList1.OnKeyDown := ControlList1KeyDown;
+  SearchFilterBox.OnChange := SearchFilterBoxChange;
   pnToolbar.Alignment := taLeftJustify;
-  UpdateControlList;
+  ApplyFilter;
   ApplyTheme;
 end;
 
 destructor TLogControl.Destroy;
 begin
+  FVisibleEntryIndexes.Free;
   FEntries.Free;
   inherited;
 end;
@@ -97,8 +112,11 @@ begin
   while FEntries.Count > cMaximumRetainedLogEntries do
     FEntries.Delete(0);
 
-  UpdateControlList;
-  ControlList1.ItemIndex := FEntries.Count - 1;
+  ApplyFilter;
+  if not FUsingFilteredIndexes or
+    ((FVisibleEntryIndexes.Count > 0) and
+     (FVisibleEntryIndexes.Last = FEntries.Count - 1)) then
+    ControlList1.ItemIndex := ControlList1.ItemCount - 1;
 end;
 
 procedure TLogControl.ApplyTheme;
@@ -110,7 +128,7 @@ end;
 procedure TLogControl.Clear;
 begin
   FEntries.Clear;
-  UpdateControlList;
+  ApplyFilter;
 end;
 
 procedure TLogControl.CMStyleChanged(var AMessage: TMessage);
@@ -126,6 +144,7 @@ const
   cTimestampColumnWidth = 92;
   cStatusColumnWidth = 78;
 var
+  LEntryIndex: Integer;
   LEntry: TLogEntry;
   LTimestampText: string;
   LStatusText: string;
@@ -136,7 +155,8 @@ var
   LSelected: Boolean;
   LBrushStyle: TBrushStyle;
 begin
-  if (AIndex < 0) or (AIndex >= FEntries.Count) then
+  LEntryIndex := VisibleEntryIndex(AIndex);
+  if LEntryIndex < 0 then
     Exit;
 
   LSelected := odSelected in AState;
@@ -162,7 +182,7 @@ begin
     ACanvas.FillRect(ARect);
   end;
 
-  LEntry := FEntries[AIndex];
+  LEntry := FEntries[LEntryIndex];
   LTimestampText := FormatDateTime('hh:nn:ss.zzz', LEntry.Timestamp);
   LStatusText := EntryTypeText(LEntry.EntryType);
   LTimestampRect := ARect;
@@ -193,9 +213,30 @@ begin
       [tfVerticalCenter, tfSingleLine, tfEndEllipsis, tfNoPrefix]);
     ACanvas.TextRect(LMessageRect, LEntry.Message,
       [tfVerticalCenter, tfSingleLine, tfEndEllipsis, tfNoPrefix]);
+    DrawFilterMatches(ACanvas, LTimestampRect, LTimestampText);
+    DrawFilterMatches(ACanvas, LStatusRect, LStatusText);
+    DrawFilterMatches(ACanvas, LMessageRect, LEntry.Message);
   finally
     ACanvas.Brush.Style := LBrushStyle;
   end;
+end;
+
+procedure TLogControl.ControlList1DblClick(Sender: TObject);
+begin
+  PostMessage(Handle, cWmLogFilterItemDblClick, 0, 0);
+end;
+
+procedure TLogControl.WMLogFilterItemDblClick(var AMessage: TMessage);
+begin
+  if not FUsingFilteredIndexes then
+    Exit;
+
+  var LEntryIndex := VisibleEntryIndex(ControlList1.ItemIndex);
+  if LEntryIndex < 0 then
+    Exit;
+
+  SearchFilterBox.Text := '';
+  ControlList1.ItemIndex := LEntryIndex;
 end;
 
 procedure TLogControl.ControlList1KeyDown(Sender: TObject; var Key: Word;
@@ -224,15 +265,58 @@ begin
     begin
       if LText.Length > 0 then
         LText.AppendLine;
-      LText.Append(EntryText(FEntries[LIndex]));
+      var LEntryIndex := VisibleEntryIndex(LIndex);
+      if LEntryIndex >= 0 then
+        LText.Append(EntryText(FEntries[LEntryIndex]));
     end;
-    if (LText.Length = 0) and (ControlList1.ItemIndex >= 0) and
-      (ControlList1.ItemIndex < FEntries.Count) then
-      LText.Append(EntryText(FEntries[ControlList1.ItemIndex]));
+    var LItemEntryIndex := VisibleEntryIndex(ControlList1.ItemIndex);
+    if (LText.Length = 0) and (LItemEntryIndex >= 0) then
+      LText.Append(EntryText(FEntries[LItemEntryIndex]));
     if LText.Length > 0 then
       Clipboard.AsText := LText.ToString;
   finally
     LText.Free;
+  end;
+end;
+
+procedure TLogControl.DrawFilterMatches(ACanvas: TCanvas; const ARect: TRect;
+  const AText: string);
+begin
+  var LFilterText := Trim(SearchFilterBox.Text);
+  if LFilterText = '' then
+    Exit;
+
+  var LUpperText := UpperCase(AText);
+  var LUpperFilter := UpperCase(LFilterText);
+  var LSearchIndex := 1;
+  var LMatchIndex := PosEx(LUpperFilter, LUpperText, LSearchIndex);
+  if LMatchIndex = 0 then
+    Exit;
+
+  var LOriginalPenColor := ACanvas.Pen.Color;
+  var LOriginalPenWidth := ACanvas.Pen.Width;
+  try
+    ACanvas.Pen.Color := TExplorerTheme.ActiveTheme.TypeColor;
+    ACanvas.Pen.Width := 1;
+    while LMatchIndex > 0 do
+    begin
+      var LLeft := ARect.Left + ACanvas.TextWidth(Copy(AText, 1,
+        LMatchIndex - 1));
+      var LRight := LLeft + ACanvas.TextWidth(Copy(AText, LMatchIndex,
+        Length(LFilterText)));
+      if LLeft < ARect.Right then
+      begin
+        LRight := Min(LRight, ARect.Right);
+        var LY := ARect.Top + ((ARect.Height + ACanvas.TextHeight(AText)) div 2);
+        ACanvas.MoveTo(LLeft, LY);
+        ACanvas.LineTo(LRight, LY);
+      end;
+      LSearchIndex := LMatchIndex + Length(LFilterText);
+      LMatchIndex := PosEx(LUpperFilter, LUpperText, LSearchIndex);
+    end;
+  finally
+    ACanvas.Pen.Color := LOriginalPenColor;
+    ACanvas.Pen.Width := LOriginalPenWidth;
   end;
 end;
 
@@ -276,11 +360,43 @@ begin
   end;
 end;
 
+procedure TLogControl.ApplyFilter;
+begin
+  var LFilterText := Trim(SearchFilterBox.Text);
+  FVisibleEntryIndexes.Clear;
+  FUsingFilteredIndexes := LFilterText <> '';
+  if FUsingFilteredIndexes then
+    for var LIndex := 0 to FEntries.Count - 1 do
+      if ContainsText(EntryText(FEntries[LIndex]), LFilterText) then
+        FVisibleEntryIndexes.Add(LIndex);
+  UpdateControlList;
+end;
+
+procedure TLogControl.SearchFilterBoxChange(Sender: TObject);
+begin
+  ApplyFilter;
+end;
+
 procedure TLogControl.UpdateControlList;
 begin
-  ControlList1.ItemCount := FEntries.Count;
+  if FUsingFilteredIndexes then
+    ControlList1.ItemCount := FVisibleEntryIndexes.Count
+  else
+    ControlList1.ItemCount := FEntries.Count;
   //pnToolbar.Caption := Format('General activity (%d)', [FEntries.Count]);
   ControlList1.Invalidate;
+end;
+
+function TLogControl.VisibleEntryIndex(AIndex: Integer): Integer;
+begin
+  Result := -1;
+  if FUsingFilteredIndexes then
+  begin
+    if (AIndex >= 0) and (AIndex < FVisibleEntryIndexes.Count) then
+      Result := FVisibleEntryIndexes[AIndex];
+  end
+  else if (AIndex >= 0) and (AIndex < FEntries.Count) then
+    Result := AIndex;
 end;
 
 end.

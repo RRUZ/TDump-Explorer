@@ -77,7 +77,7 @@ const
     (Caption: 'Global Type'; ImageName: ''; TextColorKind: ttckType),
     (Caption: 'Mach Header'; ImageName: ''; TextColorKind: ttckHighlighted),
     (Caption: 'FAT Architectures'; ImageName: 'scan'; TextColorKind: ttckHighlighted),
-    (Caption: 'FAT Architecture'; ImageName: ''; TextColorKind: ttckDefault),
+    (Caption: 'FAT Architecture'; ImageName: 'cpu'; TextColorKind: ttckDefault),
     (Caption: 'Load Commands'; ImageName: ''; TextColorKind: ttckHighlighted),
     (Caption: 'Load Command'; ImageName: ''; TextColorKind: ttckDefault),
     (Caption: 'Mach Section'; ImageName: ''; TextColorKind: ttckDefault),

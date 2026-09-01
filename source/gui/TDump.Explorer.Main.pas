@@ -1550,8 +1550,13 @@ procedure TFrmMain.AddPendingDocumentTabs;
 begin
   AttachPendingDocumentCards;
   try
+   FTabs.LockDrawing;
+   try
     for var LCard in FPendingDocumentCards do
       FTabs.AddTab(LCard.Caption, DocumentTabImageName, True, False);
+   finally
+     FTabs.UnlockDrawing;
+   end;
   finally
     FTabs.Invalidate;
   end;
@@ -1586,7 +1591,6 @@ begin
   FDeferredDocumentCard := nil;
   if (LCard = nil) or (LCard.Parent <> CardPanel1) then
     Exit;
-
   LCard.Visible := True;
   FTabs.ActiveIndex := LCard.CardIndex;
 end;

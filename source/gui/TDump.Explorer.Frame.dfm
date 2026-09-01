@@ -370,7 +370,7 @@ object DumpDocumentFrame: TDumpDocumentFrame
     inherited pnToolbar: TPanel
       Width = 1056
       Height = 32
-      StyleElements = [seFont, seClient, seBorder]
+      StyleElements = [seFont, seBorder]
       ExplicitWidth = 1056
       ExplicitHeight = 32
       inherited Label1: TLabel
