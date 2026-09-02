@@ -23,6 +23,7 @@ type
     pnToolbar: TPanel;
     SearchFilterBox: TSearchBox;
     Label1: TLabel;
+    lblFilterMatches: TLabel;
     cbFollowSelection: TCheckBox;
   private
     FHighlighterControl: THighlighterControl;
@@ -55,6 +56,7 @@ type
     procedure SearchFilterBoxKeyDown(Sender: TObject; var Key: Word;
       Shift: TShiftState);
     procedure SetSyncWithSelectedNode(const AValue: Boolean);
+    procedure UpdateFilterMatchCount(AFiltering: Boolean = False);
     procedure CMStyleChanged(var AMessage: TMessage); message CM_STYLECHANGED;
     procedure WMRawFilterReady(var AMessage: TMessage);
       message cWmRawFilterReady;
@@ -115,6 +117,7 @@ begin
   FHighlighterControl.OnItemClick := HighlighterControlItemClick;
   FHighlighterControl.ControlList1.OnItemDblClick := HighlighterControlItemDblClick;
   cbFollowSelection.OnClick := cbFollowSelectionClick;
+  //SearchFilterBox.TextHint := 'Filter raw TDUMP...';
   SearchFilterBox.OnChange := SearchFilterBoxChange;
   SearchFilterBox.OnKeyDown := SearchFilterBoxKeyDown;
   SetSyncWithSelectedNode(cbFollowSelection.Checked);
@@ -149,6 +152,7 @@ begin
   FLastSourceEndLine := 0;
   FHighlighterControl.FilterText := '';
   FHighlighterControl.SetText('No TDUMP report is loaded.');
+  UpdateFilterMatchCount;
 end;
 
 procedure TRawViewFrame.CMStyleChanged(var AMessage: TMessage);
@@ -174,7 +178,10 @@ end;
 procedure TRawViewFrame.ApplyFilter;
 begin
   if (FDocument = nil) or (FDocument.TextSource = nil) then
+  begin
+    UpdateFilterMatchCount;
     Exit;
+  end;
   var LFilterText := Trim(SearchFilterBox.Text);
   if LFilterText = '' then
   begin
@@ -182,7 +189,10 @@ begin
     DisplayFullSource
   end
   else
+  begin
+    UpdateFilterMatchCount(True);
     BeginFilterTask(LFilterText);
+  end;
 
   if FSyncWithSelectedNode and (FLastSourceStartLine > 0) then
     ShowLines(FLastSourceStartLine, FLastSourceEndLine);
@@ -209,6 +219,7 @@ begin
   finally
     FHighlighterControl.EndUpdate;
   end;
+  UpdateFilterMatchCount;
   if FSyncWithSelectedNode and (FLastSourceStartLine > 0) then
     ShowLines(FLastSourceStartLine, FLastSourceEndLine);
 end;
@@ -285,6 +296,7 @@ begin
   finally
     FHighlighterControl.EndUpdate;
   end;
+  UpdateFilterMatchCount;
 end;
 
 function TRawViewFrame.FindFirstVisibleIndexAtOrAfter(
@@ -327,10 +339,33 @@ end;
 
 procedure TRawViewFrame.ApplyTheme;
 begin
+  var LTheme := TExplorerTheme.ActiveTheme;
   pnToolbar.ParentBackground := False;
   pnToolbar.StyleElements := pnToolbar.StyleElements - [seClient];
-  pnToolbar.Color := TExplorerTheme.ActiveTheme.BackgroundColor;
+  pnToolbar.Color := LTheme.BackgroundColor;
+  SearchFilterBox.Font.Color := LTheme.TextColor;
+  lblFilterMatches.Font.Color := LTheme.InactiveText;
   FHighlighterControl.Invalidate;
+end;
+
+procedure TRawViewFrame.UpdateFilterMatchCount(AFiltering: Boolean);
+begin
+  if (FDocument = nil) or (FDocument.TextSource = nil) then
+  begin
+    lblFilterMatches.Caption := '0 matches';
+    Exit;
+  end;
+
+  var LTotalLines := FDocument.TextSource.LineCount;
+  if Trim(SearchFilterBox.Text) = '' then
+    lblFilterMatches.Caption := Format('%s lines', [FormatFloat('#,##0',
+      LTotalLines)])
+  else if AFiltering then
+    lblFilterMatches.Caption := 'Filtering...'
+  else
+    lblFilterMatches.Caption := Format('%s / %s matches', [
+      FormatFloat('#,##0', FVisibleSourceLineIndexes.Count),
+      FormatFloat('#,##0', LTotalLines)]);
 end;
 
 procedure TRawViewFrame.cbFollowSelectionClick(Sender: TObject);

@@ -28,6 +28,30 @@ object RawViewFrame: TRawViewFrame
       Font.Style = [fsBold]
       ParentFont = False
     end
+    object lblFilterMatches: TLabel
+      AlignWithMargins = True
+      Left = 250
+      Top = 0
+      Width = 54
+      Height = 41
+      Margins.Left = 0
+      Margins.Top = 0
+      Margins.Right = 16
+      Margins.Bottom = 0
+      Align = alRight
+      Alignment = taRightJustify
+      Caption = '0 matches'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -12
+      Font.Name = 'Segoe UI'
+      Font.Style = []
+      ParentFont = False
+      Layout = tlCenter
+      StyleName = 'Windows'
+      ExplicitLeft = 247
+      ExplicitTop = -2
+    end
     object SearchFilterBox: TSearchBox
       AlignWithMargins = True
       Left = 467

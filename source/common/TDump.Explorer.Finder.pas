@@ -51,6 +51,7 @@ type
       AExecutableKind: TDumpExecutableKind): TDumpInstallation;
     function FindDefault(const AInstallations: TObjectList<TDumpInstallation>):
       TDumpInstallation;
+    function FindDefaultTool(out AToolPath, AStudioVersion: string): Boolean;
   end;
 
 implementation
@@ -229,6 +230,28 @@ begin
   Result := FindNewest(AInstallations, tekTDump64);
   if Result = nil then
     Result := FindNewest(AInstallations, tekTDump);
+end;
+
+function TDumpFinder.FindDefaultTool(out AToolPath,
+  AStudioVersion: string): Boolean;
+begin
+  AToolPath := '';
+  AStudioVersion := '';
+  var LInstallations := Find;
+  try
+    var LInstallation := FindDefault(LInstallations);
+    if LInstallation = nil then
+      Exit(False);
+
+    AStudioVersion := LInstallation.StudioVersion;
+    if LInstallation.HasTDump64 then
+      AToolPath := LInstallation.TDump64Path
+    else
+      AToolPath := LInstallation.TDumpPath;
+    Result := FileExists(AToolPath);
+  finally
+    LInstallations.Free;
+  end;
 end;
 
 end.

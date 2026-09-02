@@ -15,7 +15,8 @@ unit TDump.Explorer.UI;
 interface
 
 uses
-  Vcl.Graphics, System.Types, System.UITypes, System.Classes;
+  Vcl.Graphics, System.Types, System.UITypes, System.Classes, Vcl.Controls,
+  Vcl.ExtCtrls, TDump.Explorer.GlassTabs;
 
 type
   TExplorerThemeKind = (thtLight, thtDark);
@@ -48,11 +49,24 @@ type
     class function ActiveTheme: TExplorerTheme; static;
   end;
 
+  TEmptyStateDropZone = class(TCustomPanel)
+  private
+    FBorderColor: TColor;
+    procedure SetBorderColor(const AValue: TColor);
+  protected
+    procedure Paint; override;
+  public
+    constructor Create(AOwner: TComponent); override;
+    property Color;
+    property BorderColor: TColor read FBorderColor write SetBorderColor;
+  end;
+
 procedure DrawRoundedBar(const Canvas: TCanvas; const ARect: TRect; FillColor, BorderColor: TColor; const Radius: Single = 2.0);
 procedure DrawDashedRoundedRectangle(const ACanvas: TCanvas;
   const ARect: TRect; ABorderColor: TColor; ARadius: Integer);
 procedure DrawSelectionBar(const Canvas: TCanvas; const ARect: TRect; FillColor, BorderColor: TColor);
 procedure DrawSplitterLine(const ACanvas: TCanvas; const ARect: TRect; AIsVertical: Boolean; AColor: TColor);
+function ExplorerTabPalette(const ATheme: TExplorerTheme): TGlassTabPalette;
 function IsWindows11: Boolean;
 function IsLightThemeActive: Boolean;
 function IsWindowsLightTheme: Boolean;
@@ -63,6 +77,60 @@ implementation
 uses
   Winapi.Windows, System.Win.Registry, Vcl.GraphUtil, Winapi.GDIPAPI, Winapi.GDIPOBJ,
   System.SysUtils, Vcl.Themes;
+
+const
+  cBorderBlend = 0.82;
+  cInactiveTopBlend = 0.97;
+  cHoverTopBlend = 0.82;
+  cCloseHoverBlend = 0.72;
+
+{ TEmptyStateDropZone }
+
+constructor TEmptyStateDropZone.Create(AOwner: TComponent);
+begin
+  inherited Create(AOwner);
+  BevelOuter := bvNone;
+  ParentBackground := False;
+  DoubleBuffered := True;
+end;
+
+procedure TEmptyStateDropZone.Paint;
+begin
+  Canvas.Brush.Color := Color;
+  Canvas.FillRect(ClientRect);
+  DrawDashedRoundedRectangle(Canvas, ClientRect, FBorderColor,
+    ScaleValue(14));
+end;
+
+procedure TEmptyStateDropZone.SetBorderColor(const AValue: TColor);
+begin
+  if FBorderColor = AValue then
+    Exit;
+  FBorderColor := AValue;
+  Invalidate;
+end;
+
+function ExplorerTabPalette(const ATheme: TExplorerTheme): TGlassTabPalette;
+begin
+  Result.StripTop := ATheme.BackgroundColor;
+  Result.StripBottom := ATheme.BackgroundColor;
+  Result.StripBorder := ColorBlendRGB(ATheme.TextColor,
+    ATheme.BackgroundColor, cBorderBlend);
+  Result.BackgroundTopLine := ATheme.BackgroundColor;
+  Result.TabTop := ATheme.BackgroundColor;
+  Result.TabBottom := ATheme.BackgroundColor;
+  Result.InactiveTop := ColorBlendRGB(ATheme.TextColor,
+    ATheme.BackgroundColor, cInactiveTopBlend);
+  Result.InactiveBottom := ATheme.BackgroundColor;
+  Result.HoverTop := ColorBlendRGB(ATheme.SelectionColor,
+    ATheme.BackgroundColor, cHoverTopBlend);
+  Result.HoverBottom := ATheme.BackgroundColor;
+  Result.Accent := ATheme.SelectionColor;
+  Result.Text := ATheme.TextColor;
+  Result.InactiveText := ATheme.InactiveText;
+  Result.CloseHover := ColorBlendRGB(ATheme.SelectionColor,
+    ATheme.BackgroundColor, cCloseHoverBlend);
+end;
 
 function IsWindowsLightTheme: Boolean;
 const

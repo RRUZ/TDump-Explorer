@@ -19,6 +19,9 @@ interface
 uses
   TDump.Explorer.Parser;
 
+function TDumpToolKindFromPath(const AToolPath: string): TDumpToolKind;
+function IsTDumpReportFile(const AFileName: string): Boolean;
+
 type
   // Chooses the TDUMP view appropriate for a known input-file family.
   TDumpOptionProfile = (topRaw, topExecutable, topObject, topLibrary,
@@ -132,6 +135,9 @@ type
       TDumpRunResult;
     procedure ParseResult(const AResult: TDumpRunResult;
       AToolKind: TDumpToolKind);
+    procedure ParseReportFile(const AResult: TDumpRunResult;
+      const AReportFileName: string; ADeleteWhenDone: Boolean;
+      AToolKind: TDumpToolKind);
     function IsCancellationRequested: Boolean;
   public
     class function GetOptionProfile(const AInputFileName: string):
@@ -166,6 +172,9 @@ type
     function RunAndParse(const AInputFileName, AToolPath: string;
       AToolKind: TDumpToolKind; const AOptions: TDumpCommandOptions):
       TDumpRunResult; overload;
+    // Parses a pre-generated TDUMP report through the same mapped-source,
+    // progress and cancellation path used for TDUMP process output.
+    function ParseReport(const AReportFileName: string): TDumpRunResult;
   end;
 
 implementation
@@ -177,6 +186,35 @@ uses
   System.SysUtils,
   Winapi.Windows,
   TDump.Explorer.TextSource;
+
+const
+  cReportValidationProbeSize = 64 * 1024;
+
+function TDumpToolKindFromPath(const AToolPath: string): TDumpToolKind;
+begin
+  if SameText(ExtractFileName(AToolPath), 'tdump64.exe') then
+    Result := tkTDump64
+  else
+    Result := tkTDump32;
+end;
+
+function IsTDumpReportFile(const AFileName: string): Boolean;
+begin
+  var LStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyWrite);
+  try
+    var LReadCount := cReportValidationProbeSize;
+    if LStream.Size < LReadCount then
+      LReadCount := Integer(LStream.Size);
+    if LReadCount <= 0 then
+      Exit(False);
+    var LBytes: TBytes;
+    SetLength(LBytes, LReadCount);
+    LStream.ReadBuffer(LBytes[0], LReadCount);
+    Result := IsTDumpReport(TEncoding.Default.GetString(LBytes));
+  finally
+    LStream.Free;
+  end;
+end;
 
 function QuoteCommandLineArgument(const AValue: string): string;
 begin
@@ -627,6 +665,13 @@ end;
 procedure TDumpRunner.ParseResult(const AResult: TDumpRunResult;
   AToolKind: TDumpToolKind);
 begin
+  ParseReportFile(AResult, AResult.FOutputFileName, True, AToolKind);
+end;
+
+procedure TDumpRunner.ParseReportFile(const AResult: TDumpRunResult;
+  const AReportFileName: string; ADeleteWhenDone: Boolean;
+  AToolKind: TDumpToolKind);
+begin
   var LParseStopwatch := TStopwatch.StartNew;
   var LParser := TDumpParser.Create;
   try
@@ -639,8 +684,10 @@ begin
         if Assigned(FOnProgress) then
           FOnProgress(APhase, ACompletedLines, ATotalLines);
       end;
-    var LSource := TDumpMappedTextSource.Create(AResult.FOutputFileName, True);
-    AResult.FOwnsOutputFile := False;
+    var LSource := TDumpMappedTextSource.Create(AReportFileName,
+      ADeleteWhenDone);
+    if ADeleteWhenDone then
+      AResult.FOwnsOutputFile := False;
     try
       AResult.Document := LParser.ParseSource(LSource, AResult.InputFileName);
       LSource := nil;
@@ -656,6 +703,26 @@ begin
     LParseStopwatch.Stop;
     AResult.ParsingMilliseconds := LParseStopwatch.ElapsedMilliseconds;
     LParser.Free;
+  end;
+end;
+
+function TDumpRunner.ParseReport(
+  const AReportFileName: string): TDumpRunResult;
+begin
+  if TFile.GetSize(AReportFileName) > CMaxTDumpReportSize then
+    raise Exception.CreateFmt('%s exceeds the 100 MB file limit.',
+      [AReportFileName]);
+  if not IsTDumpReportFile(AReportFileName) then
+    raise Exception.CreateFmt('%s is text, but it is not a TDUMP report.',
+      [AReportFileName]);
+
+  Result := TDumpRunResult.Create;
+  try
+    Result.InputFileName := AReportFileName;
+    ParseReportFile(Result, AReportFileName, False, tkUnknown);
+  except
+    Result.Free;
+    raise;
   end;
 end;
 

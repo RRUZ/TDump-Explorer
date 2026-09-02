@@ -24,11 +24,67 @@ function RawLineCount(const S: string): Integer;
 function GetTDumpVersion(const AFileName: string): string;
 function GetExecutableVersion(const AFileName: string): string;
 function CaptureProcessOutput(const AExecutableFileName, AParameters: string): string;
+function BuildDocumentSummary(const ATitle: string;
+  const ADocument: TDumpDocument; const ATDumpParameters: string = ''): string;
+function FormatProfile(AFileSize, ATotalMilliseconds, AExecutionMilliseconds,
+  AParsingMilliseconds: Int64; AReportLines: Integer): string;
+function ParserProgressPhaseName(AValue: TDumpParserProgressPhase): string;
 
 implementation
 
 uses
- Winapi.Windows;
+  Winapi.Windows, System.Classes, System.TypInfo,
+  TDump.Explorer.UI;
+
+function BuildDocumentSummary(const ATitle: string;
+  const ADocument: TDumpDocument; const ATDumpParameters: string): string;
+begin
+  var LLines := TStringList.Create;
+  try
+    LLines.Add(ATitle);
+    LLines.Add('Source: ' + ADocument.SourceFileName);
+    if ADocument.TurboDumpHeader <> '' then
+      LLines.Add('TDUMP header: ' + ADocument.TurboDumpHeader);
+    LLines.Add('Tool: ' + GetEnumName(TypeInfo(TDumpToolKind),
+      Ord(ADocument.ToolKind)));
+    if ATDumpParameters <> '' then
+      LLines.Add('TDUMP parameters: ' + ATDumpParameters);
+    if ADocument.ToolVersion <> '' then
+      LLines.Add('TDUMP version: ' + ADocument.ToolVersion);
+    LLines.Add('File kind: ' + GetEnumName(TypeInfo(TDumpFileKind),
+      Ord(ADocument.FileKind)));
+    LLines.Add('Architecture: ' + ADocument.Architecture);
+    LLines.Add(Format('Report lines: %d', [ADocument.Lines.Count]));
+    LLines.Add('');
+    LLines.Add(Format('Headers: %d', [ADocument.Headers.Count]));
+    LLines.Add(Format('Sections: %d', [ADocument.Sections.Count]));
+    LLines.Add(Format('Import modules: %d', [ADocument.Imports.Count]));
+    LLines.Add(Format('Exports: %d', [ADocument.ExportList.Count]));
+    LLines.Add(Format('Resources: %d', [ADocument.Resources.Count]));
+    LLines.Add(Format('Diagnostics: %d', [ADocument.Diagnostics.Count]));
+    Result := LLines.Text;
+  finally
+    LLines.Free;
+  end;
+end;
+
+function FormatProfile(AFileSize, ATotalMilliseconds, AExecutionMilliseconds,
+  AParsingMilliseconds: Int64; AReportLines: Integer): string;
+begin
+  var LSpeed := 'n/a';
+  if (AReportLines > 0) and (AParsingMilliseconds > 0) then
+    LSpeed := Format('%s lines/s', [FormatFloat('#,##0',
+      AReportLines * 1000.0 / AParsingMilliseconds)]);
+  Result := Format('Profile: size %s | total %.3f s | TDUMP %.3f s | parse %.3f s | %s lines | %s',
+    [FormatByteSize(AFileSize), ATotalMilliseconds / 1000.0,
+      AExecutionMilliseconds / 1000.0, AParsingMilliseconds / 1000.0,
+      FormatFloat('#,##0', AReportLines), LSpeed]);
+end;
+
+function ParserProgressPhaseName(AValue: TDumpParserProgressPhase): string;
+begin
+  Result := GetEnumName(TypeInfo(TDumpParserProgressPhase), Ord(AValue));
+end;
 
 function GetExecutableVersion(const AFileName: string): string;
 begin

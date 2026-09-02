@@ -24,11 +24,7 @@ type
     pnToolbar: TPanel;
     SearchFilterBox: TSearchBox;
     Label1: TLabel;
-  private
-    var
-      FEntries: TLogEntryList;
-      FVisibleEntryIndexes: TList<Integer>;
-      FUsingFilteredIndexes: Boolean;
+    lblFilterMatches: TLabel;
     procedure ApplyFilter;
     procedure ControlList1BeforeDrawItem(AIndex: Integer; ACanvas: TCanvas;
       ARect: TRect; AState: TOwnerDrawState);
@@ -44,10 +40,15 @@ type
     function VisibleEntryIndex(AIndex: Integer): Integer;
     procedure SearchFilterBoxChange(Sender: TObject);
     procedure UpdateControlList;
+    procedure UpdateFilterMatchCount;
     procedure CMStyleChanged(var AMessage: TMessage); message CM_STYLECHANGED;
     procedure WMLogFilterItemDblClick(var AMessage: TMessage);
       message WM_USER + $541;
     procedure ApplyTheme;
+  private
+    FEntries: TLogEntryList;
+    FVisibleEntryIndexes: TList<Integer>;
+    FUsingFilteredIndexes: Boolean;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -78,6 +79,7 @@ begin
   ControlList1.OnBeforeDrawItem := ControlList1BeforeDrawItem;
   ControlList1.OnItemDblClick := ControlList1DblClick;
   ControlList1.OnKeyDown := ControlList1KeyDown;
+  //SearchFilterBox.TextHint := 'Filter activity log...';
   SearchFilterBox.OnChange := SearchFilterBoxChange;
   pnToolbar.Alignment := taLeftJustify;
   ApplyFilter;
@@ -121,8 +123,11 @@ end;
 
 procedure TLogControl.ApplyTheme;
 begin
+  var LTheme := TExplorerTheme.ActiveTheme;
   pnToolbar.StyleElements := pnToolbar.StyleElements - [seClient];
-  pnToolbar.Color := TExplorerTheme.ActiveTheme.BackgroundColor;
+  pnToolbar.Color := LTheme.BackgroundColor;
+  SearchFilterBox.Font.Color := LTheme.TextColor;
+  lblFilterMatches.Font.Color := LTheme.InactiveText;
 end;
 
 procedure TLogControl.Clear;
@@ -369,6 +374,7 @@ begin
     for var LIndex := 0 to FEntries.Count - 1 do
       if ContainsText(EntryText(FEntries[LIndex]), LFilterText) then
         FVisibleEntryIndexes.Add(LIndex);
+  UpdateFilterMatchCount;
   UpdateControlList;
 end;
 
@@ -385,6 +391,17 @@ begin
     ControlList1.ItemCount := FEntries.Count;
   //pnToolbar.Caption := Format('General activity (%d)', [FEntries.Count]);
   ControlList1.Invalidate;
+end;
+
+procedure TLogControl.UpdateFilterMatchCount;
+begin
+  if Trim(SearchFilterBox.Text) = '' then
+    lblFilterMatches.Caption := Format('%s entries', [FormatFloat('#,##0',
+      FEntries.Count)])
+  else
+    lblFilterMatches.Caption := Format('%s / %s matches', [
+      FormatFloat('#,##0', FVisibleEntryIndexes.Count),
+      FormatFloat('#,##0', FEntries.Count)]);
 end;
 
 function TLogControl.VisibleEntryIndex(AIndex: Integer): Integer;

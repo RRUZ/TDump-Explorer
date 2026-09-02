@@ -3,7 +3,7 @@ object FrmSettings: TFrmSettings
   Top = 0
   BorderStyle = bsDialog
   Caption = 'Settings'
-  ClientHeight = 598
+  ClientHeight = 388
   ClientWidth = 585
   Color = clWindow
   CustomTitleBar.Control = TitleBarPanel1
@@ -38,7 +38,7 @@ object FrmSettings: TFrmSettings
     Left = 0
     Top = 37
     Width = 585
-    Height = 561
+    Height = 282
     Align = alClient
     BevelOuter = bvNone
     Color = clWindow
@@ -49,75 +49,14 @@ object FrmSettings: TFrmSettings
     ParentBackground = False
     TabOrder = 0
     StyleElements = [seFont, seBorder]
-    object pnFooter: TPanel
-      Left = 20
-      Top = 459
-      Width = 545
-      Height = 88
-      Align = alClient
-      BevelOuter = bvNone
-      Color = clWindow
-      ParentBackground = False
-      TabOrder = 3
-      StyleElements = [seFont, seBorder]
-      DesignSize = (
-        545
-        88)
-      object lblInformation: TLabel
-        Left = 0
-        Top = 6
-        Width = 17
-        Height = 28
-        Caption = #9432
-        Font.Charset = DEFAULT_CHARSET
-        Font.Color = clGrayText
-        Font.Height = -20
-        Font.Name = 'Segoe UI Symbol'
-        Font.Style = []
-        ParentFont = False
-      end
-      object lblHint: TLabel
-        Left = 34
-        Top = 15
-        Width = 263
-        Height = 17
-        Caption = 'Changes apply on next open where required.'
-        Font.Charset = DEFAULT_CHARSET
-        Font.Color = clGrayText
-        Font.Height = -13
-        Font.Name = 'Segoe UI'
-        Font.Style = []
-        ParentFont = False
-      end
-      object btnSave: TButton
-        Left = 463
-        Top = 13
-        Width = 80
-        Height = 25
-        Anchors = [akTop, akRight]
-        Caption = 'Save'
-        Default = True
-        ModalResult = 1
-        TabOrder = 1
-      end
-      object btnCancel: TButton
-        Left = 377
-        Top = 13
-        Width = 80
-        Height = 25
-        Anchors = [akTop, akRight]
-        Cancel = True
-        Caption = 'Cancel'
-        ModalResult = 2
-        TabOrder = 0
-      end
-    end
+    ExplicitTop = 43
+    ExplicitHeight = 365
     object pnlWorkspace: TPanel
       AlignWithMargins = True
       Left = 20
-      Top = 279
+      Top = 293
       Width = 545
-      Height = 166
+      Height = 1
       Margins.Left = 0
       Margins.Top = 0
       Margins.Right = 0
@@ -127,7 +66,9 @@ object FrmSettings: TFrmSettings
       Color = clWindow
       ParentBackground = False
       TabOrder = 2
+      Visible = False
       StyleElements = [seFont, seBorder]
+      ExplicitTop = 279
       object lblWorkspace: TLabel
         Left = 0
         Top = 18
@@ -201,7 +142,7 @@ object FrmSettings: TFrmSettings
       Left = 20
       Top = 159
       Width = 545
-      Height = 106
+      Height = 120
       Margins.Left = 0
       Margins.Top = 0
       Margins.Right = 0
@@ -209,6 +150,8 @@ object FrmSettings: TFrmSettings
       Align = alTop
       BevelOuter = bvNone
       Color = clWindow
+      Constraints.MaxHeight = 120
+      Constraints.MinHeight = 120
       ParentBackground = False
       TabOrder = 1
       StyleElements = [seFont, seBorder]
@@ -216,7 +159,7 @@ object FrmSettings: TFrmSettings
         Left = 0
         Top = 0
         Width = 545
-        Height = 17
+        Height = 28
         Align = alTop
         Caption = 'Appearance'
         Font.Charset = DEFAULT_CHARSET
@@ -225,22 +168,26 @@ object FrmSettings: TFrmSettings
         Font.Name = 'Segoe UI'
         Font.Style = [fsBold]
         ParentFont = False
-        ExplicitWidth = 72
       end
       object lblPreferredTheme: TLabel
         Left = 0
-        Top = 17
+        Top = 28
         Width = 545
-        Height = 15
+        Height = 24
         Align = alTop
         Caption = 'Preferred theme'
-        ExplicitWidth = 85
+        ExplicitTop = 24
       end
       object ControlList1: TControlList
-        Left = 0
-        Top = 32
-        Width = 545
-        Height = 74
+        AlignWithMargins = True
+        Left = 8
+        Top = 60
+        Width = 529
+        Height = 52
+        Margins.Left = 8
+        Margins.Top = 8
+        Margins.Right = 8
+        Margins.Bottom = 8
         Align = alClient
         BorderStyle = bsNone
         ItemCount = 5
@@ -252,6 +199,10 @@ object FrmSettings: TFrmSettings
         ColumnLayout = cltMultiLeftToRight
         ParentColor = False
         TabOrder = 0
+        ExplicitLeft = 11
+        ExplicitTop = 58
+        ExplicitWidth = 539
+        ExplicitHeight = 75
       end
     end
     object pnlGeneral: TPanel
@@ -272,9 +223,10 @@ object FrmSettings: TFrmSettings
       StyleElements = [seFont, seBorder]
       object lblGeneral: TLabel
         Left = 0
-        Top = -3
-        Width = 47
-        Height = 17
+        Top = 0
+        Width = 545
+        Height = 28
+        Align = alTop
         Caption = 'General'
         Font.Charset = DEFAULT_CHARSET
         Font.Color = clWindowText
@@ -333,5 +285,70 @@ object FrmSettings: TFrmSettings
     Width = 585
     Height = 37
     CustomButtons = <>
+    ExplicitTop = -6
+  end
+  object pnFooter: TPanel
+    Left = 0
+    Top = 319
+    Width = 585
+    Height = 69
+    Align = alBottom
+    BevelOuter = bvNone
+    Color = clWindow
+    ParentBackground = False
+    TabOrder = 2
+    StyleElements = [seFont, seBorder]
+    ExplicitTop = 333
+    DesignSize = (
+      585
+      69)
+    object lblInformation: TLabel
+      Left = 20
+      Top = 22
+      Width = 17
+      Height = 28
+      Caption = #9432
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clGrayText
+      Font.Height = -20
+      Font.Name = 'Segoe UI Symbol'
+      Font.Style = []
+      ParentFont = False
+    end
+    object lblHint: TLabel
+      Left = 43
+      Top = 31
+      Width = 263
+      Height = 17
+      Caption = 'Changes apply on next open where required.'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clGrayText
+      Font.Height = -13
+      Font.Name = 'Segoe UI'
+      Font.Style = []
+      ParentFont = False
+    end
+    object btnSave: TButton
+      Left = 474
+      Top = 29
+      Width = 80
+      Height = 25
+      Anchors = [akTop, akRight]
+      Caption = 'Save'
+      Default = True
+      ModalResult = 1
+      TabOrder = 1
+    end
+    object btnCancel: TButton
+      Left = 388
+      Top = 29
+      Width = 80
+      Height = 25
+      Anchors = [akTop, akRight]
+      Cancel = True
+      Caption = 'Cancel'
+      ModalResult = 2
+      TabOrder = 0
+    end
   end
 end

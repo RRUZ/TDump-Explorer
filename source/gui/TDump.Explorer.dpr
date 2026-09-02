@@ -49,7 +49,7 @@ begin
     TThread.ForceQueue(nil,
       procedure
       begin
-        FrmMain.OpenInputFile(LInputFileName);
+        FrmMain.OpenInputFile(LInputFileName, True);
       end);
   end;
   Application.Run;

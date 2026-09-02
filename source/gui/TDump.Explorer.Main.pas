@@ -7,13 +7,14 @@ uses
   System.UITypes,
   System.Diagnostics, System.Generics.Collections, System.IOUtils, System.StrUtils,
   System.Threading,
-  System.TypInfo, Vcl.Graphics, Vcl.Controls, Vcl.Forms,
+  Vcl.Graphics, Vcl.Controls, Vcl.Forms,
   Vcl.Dialogs, Vcl.StdCtrls, Winapi.ShellAPI, TDump.Explorer.Finder,
   TDump.Explorer.Parser, TDump.Explorer.Phosphor.Font, TDump.Explorer.Runner,
   TDump.Explorer.TextSource, TDump.Explorer.Settings,
   TDump.Explorer.Frame, Vcl.ComCtrls, TDump.Explorer.LogControl, Vcl.ExtCtrls,
   Vcl.TitleBarCtrls, Vcl.WinXPanels, Vcl.VirtualImageList,
-  TDump.Explorer.GlassTabs, TDump.Explorer.PopupMenu, Vcl.AppEvnts;
+  TDump.Explorer.GlassTabs, TDump.Explorer.PopupMenu, TDump.Explorer.UI,
+  Vcl.AppEvnts;
 
 type
   TAnalysisKind = (akBinary, akReport);
@@ -25,17 +26,7 @@ type
     ParsingStarted: Boolean;
     ReloadRequested: Boolean;
     Discarded: Boolean;
-  end;
-
-  TEmptyStateDropZone = class(TCustomPanel)
-  private
-    FBorderColor: TColor;
-    procedure SetBorderColor(const AValue: TColor);
-  protected
-    procedure Paint; override;
-  public
-    constructor Create(AOwner: TComponent); override;
-    property BorderColor: TColor read FBorderColor write SetBorderColor;
+    ActivateTabWhenComplete: Boolean;
   end;
 
 const
@@ -77,8 +68,8 @@ type
     FRecentFilesPopupMenu: TExplorerPopupMenuForm;
     FRecentFilesPopupFiles: TStringList;
     FDocumentStagingPanel: TCardPanel;
-    FDeferredTabActivationTimer: TTimer;
     FPendingDocumentCards: TList<TCard>;
+    FPendingActivationCard: TCard;
     FDeferredDocumentCard: TCard;
     FProgressTotalFiles: Integer;
     FProgressCompletedFiles: Integer;
@@ -96,6 +87,7 @@ type
     procedure BeginAnalysis(ARequest: TAnalysisRequest);
     procedure CardsChanged(Sender: TObject; PrevCard, NextCard: TCard);
     procedure CheckTDumpAvailability;
+    function EnsureTDumpAvailable: Boolean;
     procedure CompleteAnalysis(AAnalysisId: Integer; const ASummary: string;
       ASucceeded: Boolean; AFileSize, ATotalMilliseconds,
       AExecutionMilliseconds, AParsingMilliseconds: Int64;
@@ -106,22 +98,24 @@ type
       var ADocument: TDumpDocument);
     procedure AddPendingDocumentTabs;
     procedure AttachPendingDocumentCards;
-    procedure DeferredTabActivationTimer(Sender: TObject);
+    procedure ActivateDeferredDocumentTab;
     procedure DrainAnalysisMessages;
     function HasPendingAnalysis: Boolean;
     function IsPendingDocumentCard(ACard: TCard): Boolean;
     function IsDocumentOpen(const AFileName: string): Boolean;
     function CreateAnalysisRequest(const AFileName: string;
-      AKind: TAnalysisKind): TAnalysisRequest;
+      AKind: TAnalysisKind; AActivateTabWhenComplete: Boolean): TAnalysisRequest;
     procedure CreateTabs;
     procedure CreateEmptyState;
     function DocumentTabImageName: System.UITypes.TImageName;
     function IsTextFile(const AFileName: string): Boolean;
-    procedure ProcessDroppedFile(const AFileName: string);
+    function ProcessDroppedFile(const AFileName: string;
+      AActivateTabWhenComplete: Boolean = False): Boolean;
+    function CanAutoActivateInitialDocument: Boolean;
     procedure RemoveDocumentCard(ACard: TCard; ADeleteTab: Boolean);
     procedure ResetAnalysisProgress;
     procedure SetAnalysisProgress(ACompletedLines, ATotalLines: Integer);
-    procedure SchedulePendingDocumentActivation;
+    procedure FinalizePendingDocumentTabs;
     procedure SplitterPaint(Sender: TObject);
     procedure StartNextAnalysis;
     procedure PopupMenuAboutClick(Sender: TObject);
@@ -169,7 +163,8 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure InitializeTabImages;
-    procedure OpenInputFile(const AFileName: string);
+    procedure OpenInputFile(const AFileName: string;
+      AActivateTabWhenComplete: Boolean);
   end;
 
 var
@@ -178,95 +173,17 @@ var
 implementation
 
 uses
-  TDump.Explorer.UI, TDump.Explorer.Utils, TDump.Explorer.Resources,
+  TDump.Explorer.Utils, TDump.Explorer.Resources,
   Vcl.GraphUtil, Vcl.Menus, Vcl.Themes;
 
 {$R *.dfm}
 
 const
   cTextProbeSize = 8192;
-  cReportValidationProbeSize = 64 * 1024;
   cTitleBarHeight = 40;
   cTitleBarButtonMargin = 150;
   cTabIconSize = 16;
   cCaptionFontSize = 11;
-  cBorderBlend = 0.82;
-  cInactiveTopBlend = 0.97;
-  cHoverTopBlend = 0.82;
-  cInactiveTextBlend = 0.35;
-  cCloseHoverBlend = 0.72;
-
-{ TEmptyStateDropZone }
-
-constructor TEmptyStateDropZone.Create(AOwner: TComponent);
-begin
-  inherited Create(AOwner);
-  BevelOuter := bvNone;
-  ParentBackground := False;
-  DoubleBuffered := True;
-end;
-
-procedure TEmptyStateDropZone.Paint;
-begin
-  Canvas.Brush.Color := Color;
-  Canvas.FillRect(ClientRect);
-  DrawDashedRoundedRectangle(Canvas, ClientRect, FBorderColor,
-    ScaleValue(14));
-end;
-
-procedure TEmptyStateDropZone.SetBorderColor(const AValue: TColor);
-begin
-  if FBorderColor = AValue then
-    Exit;
-  FBorderColor := AValue;
-  Invalidate;
-end;
-
-function DescribeCard(ACard: TCard): string;
-begin
-  if ACard = nil then
-    Exit('(none)');
-  Result := Format('"%s" index=%d visible=%s', [ACard.Caption,
-    ACard.CardIndex, BoolToStr(ACard.Visible, True)]);
-end;
-
-function IsTDumpReportFile(const AFileName: string): Boolean;
-begin
-  var LStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyWrite);
-  try
-    var LReadCount := cReportValidationProbeSize;
-    if LStream.Size < LReadCount then
-      LReadCount := Integer(LStream.Size);
-    if LReadCount <= 0 then
-      Exit(False);
-    var LBytes: TBytes;
-    SetLength(LBytes, LReadCount);
-    LStream.ReadBuffer(LBytes[0], LReadCount);
-    Result := IsTDumpReport(TEncoding.Default.GetString(LBytes));
-  finally
-    LStream.Free;
-  end;
-end;
-
-function ExplorerTabPalette(const ATheme: TExplorerTheme): TGlassTabPalette;
-begin
-  Result.StripTop := ATheme.BackgroundColor;
-  Result.StripBottom := ATheme.BackgroundColor;
-  Result.StripBorder := ColorBlendRGB(ATheme.TextColor, ATheme.BackgroundColor, cBorderBlend);
-  Result.BackgroundTopLine := ATheme.BackgroundColor;
-  Result.TabTop := ATheme.BackgroundColor;
-  Result.TabBottom := ATheme.BackgroundColor;
-  Result.InactiveTop := ColorBlendRGB(ATheme.TextColor,  ATheme.BackgroundColor, cInactiveTopBlend);
-  Result.InactiveBottom := ATheme.BackgroundColor;
-  Result.HoverTop := ColorBlendRGB(ATheme.SelectionColor,  ATheme.BackgroundColor, cHoverTopBlend);
-  Result.HoverBottom := ATheme.BackgroundColor;
-  Result.Accent := ATheme.SelectionColor;
-
-  Result.Text := ATheme.TextColor;
-  Result.InactiveText := ATheme.InactiveText;
-
-  Result.CloseHover := ColorBlendRGB(ATheme.SelectionColor, ATheme.BackgroundColor, cCloseHoverBlend);
-end;
 
 type
   TAnalysisProgressUpdate = class
@@ -316,56 +233,6 @@ begin
     on EOperationCancelled do
       Result := True;
   end;
-end;
-
-function BuildDocumentSummary(const ATitle: string;
-  const ADocument: TDumpDocument; const ATDumpParameters: string = ''): string;
-begin
-  var LLines := TStringList.Create;
-  try
-    LLines.Add(ATitle);
-    LLines.Add('Source: ' + ADocument.SourceFileName);
-    if ADocument.TurboDumpHeader <> '' then
-      LLines.Add('TDUMP header: ' + ADocument.TurboDumpHeader);
-    LLines.Add('Tool: ' + GetEnumName(TypeInfo(TDumpToolKind),
-      Ord(ADocument.ToolKind)));
-    if ATDumpParameters <> '' then
-      LLines.Add('TDUMP parameters: ' + ATDumpParameters);
-    if ADocument.ToolVersion <> '' then
-      LLines.Add('TDUMP version: ' + ADocument.ToolVersion);
-    LLines.Add('File kind: ' + GetEnumName(TypeInfo(TDumpFileKind),
-      Ord(ADocument.FileKind)));
-    LLines.Add('Architecture: ' + ADocument.Architecture);
-    LLines.Add(Format('Report lines: %d', [ADocument.Lines.Count]));
-    LLines.Add('');
-    LLines.Add(Format('Headers: %d', [ADocument.Headers.Count]));
-    LLines.Add(Format('Sections: %d', [ADocument.Sections.Count]));
-    LLines.Add(Format('Import modules: %d', [ADocument.Imports.Count]));
-    LLines.Add(Format('Exports: %d', [ADocument.ExportList.Count]));
-    LLines.Add(Format('Resources: %d', [ADocument.Resources.Count]));
-    LLines.Add(Format('Diagnostics: %d', [ADocument.Diagnostics.Count]));
-    Result := LLines.Text;
-  finally
-    LLines.Free;
-  end;
-end;
-
-function FormatProfile(AFileSize, ATotalMilliseconds, AExecutionMilliseconds,
-  AParsingMilliseconds: Int64; AReportLines: Integer): string;
-begin
-  var LSpeed := 'n/a';
-  if (AReportLines > 0) and (AParsingMilliseconds > 0) then
-    LSpeed := Format('%s lines/s', [FormatFloat('#,##0',
-      AReportLines * 1000.0 / AParsingMilliseconds)]);
-  Result := Format('Profile: size %s | total %.3f s | TDUMP %.3f s | parse %.3f s | %s lines | %s',
-    [FormatByteSize(AFileSize), ATotalMilliseconds / 1000.0,
-      AExecutionMilliseconds / 1000.0, AParsingMilliseconds / 1000.0,
-      FormatFloat('#,##0', AReportLines), LSpeed]);
-end;
-
-function ParserProgressPhaseName(AValue: TDumpParserProgressPhase): string;
-begin
-  Result := GetEnumName(TypeInfo(TDumpParserProgressPhase), Ord(AValue));
 end;
 
 procedure PostAnalysisProgress(AWindowHandle: HWND; AAnalysisId: Integer;
@@ -465,61 +332,46 @@ begin
   ADiagnosticCount := 0;
   ATDumpParameters := '';
   ADocument := nil;
-  if TFile.GetSize(AFileName) > cMaxTDumpReportSize then
-  begin
-    Result := Format('%s exceeds the 100 MB file limit.', [AFileName]);
-    Exit;
-  end;
-  if not IsTDumpReportFile(AFileName) then
-  begin
-    Result := Format('%s is text, but it is not a TDUMP report.',
-      [AFileName]);
-    Exit;
-  end;
-
   var LLastPhase := ppPreparing;
   var LLastCompletedLines := 0;
   var LLastTotalLines := 0;
-  var LParser := TDumpParser.Create;
+  var LRunner := TDumpRunner.Create;
   try
-    LParser.OnProgress :=
+    LRunner.OnCancellationCheck := IsCurrentTaskCancellationRequested;
+    LRunner.OnProgress :=
       procedure(APhase: TDumpParserProgressPhase; ACompletedLines,
         ATotalLines: Integer)
       begin
         LLastPhase := APhase;
         LLastCompletedLines := ACompletedLines;
         LLastTotalLines := ATotalLines;
-        CheckCurrentTaskCancellation;
         PostAnalysisProgress(AWindowHandle, AAnalysisId, APhase,
           ACompletedLines, ATotalLines);
       end;
-    var LParseStopwatch := TStopwatch.StartNew;
     try
-      ADocument := LParser.ParseFile(AFileName);
+      var LRun := LRunner.ParseReport(AFileName);
+      try
+        AExecutionMilliseconds := LRun.ExecutionMilliseconds;
+        AParsingMilliseconds := LRun.ParsingMilliseconds;
+        AReportLines := LRun.Document.Lines.Count;
+        ATDumpExitCode := LRun.ExitCode;
+        ADiagnosticCount := LRun.Document.Diagnostics.Count;
+        ATDumpParameters := LRun.Options;
+        Result := BuildDocumentSummary('TDUMP report parsed', LRun.Document);
+        ADocument := LRun.Document;
+        LRun.Document := nil;
+      finally
+        LRun.Free;
+      end;
     except
       on LException: Exception do
-      begin
-        LParseStopwatch.Stop;
-        AParsingMilliseconds := LParseStopwatch.ElapsedMilliseconds;
         raise Exception.CreateFmt('%s: %s (parser phase %s, line %d of %d)',
           [LException.ClassName, LException.Message,
             ParserProgressPhaseName(LLastPhase), LLastCompletedLines,
             LLastTotalLines]);
-      end;
-    end;
-    try
-      LParseStopwatch.Stop;
-      AParsingMilliseconds := LParseStopwatch.ElapsedMilliseconds;
-      AReportLines := ADocument.Lines.Count;
-      ADiagnosticCount := ADocument.Diagnostics.Count;
-      Result := BuildDocumentSummary('TDUMP report parsed', ADocument);
-    except
-      ADocument.Free;
-      ADocument := nil;
-      raise;
     end;
   finally
-    LParser.Free;
+    LRunner.Free;
   end;
 end;
 
@@ -590,6 +442,8 @@ begin
     FRestoreAlphaBlend := False;
     AlphaBlend := False;
   end;
+  if not FClosing then
+    ActivateDeferredDocumentTab;
 end;
 
 procedure TFrmMain.ApplyEmptyStateTheme;
@@ -645,6 +499,7 @@ end;
 procedure TFrmMain.WMSettingsChanged(var AMessage: TMessage);
 begin
   SyncActiveTheme;
+  CheckTDumpAvailability;
 end;
 
 procedure TFrmMain.CreateTabs;
@@ -1010,7 +865,7 @@ begin
     TSettings.Instance.Save;
     Exit;
   end;
-  OpenInputFile(LFileName);
+  OpenInputFile(LFileName, True);
 end;
 
 function TFrmMain.RecentFileShortcutCaption(AIndex: Integer): string;
@@ -1059,8 +914,15 @@ begin
     //CardPanel1.LockDrawing;
     try
       if LOpenDialog.Execute then
+      begin
+        // Multi-file opens retain the current tab.  With no document yet,
+        // nominate only the first accepted item for activation.
+        var LActivateNextAcceptedTab := (LOpenDialog.Files.Count = 1) or
+          CanAutoActivateInitialDocument;
         for var LFileName in LOpenDialog.Files do
-          ProcessDroppedFile(LFileName);
+          if ProcessDroppedFile(LFileName, LActivateNextAcceptedTab) then
+            LActivateNextAcceptedTab := False;
+      end;
     finally
       //CardPanel1.UnlockDrawing;
     end;
@@ -1197,12 +1059,7 @@ begin
   CreateTabs;
   CreateEmptyState;
   UpdateEmptyState;
-  FDeferredTabActivationTimer := TTimer.Create(Self);
-  FDeferredTabActivationTimer.Interval := 100;
-  FDeferredTabActivationTimer.Enabled := False;
-  FDeferredTabActivationTimer.OnTimer := DeferredTabActivationTimer;
   CompleteAnalysisProgress;
-  CheckTDumpAvailability;
 end;
 
 procedure TFrmMain.SplitterPaint(Sender: TObject);
@@ -1222,42 +1079,56 @@ begin
   FTDumpAvailable := False;
   FTDumpToolPath := '';
   FTDumpToolKind := tkTDump32;
-  LogControl1.Add('Checking TDUMP availability...');
+  var LConfiguredPath := Trim(TSettings.Instance.TDumpPath);
+  if LConfiguredPath <> '' then
+  begin
+    LConfiguredPath := ExpandFileName(LConfiguredPath);
+    if FileExists(LConfiguredPath) then
+    begin
+      FTDumpToolPath := LConfiguredPath;
+      FTDumpToolKind := TDumpToolKindFromPath(FTDumpToolPath);
+      FTDumpAvailable := True;
+      if not SameText(TSettings.Instance.TDumpPath, FTDumpToolPath) then
+      begin
+        TSettings.Instance.TDumpPath := FTDumpToolPath;
+        TSettings.Instance.Save;
+      end;
+      var LConfiguredMessage := 'TDUMP path from settings: ' +
+        FTDumpToolPath;
+      var LConfiguredVersion := GetTDumpVersion(FTDumpToolPath);
+      if LConfiguredVersion <> '' then
+        LConfiguredMessage := LConfiguredMessage + ' (version ' +
+          LConfiguredVersion + ')';
+      LogControl1.Add(LConfiguredMessage, letSuccess);
+      Exit;
+    end;
+    LogControl1.Add('Configured TDUMP path is invalid: ' + LConfiguredPath +
+      '. Searching for the best installed candidate...', letWarning);
+  end
+  else
+    LogControl1.Add('TDUMP path is not configured. Searching for the best ' +
+      'installed candidate...');
   try
     var LFinder := TDumpFinder.Create;
     try
-      var LInstallations := LFinder.Find;
-      try
-        var LInstallation := LFinder.FindDefault(LInstallations);
-        if LInstallation = nil then
-        begin
-          LogControl1.Add('TDUMP was not found.', letError);
-          Exit;
-        end;
-
-        FTDumpToolPath := LInstallation.TDumpPath;
-        if LInstallation.HasTDump64 then
-        begin
-          FTDumpToolPath := LInstallation.TDump64Path;
-          FTDumpToolKind := tkTDump64;
-        end;
-        FTDumpAvailable := FileExists(FTDumpToolPath);
-        if not FTDumpAvailable then
-        begin
-          LogControl1.Add('TDUMP was not found.', letError);
-          Exit;
-        end;
-        var LMessage := 'TDUMP available: ' + FTDumpToolPath;
-        var LVersion := GetTDumpVersion(FTDumpToolPath);
-        if LVersion <> '' then
-          LMessage := LMessage + ' (version ' + LVersion + ')';
-        if LInstallation.StudioVersion <> '' then
-          LMessage := LMessage + ' [RAD Studio ' +
-            LInstallation.StudioVersion + ']';
-        LogControl1.Add(LMessage, letSuccess);
-      finally
-        LInstallations.Free;
+      var LStudioVersion := '';
+      FTDumpAvailable := LFinder.FindDefaultTool(FTDumpToolPath,
+        LStudioVersion);
+      if not FTDumpAvailable then
+      begin
+        LogControl1.Add('TDUMP was not found.', letError);
+        Exit;
       end;
+      FTDumpToolKind := TDumpToolKindFromPath(FTDumpToolPath);
+      TSettings.Instance.TDumpPath := FTDumpToolPath;
+      TSettings.Instance.Save;
+      var LMessage := 'TDUMP path discovered and saved: ' + FTDumpToolPath;
+      var LVersion := GetTDumpVersion(FTDumpToolPath);
+      if LVersion <> '' then
+        LMessage := LMessage + ' (version ' + LVersion + ')';
+      if LStudioVersion <> '' then
+        LMessage := LMessage + ' [RAD Studio ' + LStudioVersion + ']';
+      LogControl1.Add(LMessage, letSuccess);
     finally
       LFinder.Free;
     end;
@@ -1268,14 +1139,27 @@ begin
   end;
 end;
 
+function TFrmMain.EnsureTDumpAvailable: Boolean;
+var
+  LConfiguredPath: string;
+begin
+  LConfiguredPath := Trim(TSettings.Instance.TDumpPath);
+  if (not FTDumpAvailable) or not SameText(FTDumpToolPath, LConfiguredPath) or
+    not FileExists(LConfiguredPath) then
+    CheckTDumpAvailability;
+  Result := FTDumpAvailable and
+    SameText(FTDumpToolPath, Trim(TSettings.Instance.TDumpPath)) and
+    FileExists(TSettings.Instance.TDumpPath);
+end;
+
 procedure TFrmMain.BeginAnalysis(ARequest: TAnalysisRequest);
 begin
   FActiveRequest := ARequest;  Inc(FAnalysisId);
   var LAnalysisId := FAnalysisId;
   var LInputFileName := ARequest.FileName;
   var LKind := ARequest.Kind;
-  var LToolPath := FTDumpToolPath;
-  var LToolKind := FTDumpToolKind;
+  var LToolPath := TSettings.Instance.TDumpPath;
+  var LToolKind := TDumpToolKindFromPath(LToolPath);
   var LWindowHandle := Handle;
   FCurrentFileProgress := 0;
   UpdateOverallProgress;
@@ -1370,7 +1254,7 @@ begin
     FActiveRequest.Free;
     FActiveRequest := nil;
     CompleteAnalysisProgress;
-    ProcessDroppedFile(LFileName);
+    ProcessDroppedFile(LFileName, False);
     Exit;
   end;
 
@@ -1406,13 +1290,17 @@ begin
   LogControl1.Add(FormatProfile(AFileSize, ATotalMilliseconds,
     AExecutionMilliseconds, AParsingMilliseconds, AReportLines), letProfile);
   if ASucceeded and (ADocument <> nil) then
+  begin
     CreateDocumentTab(FActiveRequest.FileName, ASummary, ADocument);
+    if FActiveRequest.ActivateTabWhenComplete then
+      FPendingActivationCard := FPendingDocumentCards.Last;
+  end;
   ADocument.Free;
   AdvanceAnalysisProgress;
   FActiveRequest.Free;
   FActiveRequest := nil;
   if not HasPendingAnalysis then
-    SchedulePendingDocumentActivation;
+    FinalizePendingDocumentTabs;
   CompleteAnalysisProgress;
   StartNextAnalysis;
 end;
@@ -1420,8 +1308,6 @@ end;
 destructor TFrmMain.Destroy;
 begin
   FClosing := True;
-  if Assigned(FDeferredTabActivationTimer) then
-    FDeferredTabActivationTimer.Enabled := False;
   CardPanel1.OnCardChange := nil;
   if FAnalysisTask <> nil then
   begin
@@ -1450,8 +1336,10 @@ end;
 
 procedure TFrmMain.FormCreate(Sender: TObject);
 begin
+  TStyleManager.SystemHooks :=  TStyleManager.SystemHooks - [shDialogs];
   TSettings.Instance.Load;
   SyncActiveTheme;
+  CheckTDumpAvailability;
 end;
 
 procedure TFrmMain.FormShow(Sender: TObject);
@@ -1499,17 +1387,19 @@ begin
   end;
 end;
 
-procedure TFrmMain.OpenInputFile(const AFileName: string);
+procedure TFrmMain.OpenInputFile(const AFileName: string;
+  AActivateTabWhenComplete: Boolean);
 begin
-  ProcessDroppedFile(AFileName);
+  ProcessDroppedFile(AFileName, AActivateTabWhenComplete);
 end;
 
 function TFrmMain.CreateAnalysisRequest(const AFileName: string;
-  AKind: TAnalysisKind): TAnalysisRequest;
+  AKind: TAnalysisKind; AActivateTabWhenComplete: Boolean): TAnalysisRequest;
 begin
   Result := TAnalysisRequest.Create;
   Result.FileName := AFileName;
   Result.Kind := AKind;
+  Result.ActivateTabWhenComplete := AActivateTabWhenComplete;
 end;
 
 procedure TFrmMain.CreateDocumentTab(const AFileName, ASummary: string;
@@ -1569,24 +1459,29 @@ begin
     Exit;
   UpdateEmptyState;
   var LPreviousCard := CardPanel1.ActiveCard;
-  //SendMessage(CardPanel1.Handle, WM_SETREDRAW, 0, 0);
+  // TCardPanel activates every TCard while it is being inserted.  Keep both
+  // the panel and each incoming card from painting those transient states.
+  CardPanel1.LockDrawing;
   try
     for var LCard in FPendingDocumentCards do
     begin
-      LCard.Parent := CardPanel1;
-      LCard.Visible := False;
+      LCard.LockDrawing;
+      try
+        LCard.Parent := CardPanel1;
+        LCard.Visible := False;
+      finally
+        LCard.UnlockDrawing;
+      end;
     end;
     if Assigned(LPreviousCard) and (LPreviousCard.Parent = CardPanel1) then
       CardPanel1.ActiveCard := LPreviousCard;
   finally
-    //SendMessage(CardPanel1.Handle, WM_SETREDRAW, 1, 0);
-    CardPanel1.Invalidate;
+    CardPanel1.UnlockDrawing;
   end;
 end;
 
-procedure TFrmMain.DeferredTabActivationTimer(Sender: TObject);
+procedure TFrmMain.ActivateDeferredDocumentTab;
 begin
-  FDeferredTabActivationTimer.Enabled := False;
   var LCard := FDeferredDocumentCard;
   FDeferredDocumentCard := nil;
   if (LCard = nil) or (LCard.Parent <> CardPanel1) then
@@ -1693,14 +1588,13 @@ begin
   UpdateOverallProgress;
 end;
 
-procedure TFrmMain.SchedulePendingDocumentActivation;
+procedure TFrmMain.FinalizePendingDocumentTabs;
 begin
   if FPendingDocumentCards.Count = 0 then
     Exit;
-  FDeferredDocumentCard := FPendingDocumentCards.Last;
+  FDeferredDocumentCard := FPendingActivationCard;
+  FPendingActivationCard := nil;
   AddPendingDocumentTabs;
-  FDeferredTabActivationTimer.Enabled := False;
-  FDeferredTabActivationTimer.Enabled := True;
 end;
 
 procedure TFrmMain.CompleteAnalysisProgress;
@@ -1755,8 +1649,17 @@ begin
   end;
 end;
 
-procedure TFrmMain.ProcessDroppedFile(const AFileName: string);
+function TFrmMain.CanAutoActivateInitialDocument: Boolean;
 begin
+  Result := (CardPanel1.CardCount = 0) and
+    (FPendingDocumentCards.Count = 0) and
+    not Assigned(FActiveRequest) and not HasPendingAnalysis;
+end;
+
+function TFrmMain.ProcessDroppedFile(const AFileName: string;
+  AActivateTabWhenComplete: Boolean): Boolean;
+begin
+  Result := False;
   var LExpandedFileName := ExpandFileName(AFileName);
   var LKind: TAnalysisKind;
   try
@@ -1769,7 +1672,7 @@ begin
     if IsTDumpBinaryFile(LExpandedFileName) or
       not IsTextFile(LExpandedFileName) then
     begin
-      if not FTDumpAvailable then
+      if not EnsureTDumpAvailable then
       begin
         LogControl1.Add(Format('TDUMP is unavailable; cannot open binary file: %s',
           [LExpandedFileName]), letError);
@@ -1817,7 +1720,8 @@ begin
     if SameText(CardPanel1.Cards[LCardIndex].Hint, LExpandedFileName) then
       RemoveDocumentCard(CardPanel1.Cards[LCardIndex], True);
 
-  var LRequest := CreateAnalysisRequest(LExpandedFileName, LKind);
+  var LRequest := CreateAnalysisRequest(LExpandedFileName, LKind,
+    AActivateTabWhenComplete);
   if (FAnalysisTask = nil) and (FActiveRequest = nil) and
     (FPendingFiles.Count = 0) then
     ResetAnalysisProgress;
@@ -1828,10 +1732,12 @@ begin
   begin
     FPendingFiles.Enqueue(LRequest);
     LogControl1.Add('Queued: ' + LExpandedFileName);
+    Result := True;
     Exit;
   end;
 
   BeginAnalysis(LRequest);
+  Result := True;
 end;
 
 procedure TFrmMain.StartNextAnalysis;
@@ -1896,6 +1802,10 @@ begin
     //CardPanel1.LockDrawing;
     try
       var LFileCount := DragQueryFile(AMessage.Drop, $FFFFFFFF, nil, 0);
+      // Multi-file drops retain the current tab.  With no document yet,
+      // nominate only the first accepted item for activation.
+      var LActivateNextAcceptedTab := (LFileCount = 1) or
+        CanAutoActivateInitialDocument;
       for var LIndex := 0 to LFileCount - 1 do
       begin
         var LFileNameLength := DragQueryFile(AMessage.Drop, LIndex, nil, 0);
@@ -1903,7 +1813,8 @@ begin
         DragQueryFile(AMessage.Drop, LIndex, PChar(LFileName),
           Length(LFileName));
         SetLength(LFileName, LFileNameLength);
-        ProcessDroppedFile(LFileName);
+        if ProcessDroppedFile(LFileName, LActivateNextAcceptedTab) then
+          LActivateNextAcceptedTab := False;
       end;
     finally
       //CardPanel1.UnlockDrawing;
