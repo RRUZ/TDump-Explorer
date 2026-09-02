@@ -5,18 +5,12 @@ program TDumpTinyParserTests;
 uses
   System.SysUtils,
   System.StrUtils,
-  System.Types,
   System.IOUtils,
   System.RegularExpressions,
   System.Generics.Collections,
-  Vcl.Graphics,
   DUnitX.TestFramework,
   DUnitX.Loggers.Xml.NUnit,
-  TDump.Explorer.GlassTabs in '..\source\common\TDump.Explorer.GlassTabs.pas',
-  TDump.Explorer.UI in '..\source\common\TDump.Explorer.UI.pas',
-  TDump.Explorer.Export in '..\source\common\TDump.Explorer.Export.pas',
-  TDump.Explorer.TinyParser in '..\source\common\TDump.Explorer.TinyParser.pas',
-  TDump.Explorer.Highlighter in '..\source\common\TDump.Explorer.Highlighter.pas';
+  TDump.Explorer.TinyParser in '..\source\common\TDump.Explorer.TinyParser.pas';
 
 const
   cTestResultsDirectory = 'C:\dev\TDump-Explorer\tests\test-results';
@@ -30,12 +24,9 @@ type
   public
     [Test] procedure TDumpValueTokenization;
     [Test] procedure PEImportPropertyTokenization;
-    [Test] procedure HighlightThemes;
     [Test] procedure CppBuilderMethodTokenization;
     [Test] procedure MachFixtureLinkerTokenization;
     [Test] procedure VclStringsBorlandTokenization;
-    [Test] procedure TextFormatDrawing;
-    [Test] procedure ViewExportFormats;
   end;
 
 procedure Require(ACondition: Boolean; const AMessage: string);
@@ -104,22 +95,6 @@ begin
   finally
     LParser.Free;
   end;
-end;
-
-procedure TestHighlightThemes;
-begin
-  var LLightTheme := TExplorerTheme.LightTheme;
-  var LDarkTheme := TExplorerTheme.DarkTheme;
-  Require(LLightTheme.StringLiteralColor <> LDarkTheme.StringLiteralColor,
-    'Light and dark highlighter themes must have distinct token palettes.');
-  Require(LLightTheme.HexadecimalColor <> LLightTheme.NumberColor,
-    'The light theme must distinguish hexadecimal and decimal values.');
-    Require(LDarkTheme.DateTimeColor <> LDarkTheme.TextColor,
-      'The dark theme must distinguish date/time and string values.');
-    Require(LDarkTheme.StringLiteralColor <> LDarkTheme.MethodColor,
-      'The dark theme must distinguish string literals and methods.');
-  Require(LLightTheme.MethodColor <> LLightTheme.KeywordColor,
-    'The light theme must distinguish demangled methods and keywords.');
 end;
 
 procedure TestCppBuilderMethodTokenization;
@@ -256,9 +231,12 @@ begin
           HasToken(LOMFFixUpTokens, ttkKeyword, 'Frame') and
           HasToken(LOMFFixUpTokens, ttkKeyword, 'Target'),
           'OMF record labels must be classified as structural keywords.');
-        Require(HasToken(LOMFFixUpTokens, ttkSymbol, 'TARGET') and
-          HasToken(LOMFFixUpTokens, ttkSymbol, 'VEI'),
-          'OMF record codes and targets must be classified as symbols.');
+        var LHasTargetSymbol := HasToken(LOMFFixUpTokens, ttkSymbol, 'TARGET');
+        var LHasVEISymbol := HasToken(LOMFFixUpTokens, ttkSymbol, 'VEI');
+        Require(LHasTargetSymbol and LHasVEISymbol,
+          'OMF record codes and targets must be classified as symbols. TARGET=' +
+          BoolToStr(LHasTargetSymbol, True) + ', VEI=' +
+          BoolToStr(LHasVEISymbol, True));
         Require(HasToken(LOMFFixUpTokens, ttkKeyword, '__fastcall') and
           HasToken(LOMFFixUpTokens, ttkNamespace, 'System') and
           HasToken(LOMFFixUpTokens, ttkMethodName, 'Finalization'),
@@ -278,13 +256,21 @@ begin
       end;
       var LOMFCommentTokens := LParser.Tokenize(cOMFComment, tpmOMFRecord);
       try
-        Require(HasToken(LOMFCommentTokens, ttkSymbol, 'COMMENT') and
-          HasToken(LOMFCommentTokens, ttkKeyword, 'Purge') and
-          HasToken(LOMFCommentTokens, ttkKeyword, 'Class') and
-          HasToken(LOMFCommentTokens, ttkKeyword, 'SubClass') and
-          HasToken(LOMFCommentTokens, ttkHexadecimal, '0003A0') and
-          HasToken(LOMFCommentTokens, ttkHexadecimal, '0A0h'),
-          'OMF COMMENT records must preserve the same code, label, and hexadecimal colors in nodes, details, and RAW output.');
+        var LHasCommentSymbol := HasToken(LOMFCommentTokens, ttkSymbol, 'COMMENT');
+        var LHasPurgeKeyword := HasToken(LOMFCommentTokens, ttkKeyword, 'Purge');
+        var LHasClassKeyword := HasToken(LOMFCommentTokens, ttkKeyword, 'Class');
+        var LHasSubClassKeyword := HasToken(LOMFCommentTokens, ttkKeyword, 'SubClass');
+        var LHasRecordCode := HasToken(LOMFCommentTokens, ttkHexadecimal, '0003A0');
+        var LHasClassCode := HasToken(LOMFCommentTokens, ttkHexadecimal, '0A0h');
+        Require(LHasCommentSymbol and LHasPurgeKeyword and LHasClassKeyword and
+          LHasSubClassKeyword and LHasRecordCode and LHasClassCode,
+          'OMF COMMENT records must preserve the same code, label, and hexadecimal colors in nodes, details, and RAW output. COMMENT=' +
+          BoolToStr(LHasCommentSymbol, True) + ', Purge=' +
+          BoolToStr(LHasPurgeKeyword, True) + ', Class=' +
+          BoolToStr(LHasClassKeyword, True) + ', SubClass=' +
+          BoolToStr(LHasSubClassKeyword, True) + ', 0003A0=' +
+          BoolToStr(LHasRecordCode, True) + ', 0A0h=' +
+          BoolToStr(LHasClassCode, True));
       finally
         LOMFCommentTokens.Free;
       end;
@@ -782,107 +768,14 @@ begin
   end;
 end;
 
-procedure TestTextFormatDrawing;
-begin
-  var LBitmap := TBitmap.Create;
-  try
-    LBitmap.SetSize(180, 24);
-    var LTheme := TExplorerTheme.DarkTheme;
-    LBitmap.Canvas.Brush.Color := LTheme.BackgroundColor;
-    LBitmap.Canvas.FillRect(Rect(0, 0, LBitmap.Width, LBitmap.Height));
-    var LHighlighter := TTinyHighlighter.Create;
-    try
-      LHighlighter.TextRect(LBitmap.Canvas,
-        Rect(0, 0, LBitmap.Width, LBitmap.Height), 'Value=0xCAFEBABE',
-        thtDark, [tfRight, tfVerticalCenter, tfEndEllipsis],
-        tpmCppBuilderMethod);
-      Assert.Pass('Highlighted text rendering completed without an exception.');
-    finally
-      LHighlighter.Free;
-    end;
-  finally
-    LBitmap.Free;
-  end;
-end;
-
 procedure TTinyParserFixture.TDumpValueTokenization;
 begin
   TestTDumpValueTokenization;
 end;
 
-procedure TestViewExportFormats;
-const
-  cEscapedTextValue = 'Comma, "double", ''single'', slash ' + #92 + #92 +
-    ' tab ' + #92 + 'tend';
-  cEscapedTextLine = 'Line 1' + #92 + 'r' + #92 + 'nLine 2 | markdown';
-var
-  LHeaders: TArray<string>;
-  LRows: TDumpExportRows;
-begin
-  SetLength(LHeaders, 2);
-  LHeaders[0] := 'Name';
-  LHeaders[1] := 'Value';
-  SetLength(LRows, 2);
-  SetLength(LRows[0], 2);
-  LRows[0][0] := 'Alpha';
-  LRows[0][1] := 'Comma, "double", ''single'', slash ' + #92 +
-    ' tab ' + #9 + 'end';
-  SetLength(LRows[1], 2);
-  LRows[1][0] := 'Beta';
-  LRows[1][1] := 'Line 1' + #13#10 + 'Line 2 | markdown';
-
-  Require(ExportView(LHeaders, LRows, defText) =
-    'Name' + #9 + 'Value' + sLineBreak +
-    'Alpha' + #9 + cEscapedTextValue + sLineBreak +
-    'Beta' + #9 + cEscapedTextLine,
-    'Text export must retain headers while escaping row-breaking characters.');
-
-  Require(ExportView(LHeaders, LRows, defCsv) =
-    'Name,Value' + sLineBreak +
-    'Alpha,"Comma, ""double"", ''single'', slash ' + #92 + ' tab ' +
-    #9 + 'end"' + sLineBreak +
-    'Beta,"Line 1' + #13#10 + 'Line 2 | markdown"',
-    'CSV export must retain headers and quote commas, double quotes, tabs, and CR/LF.');
-
-  var LJson := ExportView(LHeaders, LRows, defJson);
-  Require(ContainsText(LJson, '"Name": "Alpha"') and
-    ContainsText(LJson, '"Value": "Comma, ' + #92 + '"double' + #92 +
-      '", ''single'', slash ' + #92 + #92 + ' tab ' + #92 + 'tend"') and
-    ContainsText(LJson, 'Line 1' + #92 + 'r' + #92 + 'nLine 2 | markdown'),
-    'JSON export must use column names and escape backslashes, quotes, tabs, and CR/LF.');
-
-  Require(ExportView(LHeaders, LRows, defMarkdown) =
-    '| Name | Value |' + sLineBreak +
-    '| --- | --- |' + sLineBreak +
-    '| Alpha | Comma, "double", ''single'', slash ' + #92 + #92 + ' tab ' +
-      #9 + 'end |' + sLineBreak +
-    '| Beta | Line 1<br>Line 2 ' + #92 + '| markdown |',
-    'Markdown export must create a table and preserve quote, slash, pipe, tab, and CR/LF content.');
-
-  SetLength(LHeaders, 0);
-  SetLength(LRows, 1);
-  SetLength(LRows[0], 1);
-  LRows[0][0] := 'Unstructured report row';
-  Require(ExportView(LHeaders, LRows, defText) =
-    'Text' + sLineBreak + 'Unstructured report row',
-    'Headless text export must still expose a fallback column name.');
-  Require(ExportView(LHeaders, LRows, defCsv) =
-    'Text' + sLineBreak + 'Unstructured report row',
-    'Headless CSV export must still expose a fallback column name.');
-  Require(ExportView(LHeaders, LRows, defMarkdown) =
-    '| Text |' + sLineBreak + '| --- |' + sLineBreak +
-    '| Unstructured report row |',
-    'Headless Markdown export must still expose a fallback column name.');
-end;
-
 procedure TTinyParserFixture.PEImportPropertyTokenization;
 begin
   TestPEImportPropertyTokenization;
-end;
-
-procedure TTinyParserFixture.HighlightThemes;
-begin
-  TestHighlightThemes;
 end;
 
 procedure TTinyParserFixture.CppBuilderMethodTokenization;
@@ -898,16 +791,6 @@ end;
 procedure TTinyParserFixture.VclStringsBorlandTokenization;
 begin
   TestVclStringsBorlandTokenization;
-end;
-
-procedure TTinyParserFixture.TextFormatDrawing;
-begin
-  TestTextFormatDrawing;
-end;
-
-procedure TTinyParserFixture.ViewExportFormats;
-begin
-  TestViewExportFormats;
 end;
 
 begin

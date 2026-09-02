@@ -20,7 +20,7 @@ uses
   TDump.Explorer.TinyParser in '..\common\TDump.Explorer.TinyParser.pas',
   TDump.Explorer.Highlighter in '..\common\TDump.Explorer.Highlighter.pas',
   TDump.Explorer.UI in '..\common\TDump.Explorer.UI.pas',
-  TDump.Explorer.GlassTabs in '..\common\TDump.Explorer.GlassTabs.pas',
+  TDump.Explorer.Tabs in '..\common\TDump.Explorer.Tabs.pas',
   TDump.Explorer.LogControl in 'TDump.Explorer.LogControl.pas' {LogControl: TFrame},
   TDump.Explorer.Relations in '..\common\TDump.Explorer.Relations.pas',
   TDump.Explorer.Resources in 'TDump.Explorer.Resources.pas' {DataModule1: TDataModule},

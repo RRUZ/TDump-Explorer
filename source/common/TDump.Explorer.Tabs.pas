@@ -1,6 +1,6 @@
 //**************************************************************************************************
 //
-// Unit TDump.Explorer.GlassTabs
+// Unit TDump.Explorer.Tabs
 //
 // Provides the owner-drawn GDI+ tab strip used by TDump Explorer, including
 // configurable palettes, gradients, tab actions, and high-DPI rendering.
@@ -11,7 +11,7 @@
 // SPDX-License-Identifier: MIT
 //
 //**************************************************************************************************
-unit TDump.Explorer.GlassTabs;
+unit TDump.Explorer.Tabs;
 
 interface
 
@@ -21,20 +21,20 @@ uses
   Vcl.Graphics, Vcl.ImgList;
 
 type
-  TGlassGradientDirection = (ggdVertical, ggdHorizontal,
-    ggdForwardDiagonal, ggdBackwardDiagonal);
+  TExplorerTabGradientDirection = (etgdVertical, etgdHorizontal,
+    etgdForwardDiagonal, etgdBackwardDiagonal);
 
-  TGlassTabCustomButtonContent = (gtcbcGlyph, gtcbcImage);
-  TGlassTabCustomButtonGlyph = (gtcbgChevronLeft, gtcbgChevronRight,
-    gtcbgChevronUp, gtcbgChevronDown, gtcbgPlus, gtcbgClose);
-  TGlassTabCustomButton = (gtcbLeft, gtcbRight);
-  TGlassTabButtonDrawState = (gtbdsNormal, gtbdsHot, gtbdsDisabled);
-  TGlassTabCustomButtonDrawEvent = procedure(Sender: TObject;
-    AButton: TGlassTabCustomButton; ACanvas: TCanvas; const ARect: TRect;
-    const AGlyphRect: TRect; AState: TGlassTabButtonDrawState;
+  TExplorerTabCustomButtonContent = (etcbcGlyph, etcbcImage);
+  TExplorerTabCustomButtonGlyph = (etcbgChevronLeft, etcbgChevronRight,
+    etcbgChevronUp, etcbgChevronDown, etcbgPlus, etcbgClose);
+  TExplorerTabCustomButton = (etcbLeft, etcbRight);
+  TExplorerTabButtonDrawState = (etbdsNormal, etbdsHot, etbdsDisabled);
+  TExplorerTabCustomButtonDrawEvent = procedure(Sender: TObject;
+    AButton: TExplorerTabCustomButton; ACanvas: TCanvas; const ARect: TRect;
+    const AGlyphRect: TRect; AState: TExplorerTabButtonDrawState;
     AGlyphColor: TColor; var AHandled: Boolean) of object;
 
-  TGlassTabItem = class(TCollectionItem)
+  TExplorerTabItem = class(TCollectionItem)
   private
     FCaption: string;
     FClosable: Boolean;
@@ -55,34 +55,34 @@ type
       write SetImageName;
   end;
 
-  TGlassTabItems = class(TOwnedCollection)
+  TExplorerTabItems = class(TOwnedCollection)
   private
     FOnChanged: TNotifyEvent;
-    function GetItem(AIndex: Integer): TGlassTabItem;
+    function GetItem(AIndex: Integer): TExplorerTabItem;
   protected
     procedure Update(Item: TCollectionItem); override;
   public
     constructor Create(AOwner: TPersistent);
-    function Add: TGlassTabItem;
-    property Items[AIndex: Integer]: TGlassTabItem read GetItem; default;
+    function Add: TExplorerTabItem;
+    property Items[AIndex: Integer]: TExplorerTabItem read GetItem; default;
     property OnChanged: TNotifyEvent read FOnChanged write FOnChanged;
   end;
 
-  TGlassTabPalette = record
+  TExplorerTabPalette = record
     StripTop, StripBottom, StripBorder, BackgroundTopLine: TColor;
     TabTop, TabBottom, InactiveTop, InactiveBottom: TColor;
     HoverTop, HoverBottom, Accent: TColor;
     Text, InactiveText, CloseHover: TColor;
   end;
 
-  TTabChangingEvent = procedure(Sender: TObject; ANewIndex: Integer) of object;
-  TTabCloseEvent = procedure(Sender: TObject; AIndex: Integer; var ACanClose: Boolean) of object;
-  TGlassTabBackgroundPaintEvent = procedure(ACanvas: TCanvas;
+  TExplorerTabChangingEvent = procedure(Sender: TObject; ANewIndex: Integer) of object;
+  TExplorerTabCloseEvent = procedure(Sender: TObject; AIndex: Integer; var ACanClose: Boolean) of object;
+  TExplorerTabBackgroundPaintEvent = procedure(ACanvas: TCanvas;
     const ARect: TRect) of object;
-  TGlassTabPaintEvent = procedure(ACanvas: TCanvas; const ARect: TRect;
+  TExplorerTabPaintEvent = procedure(ACanvas: TCanvas; const ARect: TRect;
     ATabIndex: Integer; ASelected, AHot: Boolean) of object;
 
-  TGlassTabStrip = class(TCustomControl)
+  TExplorerTabStrip = class(TCustomControl)
   private
     const
       cDefaultTabHeight = 38;
@@ -100,10 +100,10 @@ type
       cGlyphButtonDisabledAlpha = 72;
       cDefaultCustomButtonGlyphSize = 18;
   private
-    FItems: TGlassTabItems;
+    FItems: TExplorerTabItems;
     FImages: TCustomImageList;
     FImageChangeLink: TChangeLink;
-    FPalette: TGlassTabPalette;
+    FPalette: TExplorerTabPalette;
     FActiveIndex, FHotIndex, FHotCloseIndex, FPressedCloseIndex: Integer;
     FShowAddButton: Boolean;
     FHotAddButton: Boolean;
@@ -115,10 +115,10 @@ type
     FHotCustomRightButton: Boolean;
     FPressedCustomLeftButton: Boolean;
     FPressedCustomRightButton: Boolean;
-    FCustomLeftButtonContent: TGlassTabCustomButtonContent;
-    FCustomRightButtonContent: TGlassTabCustomButtonContent;
-    FCustomLeftButtonGlyph: TGlassTabCustomButtonGlyph;
-    FCustomRightButtonGlyph: TGlassTabCustomButtonGlyph;
+    FCustomLeftButtonContent: TExplorerTabCustomButtonContent;
+    FCustomRightButtonContent: TExplorerTabCustomButtonContent;
+    FCustomLeftButtonGlyph: TExplorerTabCustomButtonGlyph;
+    FCustomRightButtonGlyph: TExplorerTabCustomButtonGlyph;
     FCustomLeftButtonImageIndex: System.UITypes.TImageIndex;
     FCustomRightButtonImageIndex: System.UITypes.TImageIndex;
     FCustomLeftButtonHint: string;
@@ -129,8 +129,8 @@ type
     FGlyphButtonHotColor: TColor;
     FGlyphButtonDisabledColor: TColor;
     FCustomButtonGlyphSize: Integer;
-    FBackgroundGradientDirection: TGlassGradientDirection;
-    FTabGradientDirection: TGlassGradientDirection;
+    FBackgroundGradientDirection: TExplorerTabGradientDirection;
+    FTabGradientDirection: TExplorerTabGradientDirection;
     FLeftInset: Integer;
     FTabHeight: Integer;
     FMinTabWidth: Integer;
@@ -144,23 +144,23 @@ type
     FTabPositionCache: TList<Integer>;
     FTabWidthCachePPI: Integer;
     FTabWidthCacheValid: Boolean;
-    FOnChange: TTabChangingEvent;
-    FOnCloseTab: TTabCloseEvent;
+    FOnChange: TExplorerTabChangingEvent;
+    FOnCloseTab: TExplorerTabCloseEvent;
     FOnAddButtonClick: TNotifyEvent;
     FOnCustomLeftButtonClick: TNotifyEvent;
     FOnCustomRightButtonClick: TNotifyEvent;
-    FOnCustomButtonDraw: TGlassTabCustomButtonDrawEvent;
+    FOnCustomButtonDraw: TExplorerTabCustomButtonDrawEvent;
     FOnBackgroundMouseDown: TMouseEvent;
     FOnBackgroundDblClick: TMouseEvent;
-    FOnAfterPaintBackground: TGlassTabBackgroundPaintEvent;
-    FOnAfterPaintTab: TGlassTabPaintEvent;
+    FOnAfterPaintBackground: TExplorerTabBackgroundPaintEvent;
+    FOnAfterPaintTab: TExplorerTabPaintEvent;
     procedure Changed(Sender: TObject);
     procedure EnsureTabWidthCache;
     procedure InvalidateTabWidthCache;
     procedure ImagesChanged(Sender: TObject);
     procedure SetImages(const AValue: TCustomImageList);
-    procedure SetItems(const AValue: TGlassTabItems);
-    procedure SetPalette(const AValue: TGlassTabPalette);
+    procedure SetItems(const AValue: TExplorerTabItems);
+    procedure SetPalette(const AValue: TExplorerTabPalette);
     function GetBackgroundGradientStartColor: TColor;
     function GetBackgroundGradientEndColor: TColor;
     procedure SetBackgroundGradientStartColor(const AValue: TColor);
@@ -168,8 +168,8 @@ type
     function GetBackgroundTopLineColor: TColor;
     procedure SetBackgroundTopLineColor(const AValue: TColor);
     procedure SetBackgroundGradientDirection(
-      const AValue: TGlassGradientDirection);
-    procedure SetTabGradientDirection(const AValue: TGlassGradientDirection);
+      const AValue: TExplorerTabGradientDirection);
+    procedure SetTabGradientDirection(const AValue: TExplorerTabGradientDirection);
     function GetTabGradientStartColor: TColor;
     function GetTabGradientEndColor: TColor;
     procedure SetTabGradientStartColor(const AValue: TColor);
@@ -181,13 +181,13 @@ type
     procedure SetShowCustomLeftButton(const AValue: Boolean);
     procedure SetShowCustomRightButton(const AValue: Boolean);
     procedure SetCustomLeftButtonContent(
-      const AValue: TGlassTabCustomButtonContent);
+      const AValue: TExplorerTabCustomButtonContent);
     procedure SetCustomRightButtonContent(
-      const AValue: TGlassTabCustomButtonContent);
+      const AValue: TExplorerTabCustomButtonContent);
     procedure SetCustomLeftButtonGlyph(
-      const AValue: TGlassTabCustomButtonGlyph);
+      const AValue: TExplorerTabCustomButtonGlyph);
     procedure SetCustomRightButtonGlyph(
-      const AValue: TGlassTabCustomButtonGlyph);
+      const AValue: TExplorerTabCustomButtonGlyph);
     procedure SetCustomLeftButtonImageIndex(
       const AValue: System.UITypes.TImageIndex);
     procedure SetCustomRightButtonImageIndex(
@@ -222,11 +222,11 @@ type
     function CanNavigateRight: Boolean;
     procedure EnsureActiveTabVisible;
     function ResolveImageIndex(
-      AItem: TGlassTabItem): System.UITypes.TImageIndex;
+      AItem: TExplorerTabItem): System.UITypes.TImageIndex;
     function ResolveCustomButtonImageIndex(
       AImageIndex: System.UITypes.TImageIndex): System.UITypes.TImageIndex;
-    function ButtonDrawState(AHot: Boolean): TGlassTabButtonDrawState;
-    function GlyphButtonColor(AState: TGlassTabButtonDrawState): TColor;
+    function ButtonDrawState(AHot: Boolean): TExplorerTabButtonDrawState;
+    function GlyphButtonColor(AState: TExplorerTabButtonDrawState): TColor;
     function GetCustomButtonGlyphRect(const ARect: TRect): TRect;
     procedure UpdateCustomButtonHint(const APoint: TPoint);
     function TabAt(const APoint: TPoint): Integer;
@@ -238,13 +238,13 @@ type
     procedure DrawNavigationButton(AGraphics: TGPGraphics;
       const ARect: TRect; ALeft, AHot, AEnabled: Boolean);
     procedure DrawButtonGlyph(AGraphics: TGPGraphics; const ARect: TRect;
-      AGlyph: TGlassTabCustomButtonGlyph;
-      AState: TGlassTabButtonDrawState);
+      AGlyph: TExplorerTabCustomButtonGlyph;
+      AState: TExplorerTabButtonDrawState);
     procedure DrawCustomButton(ACanvas: TCanvas; AGraphics: TGPGraphics;
-      const ARect: TRect; AButton: TGlassTabCustomButton;
-      AState: TGlassTabButtonDrawState;
-      AContent: TGlassTabCustomButtonContent;
-      AGlyph: TGlassTabCustomButtonGlyph;
+      const ARect: TRect; AButton: TExplorerTabCustomButton;
+      AState: TExplorerTabButtonDrawState;
+      AContent: TExplorerTabCustomButtonContent;
+      AGlyph: TExplorerTabCustomButtonGlyph;
       AImageIndex: System.UITypes.TImageIndex);
   protected
     procedure DoAddButtonClick; virtual;
@@ -285,9 +285,9 @@ type
     property ShowHint;
     property TabStop;
     property Visible;
-    property Items: TGlassTabItems read FItems write SetItems;
+    property Items: TExplorerTabItems read FItems write SetItems;
     property Images: TCustomImageList read FImages write SetImages;
-    property Palette: TGlassTabPalette read FPalette write SetPalette;
+    property Palette: TExplorerTabPalette read FPalette write SetPalette;
     property BackgroundGradientStartColor: TColor
       read GetBackgroundGradientStartColor
       write SetBackgroundGradientStartColor;
@@ -295,16 +295,16 @@ type
       read GetBackgroundGradientEndColor write SetBackgroundGradientEndColor;
     property BackgroundTopLineColor: TColor read GetBackgroundTopLineColor
       write SetBackgroundTopLineColor;
-    property BackgroundGradientDirection: TGlassGradientDirection
+    property BackgroundGradientDirection: TExplorerTabGradientDirection
       read FBackgroundGradientDirection write SetBackgroundGradientDirection
-      default ggdVertical;
+      default etgdVertical;
     property TabGradientStartColor: TColor read GetTabGradientStartColor
       write SetTabGradientStartColor;
     property TabGradientEndColor: TColor read GetTabGradientEndColor
       write SetTabGradientEndColor;
-    property TabGradientDirection: TGlassGradientDirection
+    property TabGradientDirection: TExplorerTabGradientDirection
       read FTabGradientDirection write SetTabGradientDirection
-      default ggdVertical;
+      default etgdVertical;
     property TabHeight: Integer read GetTabHeight write SetTabHeight
       default cDefaultTabHeight;
     property ActiveIndex: Integer read FActiveIndex write SetActiveIndex default -1;
@@ -313,18 +313,18 @@ type
       write SetShowCustomLeftButton default False;
     property ShowCustomRightButton: Boolean read FShowCustomRightButton
       write SetShowCustomRightButton default True;
-    property CustomLeftButtonContent: TGlassTabCustomButtonContent
+    property CustomLeftButtonContent: TExplorerTabCustomButtonContent
       read FCustomLeftButtonContent write SetCustomLeftButtonContent
-      default gtcbcGlyph;
-    property CustomRightButtonContent: TGlassTabCustomButtonContent
+      default etcbcGlyph;
+    property CustomRightButtonContent: TExplorerTabCustomButtonContent
       read FCustomRightButtonContent write SetCustomRightButtonContent
-      default gtcbcGlyph;
-    property CustomLeftButtonGlyph: TGlassTabCustomButtonGlyph
+      default etcbcGlyph;
+    property CustomLeftButtonGlyph: TExplorerTabCustomButtonGlyph
       read FCustomLeftButtonGlyph write SetCustomLeftButtonGlyph
-      default gtcbgChevronDown;
-    property CustomRightButtonGlyph: TGlassTabCustomButtonGlyph
+      default etcbgChevronDown;
+    property CustomRightButtonGlyph: TExplorerTabCustomButtonGlyph
       read FCustomRightButtonGlyph write SetCustomRightButtonGlyph
-      default gtcbgChevronDown;
+      default etcbgChevronDown;
     property CustomLeftButtonImageIndex: System.UITypes.TImageIndex
       read FCustomLeftButtonImageIndex write SetCustomLeftButtonImageIndex
       default -1;
@@ -351,23 +351,23 @@ type
       write SetCustomButtonGlyphSize default cDefaultCustomButtonGlyphSize;
     property LeftInset: Integer read FLeftInset write SetLeftInset
       default cDefaultLeftInset;
-    property OnChange: TTabChangingEvent read FOnChange write FOnChange;
-    property OnCloseTab: TTabCloseEvent read FOnCloseTab write FOnCloseTab;
+    property OnChange: TExplorerTabChangingEvent read FOnChange write FOnChange;
+    property OnCloseTab: TExplorerTabCloseEvent read FOnCloseTab write FOnCloseTab;
     property OnAddButtonClick: TNotifyEvent read FOnAddButtonClick
       write FOnAddButtonClick;
     property OnCustomLeftButtonClick: TNotifyEvent
       read FOnCustomLeftButtonClick write FOnCustomLeftButtonClick;
     property OnCustomRightButtonClick: TNotifyEvent
       read FOnCustomRightButtonClick write FOnCustomRightButtonClick;
-    property OnCustomButtonDraw: TGlassTabCustomButtonDrawEvent
+    property OnCustomButtonDraw: TExplorerTabCustomButtonDrawEvent
       read FOnCustomButtonDraw write FOnCustomButtonDraw;
     property OnBackgroundMouseDown: TMouseEvent read FOnBackgroundMouseDown
       write FOnBackgroundMouseDown;
     property OnBackgroundDblClick: TMouseEvent read FOnBackgroundDblClick
       write FOnBackgroundDblClick;
-    property OnAfterPaintBackground: TGlassTabBackgroundPaintEvent
+    property OnAfterPaintBackground: TExplorerTabBackgroundPaintEvent
       read FOnAfterPaintBackground write FOnAfterPaintBackground;
-    property OnAfterPaintTab: TGlassTabPaintEvent read FOnAfterPaintTab
+    property OnAfterPaintTab: TExplorerTabPaintEvent read FOnAfterPaintTab
       write FOnAfterPaintTab;
   end;
 
@@ -376,14 +376,14 @@ implementation
 uses
   Winapi.GDIPAPI, System.Math;
 
-function GradientMode(ADirection: TGlassGradientDirection): LinearGradientMode;
+function GradientMode(ADirection: TExplorerTabGradientDirection): LinearGradientMode;
 begin
   case ADirection of
-    ggdHorizontal:
+    etgdHorizontal:
       Result := LinearGradientModeHorizontal;
-    ggdForwardDiagonal:
+    etgdForwardDiagonal:
       Result := LinearGradientModeForwardDiagonal;
-    ggdBackwardDiagonal:
+    etgdBackwardDiagonal:
       Result := LinearGradientModeBackwardDiagonal;
   else
     Result := LinearGradientModeVertical;
@@ -475,26 +475,26 @@ begin
   end;
 end;
 
-{ TGlassTabItem }
+{ TExplorerTabItem }
 
-constructor TGlassTabItem.Create(ACollection: TCollection);
+constructor TExplorerTabItem.Create(ACollection: TCollection);
 begin
   inherited Create(ACollection);
   FClosable := True;
   FImageIndex := -1;
 end;
 
-procedure TGlassTabItem.SetCaption(const AValue: string);
+procedure TExplorerTabItem.SetCaption(const AValue: string);
 begin
   if FCaption <> AValue then begin FCaption := AValue; Changed(False); end;
 end;
 
-procedure TGlassTabItem.SetClosable(const AValue: Boolean);
+procedure TExplorerTabItem.SetClosable(const AValue: Boolean);
 begin
   if FClosable <> AValue then begin FClosable := AValue; Changed(False); end;
 end;
 
-procedure TGlassTabItem.SetImageIndex(
+procedure TExplorerTabItem.SetImageIndex(
   const AValue: System.UITypes.TImageIndex);
 begin
   if (FImageIndex <> AValue) or (FImageName <> '') then
@@ -505,7 +505,7 @@ begin
   end;
 end;
 
-procedure TGlassTabItem.SetImageName(
+procedure TExplorerTabItem.SetImageName(
   const AValue: System.UITypes.TImageName);
 begin
   if (FImageName <> AValue) or (FImageIndex <> -1) then
@@ -516,30 +516,30 @@ begin
   end;
 end;
 
-{ TGlassTabItems }
+{ TExplorerTabItems }
 
-constructor TGlassTabItems.Create(AOwner: TPersistent);
+constructor TExplorerTabItems.Create(AOwner: TPersistent);
 begin
-  inherited Create(AOwner, TGlassTabItem);
+  inherited Create(AOwner, TExplorerTabItem);
 end;
 
-function TGlassTabItems.Add: TGlassTabItem;
+function TExplorerTabItems.Add: TExplorerTabItem;
 begin
-  Result := TGlassTabItem(inherited Add);
+  Result := TExplorerTabItem(inherited Add);
 end;
 
-function TGlassTabItems.GetItem(AIndex: Integer): TGlassTabItem;
+function TExplorerTabItems.GetItem(AIndex: Integer): TExplorerTabItem;
 begin
-  Result := TGlassTabItem(inherited Items[AIndex]);
+  Result := TExplorerTabItem(inherited Items[AIndex]);
 end;
 
-procedure TGlassTabItems.Update(Item: TCollectionItem);
+procedure TExplorerTabItems.Update(Item: TCollectionItem);
 begin
   inherited;
   if Assigned(FOnChanged) then FOnChanged(Self);
 end;
 
-function DefaultPalette: TGlassTabPalette;
+function DefaultPalette: TExplorerTabPalette;
 begin
   Result.StripTop := C(23, 31, 43);
   Result.StripBottom := C(12, 18, 27);
@@ -557,9 +557,9 @@ begin
   Result.CloseHover := C(47, 65, 88);
 end;
 
-{ TGlassTabStrip }
+{ TExplorerTabStrip }
 
-constructor TGlassTabStrip.Create(AOwner: TComponent);
+constructor TExplorerTabStrip.Create(AOwner: TComponent);
 const
   cDefaultMinTabWidth = 154;
   cDefaultMaxTabWidth = 224;
@@ -569,7 +569,7 @@ begin
   inherited;
   ControlStyle := ControlStyle + [csOpaque, csDoubleClicks];
   DoubleBuffered := True;
-  FItems := TGlassTabItems.Create(Self);
+  FItems := TExplorerTabItems.Create(Self);
   FItems.OnChanged := Changed;
   FImageChangeLink := TChangeLink.Create;
   FImageChangeLink.OnChange := ImagesChanged;
@@ -589,17 +589,17 @@ begin
   FHotCustomRightButton := False;
   FPressedCustomLeftButton := False;
   FPressedCustomRightButton := False;
-  FCustomLeftButtonContent := gtcbcGlyph;
-  FCustomRightButtonContent := gtcbcGlyph;
-  FCustomLeftButtonGlyph := gtcbgChevronDown;
-  FCustomRightButtonGlyph := gtcbgChevronDown;
+  FCustomLeftButtonContent := etcbcGlyph;
+  FCustomRightButtonContent := etcbcGlyph;
+  FCustomLeftButtonGlyph := etcbgChevronDown;
+  FCustomRightButtonGlyph := etcbgChevronDown;
   FCustomLeftButtonImageIndex := -1;
   FCustomRightButtonImageIndex := -1;
   FButtonHoverGlow := False;
   FButtonHoverBackground := True;
   FCustomButtonGlyphSize := cDefaultCustomButtonGlyphSize;
-  FBackgroundGradientDirection := ggdVertical;
-  FTabGradientDirection := ggdVertical;
+  FBackgroundGradientDirection := etgdVertical;
+  FTabGradientDirection := etgdVertical;
   FLeftInset := cDefaultLeftInset;
   FTabHeight := cDefaultTabHeight;
   FMinTabWidth := cDefaultMinTabWidth;
@@ -616,7 +616,7 @@ begin
   Height := ScaleValue(FTabHeight);
 end;
 
-destructor TGlassTabStrip.Destroy;
+destructor TExplorerTabStrip.Destroy;
 begin
   if Assigned(FImages) then
     FImages.UnRegisterChanges(FImageChangeLink);
@@ -627,7 +627,7 @@ begin
   inherited;
 end;
 
-procedure TGlassTabStrip.Changed(Sender: TObject);
+procedure TExplorerTabStrip.Changed(Sender: TObject);
 begin
   if FActiveIndex >= FItems.Count then
     FActiveIndex := FItems.Count - 1;
@@ -637,7 +637,7 @@ begin
   Invalidate;
 end;
 
-procedure TGlassTabStrip.EnsureTabWidthCache;
+procedure TExplorerTabStrip.EnsureTabWidthCache;
 const
   cTabFixedContentWidth = 72;
 begin
@@ -666,49 +666,49 @@ begin
   FTabWidthCacheValid := True;
 end;
 
-procedure TGlassTabStrip.InvalidateTabWidthCache;
+procedure TExplorerTabStrip.InvalidateTabWidthCache;
 begin
   FTabWidthCacheValid := False;
 end;
 
-procedure TGlassTabStrip.ImagesChanged(Sender: TObject);
+procedure TExplorerTabStrip.ImagesChanged(Sender: TObject);
 begin
   Invalidate;
 end;
 
-procedure TGlassTabStrip.DoAddButtonClick;
+procedure TExplorerTabStrip.DoAddButtonClick;
 begin
   if Assigned(FOnAddButtonClick) then
     FOnAddButtonClick(Self);
 end;
 
-procedure TGlassTabStrip.DoCustomLeftButtonClick;
+procedure TExplorerTabStrip.DoCustomLeftButtonClick;
 begin
   if Assigned(FOnCustomLeftButtonClick) then
     FOnCustomLeftButtonClick(Self);
 end;
 
-procedure TGlassTabStrip.DoCustomRightButtonClick;
+procedure TExplorerTabStrip.DoCustomRightButtonClick;
 begin
   if Assigned(FOnCustomRightButtonClick) then
     FOnCustomRightButtonClick(Self);
 end;
 
-procedure TGlassTabStrip.DoAfterPaintBackground(ACanvas: TCanvas;
+procedure TExplorerTabStrip.DoAfterPaintBackground(ACanvas: TCanvas;
   const ARect: TRect);
 begin
   if Assigned(FOnAfterPaintBackground) then
     FOnAfterPaintBackground(ACanvas, ARect);
 end;
 
-procedure TGlassTabStrip.DoAfterPaintTab(ACanvas: TCanvas;
+procedure TExplorerTabStrip.DoAfterPaintTab(ACanvas: TCanvas;
   const ARect: TRect; ATabIndex: Integer; ASelected, AHot: Boolean);
 begin
   if Assigned(FOnAfterPaintTab) then
     FOnAfterPaintTab(ACanvas, ARect, ATabIndex, ASelected, AHot);
 end;
 
-procedure TGlassTabStrip.Notification(AComponent: TComponent;
+procedure TExplorerTabStrip.Notification(AComponent: TComponent;
   Operation: TOperation);
 begin
   inherited;
@@ -716,7 +716,7 @@ begin
     Images := nil;
 end;
 
-procedure TGlassTabStrip.SetImages(const AValue: TCustomImageList);
+procedure TExplorerTabStrip.SetImages(const AValue: TCustomImageList);
 begin
   if FImages = AValue then
     Exit;
@@ -734,12 +734,12 @@ begin
   Invalidate;
 end;
 
-procedure TGlassTabStrip.SetItems(const AValue: TGlassTabItems);
+procedure TExplorerTabStrip.SetItems(const AValue: TExplorerTabItems);
 begin
   FItems.Assign(AValue);
 end;
 
-procedure TGlassTabStrip.SetPalette(const AValue: TGlassTabPalette);
+procedure TExplorerTabStrip.SetPalette(const AValue: TExplorerTabPalette);
 begin
   FPalette := AValue;
   FGlyphButtonNormalColor := FPalette.InactiveText;
@@ -749,17 +749,17 @@ begin
   Invalidate;
 end;
 
-function TGlassTabStrip.GetBackgroundGradientStartColor: TColor;
+function TExplorerTabStrip.GetBackgroundGradientStartColor: TColor;
 begin
   Result := FPalette.StripTop;
 end;
 
-function TGlassTabStrip.GetBackgroundGradientEndColor: TColor;
+function TExplorerTabStrip.GetBackgroundGradientEndColor: TColor;
 begin
   Result := FPalette.StripBottom;
 end;
 
-procedure TGlassTabStrip.SetBackgroundGradientStartColor(
+procedure TExplorerTabStrip.SetBackgroundGradientStartColor(
   const AValue: TColor);
 begin
   if FPalette.StripTop = AValue then
@@ -768,7 +768,7 @@ begin
   Invalidate;
 end;
 
-procedure TGlassTabStrip.SetBackgroundGradientEndColor(
+procedure TExplorerTabStrip.SetBackgroundGradientEndColor(
   const AValue: TColor);
 begin
   if FPalette.StripBottom = AValue then
@@ -777,12 +777,12 @@ begin
   Invalidate;
 end;
 
-function TGlassTabStrip.GetBackgroundTopLineColor: TColor;
+function TExplorerTabStrip.GetBackgroundTopLineColor: TColor;
 begin
   Result := FPalette.BackgroundTopLine;
 end;
 
-procedure TGlassTabStrip.SetBackgroundTopLineColor(const AValue: TColor);
+procedure TExplorerTabStrip.SetBackgroundTopLineColor(const AValue: TColor);
 begin
   if FPalette.BackgroundTopLine = AValue then
     Exit;
@@ -790,8 +790,8 @@ begin
   Invalidate;
 end;
 
-procedure TGlassTabStrip.SetBackgroundGradientDirection(
-  const AValue: TGlassGradientDirection);
+procedure TExplorerTabStrip.SetBackgroundGradientDirection(
+  const AValue: TExplorerTabGradientDirection);
 begin
   if FBackgroundGradientDirection = AValue then
     Exit;
@@ -799,8 +799,8 @@ begin
   Invalidate;
 end;
 
-procedure TGlassTabStrip.SetTabGradientDirection(
-  const AValue: TGlassGradientDirection);
+procedure TExplorerTabStrip.SetTabGradientDirection(
+  const AValue: TExplorerTabGradientDirection);
 begin
   if FTabGradientDirection = AValue then
     Exit;
@@ -808,17 +808,17 @@ begin
   Invalidate;
 end;
 
-function TGlassTabStrip.GetTabGradientStartColor: TColor;
+function TExplorerTabStrip.GetTabGradientStartColor: TColor;
 begin
   Result := FPalette.TabTop;
 end;
 
-function TGlassTabStrip.GetTabGradientEndColor: TColor;
+function TExplorerTabStrip.GetTabGradientEndColor: TColor;
 begin
   Result := FPalette.TabBottom;
 end;
 
-procedure TGlassTabStrip.SetTabGradientStartColor(const AValue: TColor);
+procedure TExplorerTabStrip.SetTabGradientStartColor(const AValue: TColor);
 begin
   if FPalette.TabTop = AValue then
     Exit;
@@ -826,7 +826,7 @@ begin
   Invalidate;
 end;
 
-procedure TGlassTabStrip.SetTabGradientEndColor(const AValue: TColor);
+procedure TExplorerTabStrip.SetTabGradientEndColor(const AValue: TColor);
 begin
   if FPalette.TabBottom = AValue then
     Exit;
@@ -834,12 +834,12 @@ begin
   Invalidate;
 end;
 
-function TGlassTabStrip.GetTabHeight: Integer;
+function TExplorerTabStrip.GetTabHeight: Integer;
 begin
   Result := FTabHeight;
 end;
 
-procedure TGlassTabStrip.SetTabHeight(const AValue: Integer);
+procedure TExplorerTabStrip.SetTabHeight(const AValue: Integer);
 const
   cMinimumTabHeight = 16;
 begin
@@ -851,7 +851,7 @@ begin
   Invalidate;
 end;
 
-procedure TGlassTabStrip.SetActiveIndex(const AValue: Integer);
+procedure TExplorerTabStrip.SetActiveIndex(const AValue: Integer);
 begin
   var LIndex := EnsureRange(AValue, -1, FItems.Count - 1);
   if FActiveIndex = LIndex then Exit;
@@ -861,7 +861,7 @@ begin
   if Assigned(FOnChange) then FOnChange(Self, FActiveIndex);
 end;
 
-procedure TGlassTabStrip.SetShowAddButton(const AValue: Boolean);
+procedure TExplorerTabStrip.SetShowAddButton(const AValue: Boolean);
 begin
   if FShowAddButton = AValue then
     Exit;
@@ -875,7 +875,7 @@ begin
   Invalidate;
 end;
 
-procedure TGlassTabStrip.SetShowCustomLeftButton(const AValue: Boolean);
+procedure TExplorerTabStrip.SetShowCustomLeftButton(const AValue: Boolean);
 begin
   if FShowCustomLeftButton = AValue then
     Exit;
@@ -889,7 +889,7 @@ begin
   Invalidate;
 end;
 
-procedure TGlassTabStrip.SetShowCustomRightButton(const AValue: Boolean);
+procedure TExplorerTabStrip.SetShowCustomRightButton(const AValue: Boolean);
 begin
   if FShowCustomRightButton = AValue then
     Exit;
@@ -903,8 +903,8 @@ begin
   Invalidate;
 end;
 
-procedure TGlassTabStrip.SetCustomLeftButtonContent(
-  const AValue: TGlassTabCustomButtonContent);
+procedure TExplorerTabStrip.SetCustomLeftButtonContent(
+  const AValue: TExplorerTabCustomButtonContent);
 begin
   if FCustomLeftButtonContent <> AValue then
   begin
@@ -913,8 +913,8 @@ begin
   end;
 end;
 
-procedure TGlassTabStrip.SetCustomRightButtonContent(
-  const AValue: TGlassTabCustomButtonContent);
+procedure TExplorerTabStrip.SetCustomRightButtonContent(
+  const AValue: TExplorerTabCustomButtonContent);
 begin
   if FCustomRightButtonContent <> AValue then
   begin
@@ -923,8 +923,8 @@ begin
   end;
 end;
 
-procedure TGlassTabStrip.SetCustomLeftButtonGlyph(
-  const AValue: TGlassTabCustomButtonGlyph);
+procedure TExplorerTabStrip.SetCustomLeftButtonGlyph(
+  const AValue: TExplorerTabCustomButtonGlyph);
 begin
   if FCustomLeftButtonGlyph <> AValue then
   begin
@@ -933,8 +933,8 @@ begin
   end;
 end;
 
-procedure TGlassTabStrip.SetCustomRightButtonGlyph(
-  const AValue: TGlassTabCustomButtonGlyph);
+procedure TExplorerTabStrip.SetCustomRightButtonGlyph(
+  const AValue: TExplorerTabCustomButtonGlyph);
 begin
   if FCustomRightButtonGlyph <> AValue then
   begin
@@ -943,7 +943,7 @@ begin
   end;
 end;
 
-procedure TGlassTabStrip.SetCustomLeftButtonImageIndex(
+procedure TExplorerTabStrip.SetCustomLeftButtonImageIndex(
   const AValue: System.UITypes.TImageIndex);
 begin
   if FCustomLeftButtonImageIndex <> AValue then
@@ -953,7 +953,7 @@ begin
   end;
 end;
 
-procedure TGlassTabStrip.SetCustomRightButtonImageIndex(
+procedure TExplorerTabStrip.SetCustomRightButtonImageIndex(
   const AValue: System.UITypes.TImageIndex);
 begin
   if FCustomRightButtonImageIndex <> AValue then
@@ -963,7 +963,7 @@ begin
   end;
 end;
 
-procedure TGlassTabStrip.SetTrailingReservedSpace(const AValue: Integer);
+procedure TExplorerTabStrip.SetTrailingReservedSpace(const AValue: Integer);
 begin
   var LValue := Max(0, AValue);
   if FTrailingReservedSpace = LValue then
@@ -973,7 +973,7 @@ begin
   Invalidate;
 end;
 
-procedure TGlassTabStrip.SetButtonHoverGlow(const AValue: Boolean);
+procedure TExplorerTabStrip.SetButtonHoverGlow(const AValue: Boolean);
 begin
   if FButtonHoverGlow <> AValue then
   begin
@@ -982,7 +982,7 @@ begin
   end;
 end;
 
-procedure TGlassTabStrip.SetButtonHoverBackground(const AValue: Boolean);
+procedure TExplorerTabStrip.SetButtonHoverBackground(const AValue: Boolean);
 begin
   if FButtonHoverBackground <> AValue then
   begin
@@ -991,7 +991,7 @@ begin
   end;
 end;
 
-procedure TGlassTabStrip.SetGlyphButtonNormalColor(const AValue: TColor);
+procedure TExplorerTabStrip.SetGlyphButtonNormalColor(const AValue: TColor);
 begin
   if FGlyphButtonNormalColor <> AValue then
   begin
@@ -1000,7 +1000,7 @@ begin
   end;
 end;
 
-procedure TGlassTabStrip.SetGlyphButtonHotColor(const AValue: TColor);
+procedure TExplorerTabStrip.SetGlyphButtonHotColor(const AValue: TColor);
 begin
   if FGlyphButtonHotColor <> AValue then
   begin
@@ -1009,7 +1009,7 @@ begin
   end;
 end;
 
-procedure TGlassTabStrip.SetGlyphButtonDisabledColor(const AValue: TColor);
+procedure TExplorerTabStrip.SetGlyphButtonDisabledColor(const AValue: TColor);
 begin
   if FGlyphButtonDisabledColor <> AValue then
   begin
@@ -1018,7 +1018,7 @@ begin
   end;
 end;
 
-procedure TGlassTabStrip.SetCustomButtonGlyphSize(const AValue: Integer);
+procedure TExplorerTabStrip.SetCustomButtonGlyphSize(const AValue: Integer);
 begin
   var LValue := Max(1, AValue);
   if FCustomButtonGlyphSize <> LValue then
@@ -1028,7 +1028,7 @@ begin
   end;
 end;
 
-procedure TGlassTabStrip.SetLeftInset(const AValue: Integer);
+procedure TExplorerTabStrip.SetLeftInset(const AValue: Integer);
 begin
   var LValue := Max(0, AValue);
   if FLeftInset <> LValue then
@@ -1038,7 +1038,7 @@ begin
   end;
 end;
 
-procedure TGlassTabStrip.AddTab(const ACaption: string;
+procedure TExplorerTabStrip.AddTab(const ACaption: string;
   AImageIndex: System.UITypes.TImageIndex; AClosable, AActivate: Boolean);
 begin
   var LItem := FItems.Add;
@@ -1051,7 +1051,7 @@ begin
     Invalidate;
 end;
 
-procedure TGlassTabStrip.AddTab(const ACaption: string;
+procedure TExplorerTabStrip.AddTab(const ACaption: string;
   const AImageName: System.UITypes.TImageName; AClosable, AActivate: Boolean);
 begin
   var LItem := FItems.Add;
@@ -1064,7 +1064,7 @@ begin
     Invalidate;
 end;
 
-procedure TGlassTabStrip.DeleteTab(AIndex: Integer);
+procedure TExplorerTabStrip.DeleteTab(AIndex: Integer);
 begin
   if (AIndex < 0) or (AIndex >= FItems.Count) then Exit;
   FItems.Delete(AIndex);
@@ -1077,7 +1077,7 @@ begin
   if Assigned(FOnChange) then FOnChange(Self, FActiveIndex);
 end;
 
-function TGlassTabStrip.IsOverflowing: Boolean;
+function TExplorerTabStrip.IsOverflowing: Boolean;
 begin
   if FItems.Count = 0 then
     Exit(False);
@@ -1097,7 +1097,7 @@ begin
   Result := LRequiredWidth > Width;
 end;
 
-function TGlassTabStrip.GetActionButtonsWidth: Integer;
+function TExplorerTabStrip.GetActionButtonsWidth: Integer;
 begin
   Result := 0;
   if FShowAddButton then
@@ -1106,7 +1106,7 @@ begin
     Inc(Result, ScaleValue(cCustomButtonWidth));
 end;
 
-function TGlassTabStrip.GetActionAreaRect: TRect;
+function TExplorerTabStrip.GetActionAreaRect: TRect;
 begin
   if not HasTrailingActionButtons then
     Exit(TRect.Empty);
@@ -1115,7 +1115,7 @@ begin
   Result := Rect(Max(0, Width - LWidth), 0, Width, Height);
 end;
 
-function TGlassTabStrip.GetActionButtonsLeft: Integer;
+function TExplorerTabStrip.GetActionButtonsLeft: Integer;
 const
   cEmptyAddCenterOffset = 14;
   cAddButtonHalfWidth = 18;
@@ -1135,7 +1135,7 @@ begin
     ScaleValue(FAddButtonSpacing);
 end;
 
-function TGlassTabStrip.GetTabsViewport: TRect;
+function TExplorerTabStrip.GetTabsViewport: TRect;
 const
   cNavigationButtonWidth = 40;
 begin
@@ -1156,7 +1156,7 @@ begin
         ScaleValue(FAddButtonSpacing - cSelectedShoulderWidth)));
 end;
 
-function TGlassTabStrip.GetAvailableBackgroundRect: TRect;
+function TExplorerTabStrip.GetAvailableBackgroundRect: TRect;
 begin
   var LViewport := GetTabsViewport;
   Result := LViewport;
@@ -1193,7 +1193,7 @@ begin
   Result.Left := Min(Result.Right, LContentRight);
 end;
 
-function TGlassTabStrip.GetLeftNavigationRect: TRect;
+function TExplorerTabStrip.GetLeftNavigationRect: TRect;
 const
   cNavigationButtonWidth = 40;
 begin
@@ -1207,7 +1207,7 @@ begin
   Result := Rect(0, ScaleValue(cTabTop), LButtonWidth, Height);
 end;
 
-function TGlassTabStrip.GetRightNavigationRect: TRect;
+function TExplorerTabStrip.GetRightNavigationRect: TRect;
 const
   cNavigationButtonWidth = 40;
   cNavigationControlSpacing = 4;
@@ -1225,7 +1225,7 @@ begin
     LLeft + LButtonWidth, Height);
 end;
 
-function TGlassTabStrip.GetVisibleTabsRight: Integer;
+function TExplorerTabStrip.GetVisibleTabsRight: Integer;
 begin
   var LViewport := GetTabsViewport;
   Result := LViewport.Left;
@@ -1244,7 +1244,7 @@ begin
   end;
 end;
 
-function TGlassTabStrip.GetTabRect(AIndex: Integer): TRect;
+function TExplorerTabStrip.GetTabRect(AIndex: Integer): TRect;
 begin
   if (AIndex < 0) or (AIndex >= FItems.Count) then
     Exit(TRect.Empty);
@@ -1268,7 +1268,7 @@ begin
     LLeft + FTabWidthCache[AIndex], Height);
 end;
 
-function TGlassTabStrip.GetCloseRect(AIndex: Integer): TRect;
+function TExplorerTabStrip.GetCloseRect(AIndex: Integer): TRect;
 const
   cCloseLeftInset = 30;
   cCloseRightInset = 8;
@@ -1282,14 +1282,14 @@ begin
     LCenterY + ScaleValue(cCloseHitHalfHeight));
 end;
 
-function TGlassTabStrip.GetAddButtonRect: TRect;
+function TExplorerTabStrip.GetAddButtonRect: TRect;
 begin
   var LLeft := GetActionButtonsLeft;
   Result := Rect(LLeft, ScaleValue(cTabTop),
     LLeft + ScaleValue(cAddButtonWidth), Height);
 end;
 
-function TGlassTabStrip.GetCustomLeftButtonRect: TRect;
+function TExplorerTabStrip.GetCustomLeftButtonRect: TRect;
 begin
   if not IsCustomLeftButtonVisible then
     Exit(TRect.Empty);
@@ -1300,7 +1300,7 @@ begin
     LLeft + ScaleValue(cCustomButtonWidth), Height);
 end;
 
-function TGlassTabStrip.GetCustomRightButtonRect: TRect;
+function TExplorerTabStrip.GetCustomRightButtonRect: TRect;
 begin
   if not IsCustomRightButtonVisible then
     Exit(TRect.Empty);
@@ -1311,38 +1311,38 @@ begin
     LLeft + ScaleValue(cCustomButtonWidth), Height);
 end;
 
-function TGlassTabStrip.IsAddButtonVisible: Boolean;
+function TExplorerTabStrip.IsAddButtonVisible: Boolean;
 begin
   Result := FShowAddButton;
 end;
 
-function TGlassTabStrip.IsCustomLeftButtonVisible: Boolean;
+function TExplorerTabStrip.IsCustomLeftButtonVisible: Boolean;
 begin
   Result := FShowCustomLeftButton;
 end;
 
-function TGlassTabStrip.IsCustomRightButtonVisible: Boolean;
+function TExplorerTabStrip.IsCustomRightButtonVisible: Boolean;
 begin
   Result := FShowCustomRightButton;
 end;
 
-function TGlassTabStrip.HasTrailingActionButtons: Boolean;
+function TExplorerTabStrip.HasTrailingActionButtons: Boolean;
 begin
   Result := FShowAddButton or IsCustomRightButtonVisible;
 end;
 
-function TGlassTabStrip.CanNavigateLeft: Boolean;
+function TExplorerTabStrip.CanNavigateLeft: Boolean;
 begin
   Result := IsOverflowing and (FActiveIndex > 0);
 end;
 
-function TGlassTabStrip.CanNavigateRight: Boolean;
+function TExplorerTabStrip.CanNavigateRight: Boolean;
 begin
   Result := IsOverflowing and (FActiveIndex >= 0) and
     (FActiveIndex < FItems.Count - 1);
 end;
 
-procedure TGlassTabStrip.EnsureActiveTabVisible;
+procedure TExplorerTabStrip.EnsureActiveTabVisible;
 begin
   if not IsOverflowing then
   begin
@@ -1385,8 +1385,8 @@ begin
   end;
 end;
 
-function TGlassTabStrip.ResolveImageIndex(
-  AItem: TGlassTabItem): System.UITypes.TImageIndex;
+function TExplorerTabStrip.ResolveImageIndex(
+  AItem: TExplorerTabItem): System.UITypes.TImageIndex;
 begin
   Result := -1;
   if not Assigned(FImages) or not Assigned(AItem) then
@@ -1398,7 +1398,7 @@ begin
     Result := -1;
 end;
 
-function TGlassTabStrip.ResolveCustomButtonImageIndex(
+function TExplorerTabStrip.ResolveCustomButtonImageIndex(
   AImageIndex: System.UITypes.TImageIndex): System.UITypes.TImageIndex;
 begin
   Result := -1;
@@ -1407,31 +1407,31 @@ begin
     Result := AImageIndex;
 end;
 
-function TGlassTabStrip.ButtonDrawState(
-  AHot: Boolean): TGlassTabButtonDrawState;
+function TExplorerTabStrip.ButtonDrawState(
+  AHot: Boolean): TExplorerTabButtonDrawState;
 begin
   if not Enabled then
-    Result := gtbdsDisabled
+    Result := etbdsDisabled
   else if AHot then
-    Result := gtbdsHot
+    Result := etbdsHot
   else
-    Result := gtbdsNormal;
+    Result := etbdsNormal;
 end;
 
-function TGlassTabStrip.GlyphButtonColor(
-  AState: TGlassTabButtonDrawState): TColor;
+function TExplorerTabStrip.GlyphButtonColor(
+  AState: TExplorerTabButtonDrawState): TColor;
 begin
   case AState of
-    gtbdsHot:
+    etbdsHot:
       Result := FGlyphButtonHotColor;
-    gtbdsDisabled:
+    etbdsDisabled:
       Result := FGlyphButtonDisabledColor;
   else
     Result := FGlyphButtonNormalColor;
   end;
 end;
 
-function TGlassTabStrip.GetCustomButtonGlyphRect(
+function TExplorerTabStrip.GetCustomButtonGlyphRect(
   const ARect: TRect): TRect;
 begin
   var LSize := ScaleValue(FCustomButtonGlyphSize);
@@ -1442,7 +1442,7 @@ begin
     LCenterX - LSize div 2 + LSize, LCenterY - LSize div 2 + LSize);
 end;
 
-procedure TGlassTabStrip.UpdateCustomButtonHint(const APoint: TPoint);
+procedure TExplorerTabStrip.UpdateCustomButtonHint(const APoint: TPoint);
 begin
   var LHint := '';
   if IsCustomLeftButtonVisible and
@@ -1455,7 +1455,7 @@ begin
     Hint := LHint;
 end;
 
-function TGlassTabStrip.TabAt(const APoint: TPoint): Integer;
+function TExplorerTabStrip.TabAt(const APoint: TPoint): Integer;
 begin
   var LViewport := GetTabsViewport;
   if IsOverflowing and not PtInRect(LViewport, APoint) then
@@ -1474,7 +1474,7 @@ begin
   Result := -1;
 end;
 
-function TGlassTabStrip.CloseAt(const APoint: TPoint): Integer;
+function TExplorerTabStrip.CloseAt(const APoint: TPoint): Integer;
 begin
   var LViewport := GetTabsViewport;
   if IsOverflowing and not PtInRect(LViewport, APoint) then
@@ -1494,7 +1494,7 @@ begin
   Result := -1;
 end;
 
-procedure TGlassTabStrip.DrawTab(ACanvas: TCanvas; AGraphics: TGPGraphics;
+procedure TExplorerTabStrip.DrawTab(ACanvas: TCanvas; AGraphics: TGPGraphics;
   AShape, AStrokePath, AFirstShoulderPath,
   ABaselinePath: TGPGraphicsPath; AInactiveOutlinePen,
   AClosePen, AHotClosePen: TGPPen; AIndex: Integer; ASelected: Boolean);
@@ -1947,7 +1947,7 @@ begin
   end;
 end;
 
-procedure TGlassTabStrip.DrawNavigationButton(AGraphics: TGPGraphics;
+procedure TExplorerTabStrip.DrawNavigationButton(AGraphics: TGPGraphics;
   const ARect: TRect; ALeft, AHot, AEnabled: Boolean);
 const
   cNavigationGlyphHalfWidth = 3;
@@ -1958,9 +1958,9 @@ begin
   LGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
   LGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);
 
-    var LState: TGlassTabButtonDrawState;
+    var LState: TExplorerTabButtonDrawState;
     if not AEnabled then
-      LState := gtbdsDisabled
+      LState := etbdsDisabled
     else
       LState := ButtonDrawState(AHot);
 
@@ -1986,7 +1986,7 @@ begin
       LY3 := LCenterY + ScaleValue(cNavigationGlyphHalfHeight);
     end;
 
-    if LState = gtbdsHot then
+    if LState = etbdsHot then
     begin
       if FButtonHoverBackground then
       begin
@@ -2017,9 +2017,9 @@ begin
     end;
 end;
 
-procedure TGlassTabStrip.DrawButtonGlyph(AGraphics: TGPGraphics;
-  const ARect: TRect; AGlyph: TGlassTabCustomButtonGlyph;
-  AState: TGlassTabButtonDrawState);
+procedure TExplorerTabStrip.DrawButtonGlyph(AGraphics: TGPGraphics;
+  const ARect: TRect; AGlyph: TExplorerTabCustomButtonGlyph;
+  AState: TExplorerTabButtonDrawState);
 const
   cChevronGlyphHalfWidth = 4;
   { Preserve the compact chevron geometry used by the original drop-down
@@ -2037,7 +2037,7 @@ begin
   var LCenterY := (ARect.Top + ARect.Bottom) div 2;
   var LX1, LY1, LX2, LY2, LX3, LY3: Single;
   case AGlyph of
-    gtcbgChevronLeft:
+    etcbgChevronLeft:
       begin
         LX1 := LCenterX + ScaleValue(cChevronGlyphHalfWidth);
         LY1 := LCenterY - ScaleValue(cChevronGlyphHalfHeight);
@@ -2046,7 +2046,7 @@ begin
         LX3 := LX1;
         LY3 := LCenterY + ScaleValue(cChevronGlyphHalfHeight);
       end;
-    gtcbgChevronRight:
+    etcbgChevronRight:
       begin
         LX1 := LCenterX - ScaleValue(cChevronGlyphHalfWidth);
         LY1 := LCenterY - ScaleValue(cChevronGlyphHalfHeight);
@@ -2055,7 +2055,7 @@ begin
         LX3 := LX1;
         LY3 := LCenterY + ScaleValue(cChevronGlyphHalfHeight);
       end;
-    gtcbgChevronUp:
+    etcbgChevronUp:
       begin
         LX1 := LCenterX - ScaleValue(cChevronGlyphHalfWidth);
         LY1 := LCenterY + ScaleValue(cChevronGlyphHalfHeight);
@@ -2064,7 +2064,7 @@ begin
         LX3 := LCenterX + ScaleValue(cChevronGlyphHalfWidth);
         LY3 := LY1;
       end;
-    gtcbgPlus:
+    etcbgPlus:
       begin
         LX1 := LCenterX - ScaleValue(cPlusGlyphHalfSize);
         LY1 := LCenterY;
@@ -2073,7 +2073,7 @@ begin
         LX3 := LCenterX;
         LY3 := LCenterY - ScaleValue(cPlusGlyphHalfSize);
       end;
-    gtcbgClose:
+    etcbgClose:
       begin
         LX1 := LCenterX - ScaleValue(cCloseGlyphHalfSize);
         LY1 := LCenterY - ScaleValue(cCloseGlyphHalfSize);
@@ -2093,7 +2093,7 @@ begin
     end;
   end;
 
-  if AState = gtbdsHot then
+  if AState = etbdsHot then
   begin
     if FButtonHoverBackground then
     begin
@@ -2107,11 +2107,11 @@ begin
     end;
     if FButtonHoverGlow then
     begin
-      if AGlyph = gtcbgPlus then
+      if AGlyph = etcbgPlus then
         DrawTwoLineGlow(LGraphics, LX1, LY1, LX2, LY2, LX3, LY3,
           LX3, LCenterY + ScaleValue(cPlusGlyphHalfSize), FPalette.Accent,
           ScaleValue(1.0))
-      else if AGlyph = gtcbgClose then
+      else if AGlyph = etcbgClose then
         DrawTwoLineGlow(LGraphics, LX1, LY1, LX2, LY2, LX3, LY3,
           LCenterX - ScaleValue(cCloseGlyphHalfSize),
           LCenterY + ScaleValue(cCloseGlyphHalfSize), FPalette.Accent,
@@ -2130,10 +2130,10 @@ begin
     LGlyphPen.SetEndCap(LineCapRound);
     LGlyphPen.SetLineJoin(LineJoinRound);
     LGraphics.DrawLine(LGlyphPen, LX1, LY1, LX2, LY2);
-    if AGlyph = gtcbgPlus then
+    if AGlyph = etcbgPlus then
       LGraphics.DrawLine(LGlyphPen, LX3, LY3, LX3,
         LCenterY + ScaleValue(cPlusGlyphHalfSize))
-    else if AGlyph = gtcbgClose then
+    else if AGlyph = etcbgClose then
       LGraphics.DrawLine(LGlyphPen, LX3, LY3,
         LCenterX - ScaleValue(cCloseGlyphHalfSize),
         LCenterY + ScaleValue(cCloseGlyphHalfSize))
@@ -2144,16 +2144,16 @@ begin
   end;
 end;
 
-procedure TGlassTabStrip.DrawCustomButton(ACanvas: TCanvas;
+procedure TExplorerTabStrip.DrawCustomButton(ACanvas: TCanvas;
   AGraphics: TGPGraphics; const ARect: TRect;
-  AButton: TGlassTabCustomButton; AState: TGlassTabButtonDrawState;
-  AContent: TGlassTabCustomButtonContent;
-  AGlyph: TGlassTabCustomButtonGlyph;
+  AButton: TExplorerTabCustomButton; AState: TExplorerTabButtonDrawState;
+  AContent: TExplorerTabCustomButtonContent;
+  AGlyph: TExplorerTabCustomButtonGlyph;
   AImageIndex: System.UITypes.TImageIndex);
 begin
   var LCenterX := (ARect.Left + ARect.Right) div 2;
   var LCenterY := (ARect.Top + ARect.Bottom) div 2;
-  if (AState = gtbdsHot) and FButtonHoverBackground then
+  if (AState = etbdsHot) and FButtonHoverBackground then
   begin
     var LHoverRect := Rect(
       LCenterX - ScaleValue(cButtonHoverHalfWidth),
@@ -2174,7 +2174,7 @@ begin
     Exit;
 
   var LImageIndex := -1;
-  if AContent = gtcbcImage then
+  if AContent = etcbcImage then
     LImageIndex := ResolveCustomButtonImageIndex(AImageIndex);
   if LImageIndex < 0 then
   begin
@@ -2183,10 +2183,10 @@ begin
   end;
 
   FImages.Draw(ACanvas, LCenterX - FImages.Width div 2,
-    LCenterY - FImages.Height div 2, LImageIndex, AState <> gtbdsDisabled);
+    LCenterY - FImages.Height div 2, LImageIndex, AState <> etbdsDisabled);
 end;
 
-procedure TGlassTabStrip.Paint;
+procedure TExplorerTabStrip.Paint;
 const
   cInactiveOutlineWidth = 1.0;
   cCloseLineWidth = 1.25;
@@ -2291,17 +2291,17 @@ begin
     end;
 
     if IsAddButtonVisible then
-      DrawButtonGlyph(LGraphics, GetAddButtonRect, gtcbgPlus,
+      DrawButtonGlyph(LGraphics, GetAddButtonRect, etcbgPlus,
         ButtonDrawState(FHotAddButton));
 
     if IsCustomLeftButtonVisible then
       DrawCustomButton(Canvas, LGraphics, GetCustomLeftButtonRect,
-        gtcbLeft, ButtonDrawState(FHotCustomLeftButton),
+        etcbLeft, ButtonDrawState(FHotCustomLeftButton),
         FCustomLeftButtonContent,
         FCustomLeftButtonGlyph, FCustomLeftButtonImageIndex);
     if IsCustomRightButtonVisible then
       DrawCustomButton(Canvas, LGraphics, GetCustomRightButtonRect,
-        gtcbRight, ButtonDrawState(FHotCustomRightButton),
+        etcbRight, ButtonDrawState(FHotCustomRightButton),
         FCustomRightButtonContent,
         FCustomRightButtonGlyph, FCustomRightButtonImageIndex);
 
@@ -2317,7 +2317,7 @@ begin
   end;
 end;
 
-procedure TGlassTabStrip.MouseDown(Button: TMouseButton; Shift: TShiftState;
+procedure TExplorerTabStrip.MouseDown(Button: TMouseButton; Shift: TShiftState;
   X, Y: Integer);
 begin
   inherited;
@@ -2381,7 +2381,7 @@ begin
     FOnBackgroundMouseDown(Self, Button, Shift, X, Y);
 end;
 
-procedure TGlassTabStrip.MouseMove(Shift: TShiftState; X, Y: Integer);
+procedure TExplorerTabStrip.MouseMove(Shift: TShiftState; X, Y: Integer);
 begin
   inherited;
   var LPoint := Point(X, Y);
@@ -2416,7 +2416,7 @@ begin
   UpdateCustomButtonHint(LPoint);
 end;
 
-procedure TGlassTabStrip.MouseUp(Button: TMouseButton; Shift: TShiftState;
+procedure TExplorerTabStrip.MouseUp(Button: TMouseButton; Shift: TShiftState;
   X, Y: Integer);
 begin
   inherited;
@@ -2457,7 +2457,7 @@ begin
   FPressedCloseIndex := -1; Invalidate;
 end;
 
-procedure TGlassTabStrip.CMMouseLeave(var Message: TMessage);
+procedure TExplorerTabStrip.CMMouseLeave(var Message: TMessage);
 begin
   inherited;
   FHotIndex := -1;

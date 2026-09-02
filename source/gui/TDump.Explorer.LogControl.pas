@@ -16,7 +16,7 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
-  System.Generics.Collections, System.Math, System.StrUtils,
+  System.Generics.Collections, System.Math, System.StrUtils, System.UITypes,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls,
   Vcl.ExtCtrls, Vcl.ControlList, Vcl.WinXCtrls, Vcl.Clipbrd;
 
@@ -397,6 +397,11 @@ end;
 
 procedure TLogControl.UpdateControlList;
 begin
+  // A frame's DFM is loaded before the frame receives a parent window.
+  // TControlList item metrics require that window, so defer visual work until
+  // the frame is hosted.
+  if Parent = nil then
+    Exit;
   if FUsingFilteredIndexes then
     ControlList1.ItemCount := FVisibleEntryIndexes.Count
   else

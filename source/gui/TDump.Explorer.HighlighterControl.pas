@@ -1739,6 +1739,15 @@ begin
     Exit;
   end;
 
+  // Frames are created before their parent is assigned.  TControlList cannot
+  // calculate item metrics without a parent window, so defer the first visual
+  // update until the normal parent-assignment resize arrives.
+  if Parent = nil then
+  begin
+    FUpdatePending := True;
+    Exit;
+  end;
+
   FUpdatePending := False;
   if FItemProvider = nil then
   begin

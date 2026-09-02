@@ -54,6 +54,19 @@ begin
   Result := 'Column ' + IntToStr(AColumnIndex + 1);
 end;
 
+function JsonHeaderText(const AHeaders: TArray<string>; AColumnIndex: Integer): string;
+var
+  LDuplicateCount: Integer;
+begin
+  Result := HeaderText(AHeaders, AColumnIndex);
+  LDuplicateCount := 0;
+  for var LPreviousIndex := 0 to AColumnIndex - 1 do
+    if SameText(HeaderText(AHeaders, LPreviousIndex), Result) then
+      Inc(LDuplicateCount);
+  if LDuplicateCount > 0 then
+    Result := Result + ' (' + IntToStr(LDuplicateCount + 1) + ')';
+end;
+
 function EscapeCsv(const AValue: string): string;
 begin
   Result := AValue;
@@ -204,7 +217,7 @@ begin
         if LColumnIndex > 0 then
           LText.Append(',');
         LText.AppendLine;
-        LText.Append('    ').Append(EscapeJson(HeaderText(AHeaders,
+        LText.Append('    ').Append(EscapeJson(JsonHeaderText(AHeaders,
           LColumnIndex))).Append(': ').Append(EscapeJson(CellText(
           ARows[LRowIndex], LColumnIndex)));
       end;

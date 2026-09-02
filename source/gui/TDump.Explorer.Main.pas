@@ -25,7 +25,7 @@ uses
   TDump.Explorer.TextSource, TDump.Explorer.Settings,
   TDump.Explorer.Frame, Vcl.ComCtrls, TDump.Explorer.LogControl, Vcl.ExtCtrls,
   Vcl.TitleBarCtrls, Vcl.WinXPanels, Vcl.VirtualImageList,
-  TDump.Explorer.GlassTabs, TDump.Explorer.PopupMenu, TDump.Explorer.UI,
+  TDump.Explorer.Tabs, TDump.Explorer.PopupMenu, TDump.Explorer.UI,
   Vcl.AppEvnts;
 
 type
@@ -73,7 +73,7 @@ type
     FEmptyStateTitle: TLabel;
     FEmptyStateMessage: TLabel;
     FEmptyStateHint: TLabel;
-    FTabs: TGlassTabStrip;
+    FTabs: TExplorerTabStrip;
     FTabImages: TVirtualImageList;
     FExplorerPopupMenu: TExplorerPopupMenuForm;
     FExplorerPopupImages: TVirtualImageList;
@@ -151,8 +151,8 @@ type
       Shift: TShiftState; X, Y: Integer);
     procedure TabsChanged(Sender: TObject; ANewIndex: Integer);
     procedure TabsCustomButtonDraw(Sender: TObject;
-      AButton: TGlassTabCustomButton; ACanvas: TCanvas; const ARect,
-      AGlyphRect: TRect; AState: TGlassTabButtonDrawState;
+      AButton: TExplorerTabCustomButton; ACanvas: TCanvas; const ARect,
+      AGlyphRect: TRect; AState: TExplorerTabButtonDrawState;
       AGlyphColor: TColor; var AHandled: Boolean);
     procedure TabsCustomLeftButtonClick(Sender: TObject);
     procedure TabsCustomRightButtonClick(Sender: TObject);
@@ -396,8 +396,8 @@ begin
   Color := LTheme.BackgroundColor;
   CardPanel1.Color := LTheme.BackgroundColor;
   FTabs.Palette := LPalette;
-  FTabs.BackgroundGradientDirection := ggdVertical;
-  FTabs.TabGradientDirection := ggdVertical;
+  FTabs.BackgroundGradientDirection := etgdVertical;
+  FTabs.TabGradientDirection := etgdVertical;
   var LImageName := DocumentTabImageName;
   for var LIndex := 0 to FTabs.Items.Count - 1 do
     FTabs.Items[LIndex].ImageName := LImageName;
@@ -520,7 +520,7 @@ begin
   FTabImages.Width := cTabIconSize;
   FTabImages.Height := cTabIconSize;
 
-  FTabs := TGlassTabStrip.Create(Self);
+  FTabs := TExplorerTabStrip.Create(Self);
   FTabs.Parent := TitleBarPanel1;
   FTabs.Images := FTabImages;
   FTabs.Margins.Left := 0;
@@ -1005,12 +1005,12 @@ begin
 end;
 
 procedure TFrmMain.TabsCustomButtonDraw(Sender: TObject;
-  AButton: TGlassTabCustomButton; ACanvas: TCanvas; const ARect,
-  AGlyphRect: TRect; AState: TGlassTabButtonDrawState;
+  AButton: TExplorerTabCustomButton; ACanvas: TCanvas; const ARect,
+  AGlyphRect: TRect; AState: TExplorerTabButtonDrawState;
   AGlyphColor: TColor; var AHandled: Boolean);
 begin
   AHandled := False;
-  if AButton <> gtcbRight then
+  if AButton <> etcbRight then
     Exit;
 
   PhosphorFont.DrawIcon(ACanvas.Handle, cPhClockCounterClockwise,

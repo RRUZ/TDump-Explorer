@@ -1,4 +1,4 @@
-﻿//**************************************************************************************************
+//**************************************************************************************************
 //
 // Unit TDump.Explorer.TinyParser
 //
@@ -244,15 +244,18 @@ begin
 
       if (LNextIndex < AResult.Count) and (AResult[LNextIndex].Text = '(') then
         LToken.Kind := ttkMethodName
-      else if IsCppBuilderTypeName(LToken.Text) or
-        (LIsQualifiedIdentifier and CharInSet(LToken.Text[1], ['A'..'Z'])) then
+      else if IsCppBuilderTypeName(LToken.Text) then
         LToken.Kind := ttkTypeName
       else if ((LNextIndex < AResult.Count) and
         (AResult[LNextIndex].Text = '.')) or
         ((LNextIndex + 1 < AResult.Count) and
         (AResult[LNextIndex].Text = ':') and
         (AResult[LNextIndex + 1].Text = ':')) then
-        LToken.Kind := ttkNamespace;
+        // An owner can be capitalized (for example System.Generics), but it
+        // remains a namespace while another qualifier follows it.
+        LToken.Kind := ttkNamespace
+      else if LIsQualifiedIdentifier and CharInSet(LToken.Text[1], ['A'..'Z']) then
+        LToken.Kind := ttkTypeName;
       if LToken.Kind = ttkString then
         LToken.Kind := ttkMethodName;
     end;
@@ -301,15 +304,18 @@ begin
 
       if (LNextIndex < AResult.Count) and (AResult[LNextIndex].Text = '(') then
         LToken.Kind := ttkMethodName
-      else if IsCppBuilderTypeName(LToken.Text) or
-        (LIsQualifiedIdentifier and CharInSet(LToken.Text[1], ['A'..'Z'])) then
+      else if IsCppBuilderTypeName(LToken.Text) then
         LToken.Kind := ttkTypeName
       else if ((LNextIndex < AResult.Count) and
         (AResult[LNextIndex].Text = '.')) or
         ((LNextIndex + 1 < AResult.Count) and
         (AResult[LNextIndex].Text = ':') and
         (AResult[LNextIndex + 1].Text = ':')) then
-        LToken.Kind := ttkNamespace;
+        // An owner can be capitalized (for example System.Generics), but it
+        // remains a namespace while another qualifier follows it.
+        LToken.Kind := ttkNamespace
+      else if LIsQualifiedIdentifier and CharInSet(LToken.Text[1], ['A'..'Z']) then
+        LToken.Kind := ttkTypeName;
     end;
     AResult[LIndex] := LToken;
   end;
@@ -504,10 +510,13 @@ begin
   for var LIndex := 0 to AResult.Count - 1 do
   begin
     var LToken := AResult[LIndex];
-    if IsOMFLabel(LToken.Text) then
+    if IsUppercaseSymbol(LToken.Text) and not
+      (LToken.Kind in [ttkHexadecimal, ttkInteger, ttkFloat]) then
+      LToken.Kind := ttkSymbol
+    else if IsOMFLabel(LToken.Text) then
       LToken.Kind := ttkKeyword
-    else if (LToken.Kind = ttkString) and
-      (IsUppercaseSymbol(LToken.Text) or StartsText('_', LToken.Text)) then
+    else if
+      ((LToken.Kind = ttkString) and StartsText('_', LToken.Text)) then
       LToken.Kind := ttkSymbol;
     AResult[LIndex] := LToken;
   end;
@@ -777,6 +786,26 @@ begin
   begin
     var LStartIndex := LIndex;
     var LCharacter := AText[LIndex];
+    var LEndIndex := 0;
+    var LMethodStartIndex := 0;
+    var LMethodEndIndex := 0;
+    // A strings-table extraction may retain any one-byte prefix, including
+    // whitespace, immediately before a Borland linker name.  Detect it
+    // before whitespace or quote handling consumes that prefix.
+    if (AMode = tpmExtractedString) and (LIndex < Length(AText)) and
+      (AText[LIndex + 1] = '@') and TryReadBorlandMethod(AText,
+      LIndex + 1, LMethodStartIndex, LMethodEndIndex, LEndIndex) then
+    begin
+      AddToken(AResult, ttkMangledSignature, AText, LStartIndex,
+        LStartIndex + 1);
+      AddBorlandOwnerTokens(AResult, AText, LIndex + 1, LMethodStartIndex);
+      AddToken(AResult, ttkMethodName, AText, LMethodStartIndex,
+        LMethodEndIndex);
+      if LMethodEndIndex < LEndIndex then
+        AddBorlandSignatureTokens(AResult, AText, LMethodEndIndex, LEndIndex);
+      LIndex := LEndIndex;
+      Continue;
+    end;
     if CharInSet(LCharacter, [#0..#32]) then
     begin
       repeat
@@ -786,19 +815,17 @@ begin
       Continue;
     end;
 
-    var LEndIndex := 0;
     if TryReadQuotedString(AText, LIndex, LEndIndex) then
     begin
       AddToken(AResult, ttkStringLiteral, AText, LStartIndex, LEndIndex);
       LIndex := LEndIndex;
       Continue;
     end;
-    var LMethodStartIndex := 0;
-    var LMethodEndIndex := 0;
     // Strings extracted from an image can retain one byte immediately before
     // a valid Borland linker name (for example Y@System@...).  That byte is
     // extraction residue, never a source-level method identifier.
-    if (LIndex < Length(AText)) and (AText[LIndex + 1] = '@') and
+    if (AMode <> tpmExtractedString) and (LIndex < Length(AText)) and
+      (AText[LIndex + 1] = '@') and
       TryReadBorlandMethod(AText, LIndex + 1, LMethodStartIndex,
         LMethodEndIndex, LEndIndex) then
     begin
@@ -1126,6 +1153,13 @@ begin
       Inc(LIndex, 2);
       Continue;
     end;
+    if (AText[LIndex] = '%') and (LIndex < Length(AText)) and
+      IsIdentifierStart(AText[LIndex + 1]) then
+    begin
+      LMethodStart := LIndex + 1;
+      Inc(LIndex);
+      Continue;
+    end;
     if (AText[LIndex] = '@') and (LIndex > AStartIndex + 1) then
     begin
       if not LInSignature and (LIndex + 1 <= Length(AText)) and
@@ -1437,6 +1471,7 @@ begin
     Exit;
 
   var LQuote := AText[AStartIndex];
+  var LFoundClosingQuote := False;
   var LIndex := AStartIndex + 1;
   while LIndex <= Length(AText) do
   begin
@@ -1448,13 +1483,19 @@ begin
       if (LIndex <= Length(AText)) and (AText[LIndex] = LQuote) then
         Inc(LIndex)
       else
+      begin
+        LFoundClosingQuote := True;
         Break;
+      end;
     end
     else
       Inc(LIndex);
   end;
-  AEndIndex := LIndex;
-  Result := True;
+  if LFoundClosingQuote then
+  begin
+    AEndIndex := LIndex;
+    Result := True;
+  end;
 end;
 
 class function TTinyParser.TryReadTime(const AText: string;

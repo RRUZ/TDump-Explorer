@@ -17,7 +17,7 @@ interface
 uses
   Winapi.Messages, Vcl.Graphics, System.Types, System.UITypes, System.Classes,
   Vcl.Controls, Vcl.ExtCtrls, Vcl.Forms, Vcl.ImgList,
-  TDump.Explorer.GlassTabs;
+  TDump.Explorer.Tabs;
 
 type
   TExplorerThemeKind = (thtLight, thtDark);
@@ -243,7 +243,7 @@ procedure DrawSplitterLine(const ACanvas: TCanvas; const ARect: TRect; AIsVertic
 procedure DrawExplorerChevron(const ACanvas: TCanvas; const ACenter: TPoint;
   AColor: TColor; ADirection: TExplorerChevronDirection;
   ADeviceScale: Single = 1.0);
-function ExplorerTabPalette(const ATheme: TExplorerTheme): TGlassTabPalette;
+function ExplorerTabPalette(const ATheme: TExplorerTheme): TExplorerTabPalette;
 function ExplorerButtonPalette(
   const ATheme: TExplorerTheme): TSimpleUIButtonPalette;
 procedure ApplyExplorerThemeToButton(AButton: TSimpleUIButton;
@@ -898,7 +898,7 @@ begin
   Invalidate;
 end;
 
-function ExplorerTabPalette(const ATheme: TExplorerTheme): TGlassTabPalette;
+function ExplorerTabPalette(const ATheme: TExplorerTheme): TExplorerTabPalette;
 begin
   Result.StripTop := ATheme.BackgroundColor;
   Result.StripBottom := ATheme.BackgroundColor;

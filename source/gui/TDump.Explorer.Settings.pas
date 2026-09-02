@@ -29,7 +29,7 @@ uses
   Vcl.VirtualImageList,
   Vcl.WinXCtrls,
   Vcl.TitleBarCtrls,
-  TDump.Explorer.GlassTabs,
+  TDump.Explorer.Tabs,
   TDump.Explorer.UI,
   Vcl.ControlList;
 
@@ -42,6 +42,7 @@ type
   TSettings = class
   private
     class var FInstance: TSettings;
+    class var FSettingsFolderOverride: string;
   private
     FTDumpPath: string;
     FRecentItems: Integer;
@@ -57,6 +58,7 @@ type
     constructor Create;
   public
     class function Instance: TSettings; static;
+    class procedure SetSettingsFolderOverride(const AValue: string); static;
     destructor Destroy; override;
     procedure Load;
     procedure Save;
@@ -101,7 +103,7 @@ type
     procedure FormShow(Sender: TObject);
     procedure btnSaveClick(Sender: TObject);
   private
-    FSettingsTabs: TGlassTabStrip;
+    FSettingsTabs: TExplorerTabStrip;
     FSettingsTabImages: TVirtualImageList;
     FButtonImages: TVirtualImageList;
     FBrowseButton: TSimpleUIButton;
@@ -198,10 +200,17 @@ begin
   Result := FInstance;
 end;
 
+class procedure TSettings.SetSettingsFolderOverride(const AValue: string);
+begin
+  FSettingsFolderOverride := ExcludeTrailingPathDelimiter(Trim(AValue));
+end;
+
 function TSettings.SettingsFolder: string;
 var
   LRoamingAppData: array[0..MAX_PATH] of Char;
 begin
+  if FSettingsFolderOverride <> '' then
+    Exit(FSettingsFolderOverride);
   if Failed(SHGetFolderPath(0, CSIDL_APPDATA, 0, SHGFP_TYPE_CURRENT,
     LRoamingAppData)) then
     raise Exception.Create('Unable to locate the roaming application-data folder.');
@@ -362,7 +371,7 @@ procedure TFrmSettings.ApplyTheme;
 var
   LTheme: TExplorerTheme;
   LIconSuffix: string;
-  LTabPalette: TGlassTabPalette;
+  LTabPalette: TExplorerTabPalette;
 begin
   LTheme := TExplorerTheme.ActiveTheme;
   // Icon suffixes describe the surface they are intended for.  On a light
@@ -670,7 +679,7 @@ begin
   FSettingsTabImages.Add('gear_dark', 'gear_dark');
   FSettingsTabImages.Add('gear_light', 'gear_light');
 
-  FSettingsTabs := TGlassTabStrip.Create(Self);
+  FSettingsTabs := TExplorerTabStrip.Create(Self);
   FSettingsTabs.Parent := TitleBarPanel1;
   FSettingsTabs.Images := FSettingsTabImages;
   FSettingsTabs.Margins.Left := 0;

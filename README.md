@@ -2,10 +2,8 @@
   <img src="images/banner.png" alt="TDump Explorer — visual explorer for TDUMP output and binary metadata" width="100%"/>
 </p>
 
-<h1 align="center">TDump Explorer</h1>
-
 <p align="center">
-  A native Windows explorer for Embarcadero <code>TDUMP</code> and <code>TDUMP64</code> reports.
+  TDump Explorer - A native Windows explorer for Embarcadero <code>TDUMP</code> and <code>TDUMP64</code> reports.
 </p>
 
 <p align="center">
@@ -17,7 +15,6 @@
 <p align="center">
   <a href="https://github.com/RRUZ/TDump-Explorer/releases">Releases</a> ·
   <a href="#quick-start">Quick start</a> ·
-  <a href="#build-from-source">Build from source</a>
 </p>
 
 TDump Explorer turns textual dump output into navigable trees and tables while keeping the original report available for verification. Open a binary or an existing `.tdump` report and inspect PE, ELF, Mach-O, OMF, archive, and Borland debug metadata without searching through thousands of lines of text.
