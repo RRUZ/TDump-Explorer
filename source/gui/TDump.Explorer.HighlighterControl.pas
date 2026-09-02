@@ -21,7 +21,8 @@ uses
   System.Generics.Defaults, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.StdCtrls, Vcl.ControlList, Vcl.Clipbrd,
   TDump.Explorer.Highlighter, TDump.Explorer.TinyParser, Vcl.ExtCtrls, TDump.Explorer.UI,
-  Vcl.WinXCtrls, Vcl.ComCtrls, Vcl.ImgList, TDump.Explorer.Export;
+  Vcl.WinXCtrls, Vcl.ComCtrls, Vcl.ImgList, Vcl.VirtualImageList,
+  TDump.Explorer.Export;
 
 type
   // Supplies rows on demand. Implementations retain only row identifiers and
@@ -92,6 +93,8 @@ type
       FUpdatingHeader: Boolean;
       FContextPopupEnabled: Boolean;
       FContextPopupMenu: TForm;
+      FHeaderPopupMenu: TForm;
+      FContextPopupImages: TVirtualImageList;
     procedure AddItem(const AText, AImageName: string; AParserMode: Integer);
     function ItemCount: Integer;
     function ItemText(AItemIndex: Integer): string;
@@ -136,10 +139,15 @@ type
       Section: THeaderSection);
     procedure HeaderControlDrawSection(HeaderControl: THeaderControl;
       Section: THeaderSection; const ARect: TRect; Pressed: Boolean);
+    procedure HeaderControlMouseUp(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
     procedure ControlList1MouseUp(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
     procedure ContextPopupMenuItemClick(Sender: TObject; AItemIndex: Integer);
+    procedure HeaderPopupMenuItemClick(Sender: TObject; AItemIndex: Integer);
     procedure ShowContextPopupMenu(const APoint: TPoint);
+    procedure ShowHeaderPopupMenu(const APoint: TPoint);
+    procedure EnsureContextPopupImages;
     function ExportHeaders: TArray<string>;
     function ExportSelectedItems(AFormat: TDumpExportFormat): string;
     procedure CopySelectedItemsToClipboard(AFormat: TDumpExportFormat);
@@ -228,7 +236,8 @@ type
 implementation
 
 uses
-  Vcl.Themes, Vcl.GraphUtil, TDump.Explorer.PopupMenu;
+  Vcl.Themes, Vcl.GraphUtil, TDump.Explorer.PopupMenu,
+  TDump.Explorer.Resources;
 
 {$R *.dfm}
 
@@ -273,6 +282,7 @@ begin
   HeaderControl1.OnSectionClick := HeaderControlSectionClick;
   HeaderControl1.OnSectionResize := HeaderControlSectionResize;
   HeaderControl1.OnDrawSection := HeaderControlDrawSection;
+  HeaderControl1.OnMouseUp := HeaderControlMouseUp;
   ControlList1.MultiSelect := True;
   ControlList1.OnBeforeDrawItem := ControlList1BeforeDrawItem;
   ControlList1.OnKeyDown := ControlList1KeyDown;
@@ -285,6 +295,8 @@ end;
 destructor THighlighterControl.Destroy;
 begin
   FContextPopupMenu.Free;
+  FHeaderPopupMenu.Free;
+  FContextPopupImages.Free;
   FMeasureBitmap.Free;
   FItemImageNames.Free;
   FItemParserModes.Free;
@@ -297,6 +309,25 @@ begin
   FItems.Free;
   FHighlighter.Free;
   inherited;
+end;
+
+procedure THighlighterControl.EnsureContextPopupImages;
+begin
+  if Assigned(FContextPopupImages) or not Assigned(DataModule1) then
+    Exit;
+
+  FContextPopupImages := TVirtualImageList.Create(Self);
+  FContextPopupImages.Width := ScaleValue(16);
+  FContextPopupImages.Height := ScaleValue(16);
+  FContextPopupImages.ImageCollection := DataModule1.ImageCollection1;
+  FContextPopupImages.Add('file-text_dark', 'file-text_dark');
+  FContextPopupImages.Add('file-text_light', 'file-text_light');
+  FContextPopupImages.Add('file-csv_dark', 'file-csv_dark');
+  FContextPopupImages.Add('file-csv_light', 'file-csv_light');
+  FContextPopupImages.Add('file-code_dark', 'file-code_dark');
+  FContextPopupImages.Add('file-code_light', 'file-code_light');
+  FContextPopupImages.Add('file-md_dark', 'file-md_dark');
+  FContextPopupImages.Add('file-md_light', 'file-md_light');
 end;
 
 procedure THighlighterControl.AddColumns(const AColumns: array of string);
@@ -521,6 +552,15 @@ end;
 
 function THighlighterControl.CompareColumnValues(const ALeft, ARight: string;
   ADataType: TTinyHighlightDataType): Integer;
+var
+  LLeftInteger: Int64;
+  LRightInteger: Int64;
+  LLeftHexadecimal: UInt64;
+  LRightHexadecimal: UInt64;
+  LLeftFloat: Extended;
+  LRightFloat: Extended;
+  LLeftDateTime: TDateTime;
+  LRightDateTime: TDateTime;
   function CompareInt64(ALeftValue, ARightValue: Int64): Integer;
   begin
     if ALeftValue < ARightValue then
@@ -560,32 +600,24 @@ begin
   case ADataType of
     thdtInteger:
       begin
-        var LLeftInteger: Int64;
-        var LRightInteger: Int64;
         if TryStrToInt64(Trim(ALeft), LLeftInteger) and
           TryStrToInt64(Trim(ARight), LRightInteger) then
           Exit(CompareInt64(LLeftInteger, LRightInteger));
       end;
     thdtHexadecimal:
       begin
-        var LLeftHexadecimal: UInt64;
-        var LRightHexadecimal: UInt64;
         if TryParseHex(ALeft, LLeftHexadecimal) and
           TryParseHex(ARight, LRightHexadecimal) then
           Exit(CompareUInt64(LLeftHexadecimal, LRightHexadecimal));
       end;
     thdtFloat:
       begin
-        var LLeftFloat: Extended;
-        var LRightFloat: Extended;
         if TryStrToFloat(Trim(ALeft), LLeftFloat) and
           TryStrToFloat(Trim(ARight), LRightFloat) then
           Exit(CompareExtended(LLeftFloat, LRightFloat));
       end;
     thdtDate, thdtTime, thdtDateTime:
       begin
-        var LLeftDateTime: TDateTime;
-        var LRightDateTime: TDateTime;
         if TryStrToDateTime(Trim(ALeft), LLeftDateTime) and
           TryStrToDateTime(Trim(ARight), LRightDateTime) then
           Exit(CompareExtended(LLeftDateTime, LRightDateTime));
@@ -1410,42 +1442,50 @@ end;
 
 procedure THighlighterControl.ControlList1MouseUp(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+var
+  LPoint: TPoint;
 begin
   if (Button <> mbRight) or not FContextPopupEnabled then
     Exit;
 
-  var LPoint: TPoint;
   GetCursorPos(LPoint);
   ShowContextPopupMenu(LPoint);
+end;
+
+procedure THighlighterControl.HeaderControlMouseUp(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  if (Button <> mbRight) or not FContextPopupEnabled or
+    not HeaderControl1.Visible then
+    Exit;
+
+  ShowHeaderPopupMenu(HeaderControl1.ClientToScreen(Point(X, Y)));
 end;
 
 procedure THighlighterControl.ContextPopupMenuItemClick(Sender: TObject;
   AItemIndex: Integer);
 begin
-  if not HeaderControl1.Visible then
-  begin
-    case AItemIndex of
-      0: CopyToClipboard(defText);
-      1: CopyToClipboard(defCsv);
-      2: CopyToClipboard(defJson);
-      3: CopyToClipboard(defMarkdown);
-    end;
-    Exit;
+  case AItemIndex of
+    0: CopyToClipboard(defText);
+    1: CopyToClipboard(defCsv);
+    2: CopyToClipboard(defJson);
+    3: CopyToClipboard(defMarkdown);
   end;
+end;
 
+procedure THighlighterControl.HeaderPopupMenuItemClick(Sender: TObject;
+  AItemIndex: Integer);
+begin
   case AItemIndex of
     0: ResetSortOrder;
     1: AutoAdjustColumnWidths;
-    2: CopyToClipboard(defText);
-    3: CopyToClipboard(defCsv);
-    4: CopyToClipboard(defJson);
-    5: CopyToClipboard(defMarkdown);
   end;
 end;
 
 procedure THighlighterControl.ShowContextPopupMenu(const APoint: TPoint);
 var
   LPopupMenu: TExplorerPopupMenuForm;
+  LIconSuffix: string;
 begin
   if FContextPopupMenu = nil then
   begin
@@ -1457,16 +1497,39 @@ begin
   else
     LPopupMenu := TExplorerPopupMenuForm(FContextPopupMenu);
 
+  EnsureContextPopupImages;
+  LPopupMenu.MenuItems.Images := FContextPopupImages;
+  LIconSuffix := if IsLightThemeActive then '_light' else '_dark';
   LPopupMenu.MenuItems.Clear;
-  if HeaderControl1.Visible then
+  LPopupMenu.MenuItems.Add('Copy to clipboard as TEXT',
+    'file-text' + LIconSuffix);
+  LPopupMenu.MenuItems.Add('Copy to clipboard as CSV',
+    'file-csv' + LIconSuffix);
+  LPopupMenu.MenuItems.Add('Copy to clipboard as JSON',
+    'file-code' + LIconSuffix);
+  LPopupMenu.MenuItems.Add('Copy to clipboard as MD',
+    'file-md' + LIconSuffix);
+  LPopupMenu.ShowAt(APoint);
+end;
+
+procedure THighlighterControl.ShowHeaderPopupMenu(const APoint: TPoint);
+var
+  LPopupMenu: TExplorerPopupMenuForm;
+begin
+  if FHeaderPopupMenu = nil then
   begin
-    LPopupMenu.MenuItems.Add('Reset sort order');
-    LPopupMenu.MenuItems.Add('Auto adjust column widths');
-  end;
-  LPopupMenu.MenuItems.Add('Copy to clipboard as TEXT');
-  LPopupMenu.MenuItems.Add('Copy to clipboard as CSV');
-  LPopupMenu.MenuItems.Add('Copy to clipboard as JSON');
-  LPopupMenu.MenuItems.Add('Copy to clipboard as MD');
+    LPopupMenu := TExplorerPopupMenuForm.Create(Self);
+    LPopupMenu.MenuItems.ContextPopupEnabled := False;
+    LPopupMenu.OnItemClick := HeaderPopupMenuItemClick;
+    FHeaderPopupMenu := LPopupMenu;
+  end
+  else
+    LPopupMenu := TExplorerPopupMenuForm(FHeaderPopupMenu);
+
+  LPopupMenu.MenuItems.Images := nil;
+  LPopupMenu.MenuItems.Clear;
+  LPopupMenu.MenuItems.Add('Reset sort order');
+  LPopupMenu.MenuItems.Add('Auto adjust column widths');
   LPopupMenu.ShowAt(APoint);
 end;
 
@@ -1640,6 +1703,8 @@ begin
 end;
 
 procedure THighlighterControl.UpdateColumnWidths;
+var
+  LCaptionWidths: TArray<Integer>;
 begin
   FColumnCount := Max(1, FColumnHeaders.Count);
   if FUseColumnMode then
@@ -1650,7 +1715,6 @@ begin
   if not FAutoSizeColumns then
     Exit;
 
-  var LCaptionWidths: TArray<Integer>;
   SetLength(LCaptionWidths, FColumnCount);
   FMeasureBitmap.Canvas.Font.Assign(HeaderControl1.Font);
   for var LColumnIndex := 0 to FColumnHeaders.Count - 1 do

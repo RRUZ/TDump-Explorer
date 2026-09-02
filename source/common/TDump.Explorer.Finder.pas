@@ -131,35 +131,37 @@ procedure TDumpFinder.ScanBDSRegistry(
   AInstallations: TObjectList<TDumpInstallation>; ARootKey: NativeUInt);
 begin
   var LRegistry := TRegistry.Create(KEY_READ);
-  var LVersionNames: TStringList := nil;
   try
     LRegistry.RootKey := ARootKey;
     if not LRegistry.OpenKeyReadOnly(cBDSRegistryPath) then
       Exit;
 
-    LVersionNames := TStringList.Create;
-    LRegistry.GetKeyNames(LVersionNames);
-    for var LVersionName in LVersionNames do
-    begin
-      // The BDS key is already open, so use an absolute path here rather
-      // than resolving the version key below it a second time.
-      var LKeyName := '\' + cBDSRegistryPath + '\' + LVersionName;
-      if not LRegistry.OpenKeyReadOnly(LKeyName) then
-        Continue;
-      try
-        if not LRegistry.ValueExists('App') then
+    var LVersionNames := TStringList.Create;
+    try
+      LRegistry.GetKeyNames(LVersionNames);
+      for var LVersionName in LVersionNames do
+      begin
+        // The BDS key is already open, so use an absolute path here rather
+        // than resolving the version key below it a second time.
+        var LKeyName := '\' + cBDSRegistryPath + '\' + LVersionName;
+        if not LRegistry.OpenKeyReadOnly(LKeyName) then
           Continue;
-        var LAppPath := LRegistry.ReadString('App');
-        if not FileExists(LAppPath) then
-          Continue;
-        var LBinPath := ExtractFileDir(LAppPath);
-        AddInstallation(AInstallations, LVersionName, ExtractFileDir(LBinPath));
-      finally
-        LRegistry.CloseKey;
+        try
+          if not LRegistry.ValueExists('App') then
+            Continue;
+          var LAppPath := LRegistry.ReadString('App');
+          if not FileExists(LAppPath) then
+            Continue;
+          var LBinPath := ExtractFileDir(LAppPath);
+          AddInstallation(AInstallations, LVersionName, ExtractFileDir(LBinPath));
+        finally
+          LRegistry.CloseKey;
+        end;
       end;
+    finally
+      LVersionNames.Free;
     end;
   finally
-    LVersionNames.Free;
     LRegistry.Free;
   end;
 end;

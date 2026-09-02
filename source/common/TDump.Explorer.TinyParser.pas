@@ -117,8 +117,9 @@ implementation
 
 procedure TTinyParser.AddToken(AResult: TTinyTokenList; AKind: TTinyTokenKind;
   const AText: string; AStartIndex, AEndIndex: Integer);
+var
+  LToken: TTinyToken;
 begin
-  var LToken: TTinyToken;
   LToken.Kind := AKind;
   LToken.StartIndex := AStartIndex;
   LToken.Length := AEndIndex - AStartIndex;
@@ -953,6 +954,8 @@ end;
 
 procedure TTinyParser.AddItaniumNestedNameTokens(AResult: TTinyTokenList;
   const AText: string; AStartIndex, ANameStartIndex: Integer);
+var
+  LComponentLength: Integer;
 begin
   var LIndex := AStartIndex;
   while (LIndex < ANameStartIndex) and (AText[LIndex] = '_') do
@@ -994,7 +997,6 @@ begin
       Inc(LIndex);
     until (LIndex >= ANameStartIndex) or
       not CharInSet(AText[LIndex], ['0'..'9']);
-    var LComponentLength: Integer;
     if not TryStrToInt(Copy(AText, LLengthStart, LIndex - LLengthStart),
       LComponentLength) or (LComponentLength <= 0) or
       (LIndex + LComponentLength > ANameStartIndex) then
@@ -1021,6 +1023,8 @@ end;
 
 procedure TTinyParser.AddItaniumSignatureTokens(AResult: TTinyTokenList;
   const AText: string; AStartIndex, AEndIndex: Integer);
+var
+  LComponentLength: Integer;
 begin
   var LCursor := AStartIndex;
   var LIndex := AStartIndex;
@@ -1049,7 +1053,6 @@ begin
     repeat
       Inc(LIndex);
     until (LIndex >= AEndIndex) or not CharInSet(AText[LIndex], ['0'..'9']);
-    var LComponentLength: Integer;
     if not TryStrToInt(Copy(AText, LLengthStart, LIndex - LLengthStart),
       LComponentLength) or (LComponentLength <= 0) or
       (LIndex + LComponentLength > AEndIndex) then
@@ -1235,6 +1238,8 @@ end;
 class function TTinyParser.TryReadItaniumNestedName(const AText: string;
   AStartIndex: Integer; const APrefix: string; out ANameStartIndex,
   ANameEndIndex, AEndIndex: Integer): Boolean;
+var
+  LComponentLength: Integer;
 begin
   Result := False;
   ANameStartIndex := AStartIndex;
@@ -1267,7 +1272,6 @@ begin
           Inc(LIndex);
         until (LIndex > Length(AText)) or
           not CharInSet(AText[LIndex], ['0'..'9']);
-        var LComponentLength: Integer;
         if not TryStrToInt(Copy(AText, LLengthStart, LIndex - LLengthStart),
           LComponentLength) or (LComponentLength <= 0) or
           (LIndex + LComponentLength - 1 > Length(AText)) then

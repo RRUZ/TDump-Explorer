@@ -427,19 +427,21 @@ procedure DrawTwoLineGlow(AGraphics: TGPGraphics;
   AAccent: TColor; AScale: Single);
 begin
   var LOuter := TGPPen.Create(ToArgb(AAccent, 24), 5.0 * AScale);
-  var LInner: TGPPen := nil;
   try
-    LInner := TGPPen.Create(ToArgb(AAccent, 76), 2.8 * AScale);
-    LOuter.SetStartCap(LineCapRound);
-    LOuter.SetEndCap(LineCapRound);
-    LInner.SetStartCap(LineCapRound);
-    LInner.SetEndCap(LineCapRound);
-    AGraphics.DrawLine(LOuter, AX1, AY1, AX2, AY2);
-    AGraphics.DrawLine(LOuter, BX1, BY1, BX2, BY2);
-    AGraphics.DrawLine(LInner, AX1, AY1, AX2, AY2);
-    AGraphics.DrawLine(LInner, BX1, BY1, BX2, BY2);
+    var LInner := TGPPen.Create(ToArgb(AAccent, 76), 2.8 * AScale);
+    try
+      LOuter.SetStartCap(LineCapRound);
+      LOuter.SetEndCap(LineCapRound);
+      LInner.SetStartCap(LineCapRound);
+      LInner.SetEndCap(LineCapRound);
+      AGraphics.DrawLine(LOuter, AX1, AY1, AX2, AY2);
+      AGraphics.DrawLine(LOuter, BX1, BY1, BX2, BY2);
+      AGraphics.DrawLine(LInner, AX1, AY1, AX2, AY2);
+      AGraphics.DrawLine(LInner, BX1, BY1, BX2, BY2);
+    finally
+      LInner.Free;
+    end;
   finally
-    LInner.Free;
     LOuter.Free;
   end;
 end;
@@ -449,28 +451,30 @@ procedure FillRoundedHover(AGraphics: TGPGraphics; const ABounds: TRect;
 begin
   var LDiameter := ARadius * 2;
   var LPath := TGPGraphicsPath.Create;
-  var LBrush: TGPSolidBrush := nil;
   try
-    LBrush := TGPSolidBrush.Create(ToArgb(AColor, 238));
-    LPath.AddArc(ABounds.Left, ABounds.Top, LDiameter, LDiameter, 180, 90);
-    LPath.AddLine(ABounds.Left + ARadius, ABounds.Top,
-      ABounds.Right - ARadius, ABounds.Top);
-    LPath.AddArc(ABounds.Right - LDiameter, ABounds.Top,
-      LDiameter, LDiameter, 270, 90);
-    LPath.AddLine(ABounds.Right, ABounds.Top + ARadius,
-      ABounds.Right, ABounds.Bottom - ARadius);
-    LPath.AddArc(ABounds.Right - LDiameter, ABounds.Bottom - LDiameter,
-      LDiameter, LDiameter, 0, 90);
-    LPath.AddLine(ABounds.Right - ARadius, ABounds.Bottom,
-      ABounds.Left + ARadius, ABounds.Bottom);
-    LPath.AddArc(ABounds.Left, ABounds.Bottom - LDiameter,
-      LDiameter, LDiameter, 90, 90);
-    LPath.AddLine(ABounds.Left, ABounds.Bottom - ARadius,
-      ABounds.Left, ABounds.Top + ARadius);
-    LPath.CloseFigure;
-    AGraphics.FillPath(LBrush, LPath);
+    var LBrush := TGPSolidBrush.Create(ToArgb(AColor, 238));
+    try
+      LPath.AddArc(ABounds.Left, ABounds.Top, LDiameter, LDiameter, 180, 90);
+      LPath.AddLine(ABounds.Left + ARadius, ABounds.Top,
+        ABounds.Right - ARadius, ABounds.Top);
+      LPath.AddArc(ABounds.Right - LDiameter, ABounds.Top,
+        LDiameter, LDiameter, 270, 90);
+      LPath.AddLine(ABounds.Right, ABounds.Top + ARadius,
+        ABounds.Right, ABounds.Bottom - ARadius);
+      LPath.AddArc(ABounds.Right - LDiameter, ABounds.Bottom - LDiameter,
+        LDiameter, LDiameter, 0, 90);
+      LPath.AddLine(ABounds.Right - ARadius, ABounds.Bottom,
+        ABounds.Left + ARadius, ABounds.Bottom);
+      LPath.AddArc(ABounds.Left, ABounds.Bottom - LDiameter,
+        LDiameter, LDiameter, 90, 90);
+      LPath.AddLine(ABounds.Left, ABounds.Bottom - ARadius,
+        ABounds.Left, ABounds.Top + ARadius);
+      LPath.CloseFigure;
+      AGraphics.FillPath(LBrush, LPath);
+    finally
+      LBrush.Free;
+    end;
   finally
-    LBrush.Free;
     LPath.Free;
   end;
 end;
@@ -1520,36 +1524,28 @@ const
   cSelectedGlowWidth = 2.0;
   cSelectedOutlineWidth = 1.0;
   cBaselineWidth = 1.0;
+var
+  LTop: ARGB;
+  LBottom: ARGB;
+  LTextColor: TColor;
+  LCoreColors: array[0..2] of TGPColor;
+  LGlowColors: array[0..2] of TGPColor;
+  LPositions: array[0..2] of Single;
+  LBaselineColors: array[0..5] of TGPColor;
+  LBaselinePositions: array[0..5] of Single;
+  LFirstShoulderBlendY: Integer;
 begin
-  var LClose, LHoverRect: TRect;
-  var LTextRect: TRect;
-  var LTop, LBottom: ARGB;
-  var LTextColor: TColor;
-  var LOldBkMode: Integer;
-  var LOldTextColor: COLORREF;
-  var LFlags: Cardinal;
-  var LContentCenterY: Integer;
-  var LGradientStart, LFadeStart: Integer;
-  var LGradientRect: TGPRect;
-  var LCoreColors, LGlowColors: array[0..2] of TGPColor;
-  var LPositions: array[0..2] of Single;
-  var LBaselineColors: array[0..5] of TGPColor;
-  var LBaselinePositions: array[0..5] of Single;
-  var LBaselineLeftFadeEnd, LBaselineRightFadeStart: Integer;
-  var LBaselineLeft, LBaselineRight: Integer;
-  var LFirstShoulderBlendY: Integer;
-  var LBaseY: Single;
   var LTab := GetTabRect(AIndex);
   var LIsFirstSelected := ASelected and (AIndex = 0);
   var LLeftShoulder := LTab.Left - ScaleValue(cSelectedShoulderWidth);
-  LBaselineLeft := 0;
-  LBaselineRight := Width;
+  var LBaselineLeft: Integer := 0;
+  var LBaselineRight: Integer := Width;
   if IsOverflowing then
   begin
     var LViewport := GetTabsViewport;
     LBaselineLeft := LViewport.Left;
   end;
-  LBaseY := 0;
+  var LBaseY: Single := 0;
   if LTab.Left >= Width then
     Exit;
 
@@ -1695,9 +1691,9 @@ begin
     LGraphics.FillPath(LFill, LShape);
     if ASelected then
     begin
-      LGradientStart := 0;
-      LFadeStart := Max(LGradientStart, Width - ScaleValue(cAccentFadeWidth));
-      LGradientRect := MakeRect(LGradientStart, 0,
+      var LGradientStart: Integer := 0;
+      var LFadeStart: Integer := Max(LGradientStart, Width - ScaleValue(cAccentFadeWidth));
+      var LGradientRect: TGPRect := MakeRect(LGradientStart, 0,
         Max(1, Width - LGradientStart), Height);
       var LAccentGradient := TGPLinearGradientBrush.Create(LGradientRect,
         ToArgb(FPalette.Accent), ToArgb(FPalette.BackgroundTopLine),
@@ -1731,10 +1727,10 @@ begin
             tab's lower-left shoulder. This keeps short first-tab segments from
             joining the shoulder while they are still semi-transparent. }
           var LBaselineSpan := Max(1, LBaselineRight - LBaselineLeft);
-          LBaselineLeftFadeEnd := Min(
+          var LBaselineLeftFadeEnd: Integer := Min(
             LBaselineLeft + ScaleValue(cBaselineFadeWidth),
             Max(LBaselineLeft + 1, LLeftShoulder));
-          LBaselineRightFadeStart := Max(LBaselineLeftFadeEnd,
+          var LBaselineRightFadeStart: Integer := Max(LBaselineLeftFadeEnd,
             LBaselineRight - ScaleValue(cBaselineFadeWidth));
           LBaselinePositions[0] := 0;
           LBaselinePositions[1] := EnsureRange(
@@ -1869,7 +1865,7 @@ begin
     end;
 
     LGraphics.Flush(FlushIntentionSync);
-    LContentCenterY := LTab.Top + LTab.Height div 2;
+    var LContentCenterY: Integer := LTab.Top + LTab.Height div 2;
     var LTextLeft := LTab.Left + ScaleValue(cTextLeftInset);
     var LImageIndex := ResolveImageIndex(FItems[AIndex]);
     if LImageIndex >= 0 then
@@ -1881,7 +1877,7 @@ begin
         ScaleValue(cImageTextSpacing);
     end;
 
-    LClose := GetCloseRect(AIndex);
+    var LClose: TRect := GetCloseRect(AIndex);
     ACanvas.Brush.Style := bsClear;
     if ASelected then
       ACanvas.Font.Name := 'Segoe UI Semibold'
@@ -1889,13 +1885,13 @@ begin
       ACanvas.Font.Name := 'Segoe UI';
     ACanvas.Font.Height := -ScaleValue(cTextHeight);
     ACanvas.Font.Style := [];
-    LOldBkMode := SetBkMode(ACanvas.Handle, TRANSPARENT);
-    LOldTextColor := SetTextColor(ACanvas.Handle, ColorToRGB(LTextColor));
-    LTextRect := Rect(LTextLeft,
+    var LOldBkMode: Integer := SetBkMode(ACanvas.Handle, TRANSPARENT);
+    var LOldTextColor: COLORREF := SetTextColor(ACanvas.Handle, ColorToRGB(LTextColor));
+    var LTextRect: TRect := Rect(LTextLeft,
       LTab.Top - ScaleValue(cTextVerticalOffset),
       LClose.Left - ScaleValue(cTextRightSpacing),
       LTab.Bottom - ScaleValue(cTextVerticalOffset));
-    LFlags := DT_LEFT or DT_VCENTER or DT_SINGLELINE or DT_END_ELLIPSIS or DT_NOPREFIX;
+    var LFlags: Cardinal := DT_LEFT or DT_VCENTER or DT_SINGLELINE or DT_END_ELLIPSIS or DT_NOPREFIX;
     DrawText(ACanvas.Handle, PChar(FItems[AIndex].Caption), -1, LTextRect, LFlags);
     SetTextColor(ACanvas.Handle, LOldTextColor);
     SetBkMode(ACanvas.Handle, LOldBkMode);
@@ -1906,7 +1902,7 @@ begin
       begin
         if FButtonHoverBackground then
         begin
-          LHoverRect := Rect((LClose.Left + LClose.Right) div 2 -
+          var LHoverRect: TRect := Rect((LClose.Left + LClose.Right) div 2 -
             ScaleValue(cButtonHoverHalfWidth),
             LContentCenterY - ScaleValue(cButtonHoverHalfHeight),
             (LClose.Left + LClose.Right) div 2 +
@@ -1953,12 +1949,19 @@ const
   cNavigationGlyphHalfWidth = 3;
   cNavigationGlyphHalfHeight = 5;
   cNavigationLineWidth = 1.5;
+var
+  LState: TExplorerTabButtonDrawState;
+  LX1: Single;
+  LY1: Single;
+  LX2: Single;
+  LY2: Single;
+  LX3: Single;
+  LY3: Single;
 begin
   var LGraphics := AGraphics;
   LGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
   LGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);
 
-    var LState: TExplorerTabButtonDrawState;
     if not AEnabled then
       LState := etbdsDisabled
     else
@@ -1966,7 +1969,6 @@ begin
 
     var LCenterX := (ARect.Left + ARect.Right) div 2;
     var LCenterY := (ARect.Top + ARect.Bottom) div 2;
-    var LX1, LY1, LX2, LY2, LX3, LY3: Single;
     if ALeft then
     begin
       LX1 := LCenterX + ScaleValue(cNavigationGlyphHalfWidth);
@@ -2029,13 +2031,19 @@ const
   cPlusGlyphHalfSize = 5;
   cCloseGlyphHalfSize = 4;
   cGlyphLineWidth = 1.35;
+var
+  LX1: Single;
+  LY1: Single;
+  LX2: Single;
+  LY2: Single;
+  LX3: Single;
+  LY3: Single;
 begin
   var LGraphics := AGraphics;
   LGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
   LGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);
   var LCenterX := (ARect.Left + ARect.Right) div 2;
   var LCenterY := (ARect.Top + ARect.Bottom) div 2;
-  var LX1, LY1, LX2, LY2, LX3, LY3: Single;
   case AGlyph of
     etcbgChevronLeft:
       begin
@@ -2231,56 +2239,77 @@ begin
         { One graphics context and one set of mutable paths serve every visible
           tab. The paths are reset by DrawTab before the next geometry is built. }
         var LTabGraphics := TGPGraphics.Create(Canvas.Handle);
-        var LShape := TGPGraphicsPath.Create;
-        var LStrokePath := TGPGraphicsPath.Create;
-        var LFirstShoulderPath := TGPGraphicsPath.Create;
-        var LBaselinePath := TGPGraphicsPath.Create;
-        var LInactiveOutlinePen := TGPPen.Create(
-          ToArgb(FPalette.StripBorder, 180),
-          ScaleValue(cInactiveOutlineWidth));
-        var LClosePen := TGPPen.Create(ToArgb(FPalette.InactiveText),
-          ScaleValue(cCloseLineWidth));
-        var LHotClosePen := TGPPen.Create(ToArgb(FPalette.Accent),
-          ScaleValue(cCloseLineWidth));
         try
-          LTabGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
-          LTabGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);
-          LClosePen.SetStartCap(LineCapRound);
-          LClosePen.SetEndCap(LineCapRound);
-          LHotClosePen.SetStartCap(LineCapRound);
-          LHotClosePen.SetEndCap(LineCapRound);
-          for var LIndex := LFirstIndex to FItems.Count - 1 do
-          begin
-            var LTabRect := GetTabRect(LIndex);
-            if LTabRect.Left >= LViewport.Right then
-              Break;
-            if LIndex <> FActiveIndex then
-            begin
-              DrawTab(Canvas, LTabGraphics, LShape, LStrokePath,
-                LFirstShoulderPath, LBaselinePath, LInactiveOutlinePen,
-                LClosePen, LHotClosePen, LIndex, False);
-              LTabGraphics.Flush(FlushIntentionSync);
-              DoAfterPaintTab(Canvas, LTabRect, LIndex, False,
-                LIndex = FHotIndex);
+          var LShape := TGPGraphicsPath.Create;
+          try
+            var LStrokePath := TGPGraphicsPath.Create;
+            try
+              var LFirstShoulderPath := TGPGraphicsPath.Create;
+              try
+                var LBaselinePath := TGPGraphicsPath.Create;
+                try
+                  var LInactiveOutlinePen := TGPPen.Create(
+                    ToArgb(FPalette.StripBorder, 180),
+                    ScaleValue(cInactiveOutlineWidth));
+                  try
+                    var LClosePen := TGPPen.Create(ToArgb(FPalette.InactiveText),
+                      ScaleValue(cCloseLineWidth));
+                    try
+                      var LHotClosePen := TGPPen.Create(ToArgb(FPalette.Accent),
+                        ScaleValue(cCloseLineWidth));
+                      try
+                        LTabGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
+                        LTabGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);
+                        LClosePen.SetStartCap(LineCapRound);
+                        LClosePen.SetEndCap(LineCapRound);
+                        LHotClosePen.SetStartCap(LineCapRound);
+                        LHotClosePen.SetEndCap(LineCapRound);
+                        for var LIndex := LFirstIndex to FItems.Count - 1 do
+                        begin
+                          var LTabRect := GetTabRect(LIndex);
+                          if LTabRect.Left >= LViewport.Right then
+                            Break;
+                          if LIndex <> FActiveIndex then
+                          begin
+                            DrawTab(Canvas, LTabGraphics, LShape, LStrokePath,
+                              LFirstShoulderPath, LBaselinePath, LInactiveOutlinePen,
+                              LClosePen, LHotClosePen, LIndex, False);
+                            LTabGraphics.Flush(FlushIntentionSync);
+                            DoAfterPaintTab(Canvas, LTabRect, LIndex, False,
+                              LIndex = FHotIndex);
+                          end;
+                        end;
+                        if FActiveIndex >= 0 then
+                        begin
+                          DrawTab(Canvas, LTabGraphics, LShape, LStrokePath,
+                            LFirstShoulderPath, LBaselinePath, LInactiveOutlinePen,
+                            LClosePen, LHotClosePen, FActiveIndex, True);
+                          LTabGraphics.Flush(FlushIntentionSync);
+                          DoAfterPaintTab(Canvas, GetTabRect(FActiveIndex), FActiveIndex,
+                            True, FActiveIndex = FHotIndex);
+                        end;
+                      finally
+                        LHotClosePen.Free;
+                      end;
+                    finally
+                      LClosePen.Free;
+                    end;
+                  finally
+                    LInactiveOutlinePen.Free;
+                  end;
+                finally
+                  LBaselinePath.Free;
+                end;
+              finally
+                LFirstShoulderPath.Free;
+              end;
+            finally
+              LStrokePath.Free;
             end;
-          end;
-          if FActiveIndex >= 0 then
-          begin
-            DrawTab(Canvas, LTabGraphics, LShape, LStrokePath,
-              LFirstShoulderPath, LBaselinePath, LInactiveOutlinePen,
-              LClosePen, LHotClosePen, FActiveIndex, True);
-            LTabGraphics.Flush(FlushIntentionSync);
-            DoAfterPaintTab(Canvas, GetTabRect(FActiveIndex), FActiveIndex,
-              True, FActiveIndex = FHotIndex);
+          finally
+            LShape.Free;
           end;
         finally
-          LHotClosePen.Free;
-          LClosePen.Free;
-          LInactiveOutlinePen.Free;
-          LBaselinePath.Free;
-          LFirstShoulderPath.Free;
-          LStrokePath.Free;
-          LShape.Free;
           LTabGraphics.Free;
         end;
       finally

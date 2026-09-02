@@ -488,6 +488,11 @@ end;
 
 procedure TDumpRelationBuilder.BuildSourceProcedureRelations(
   AGraph: TDumpRelationGraph);
+var
+  LProcedures: TList<TDumpAlignSymbolRecord>;
+  LProcedureSegment: UInt64;
+  LProcedureStart: UInt64;
+  LProcedureEnd: UInt64;
 begin
   // Index procedures by module once. A large report can contain thousands of
   // source ranges and symbol sections; rescanning every section per range made
@@ -498,7 +503,6 @@ begin
   try
     for var LAlignSection in AGraph.Document.AlignSymbolSections do
     begin
-      var LProcedures: TList<TDumpAlignSymbolRecord>;
       if not LProceduresByModule.TryGetValue(LAlignSection.ModIndex,
         LProcedures) then
       begin
@@ -512,7 +516,6 @@ begin
 
     for var LSourceModule in AGraph.Document.SourceModules do
     begin
-      var LProcedures: TList<TDumpAlignSymbolRecord>;
       if not LProceduresByModule.TryGetValue(LSourceModule.ModIndex,
         LProcedures) then
         Continue;
@@ -520,9 +523,6 @@ begin
         for var LSourceRange in LSourceFile.Ranges do
           for var LRecord in LProcedures do
               begin
-                var LProcedureSegment: UInt64;
-                var LProcedureStart: UInt64;
-                var LProcedureEnd: UInt64;
                 if (LRecord.Kind <> bsrkProcedure) or
                   not TryGetProcedureCodeRange(LRecord, LProcedureSegment,
                     LProcedureStart, LProcedureEnd) or
@@ -578,6 +578,11 @@ end;
 
 procedure TDumpRelationBuilder.BuildProcedureReferenceRelations(
   AGraph: TDumpRelationGraph);
+var
+  LSegment: UInt64;
+  LStartOffset: UInt64;
+  LEndOffset: UInt64;
+  LReferencedProcedure: TDumpAlignSymbolRecord;
 begin
   // A GPROCREF indexes a definition by its exact entry address.  Build that
   // lookup once so large debug tables do not repeatedly scan every procedure.
@@ -587,9 +592,6 @@ begin
     for var LAlignSection in AGraph.Document.AlignSymbolSections do
       for var LProcedure in LAlignSection.Records do
       begin
-        var LSegment: UInt64;
-        var LStartOffset: UInt64;
-        var LEndOffset: UInt64;
         if (LProcedure.Kind = bsrkProcedure) and
           TryGetProcedureCodeRange(LProcedure, LSegment, LStartOffset,
             LEndOffset) and
@@ -601,12 +603,11 @@ begin
       for var LReference in LGlobalSection.Records do
         if (LReference.Kind = bsrkProcedureReference) and LReference.HasAddress then
         begin
-          var LProcedure: TDumpAlignSymbolRecord;
           if LProcedureByAddress.TryGetValue(
-            AddressKey(LReference.Segment, LReference.Address), LProcedure) then
+            AddressKey(LReference.Segment, LReference.Address), LReferencedProcedure) then
           begin
             var LRelation := TDumpProcedureReferenceRelation.Create;
-            LRelation.ProcedureRecord := LProcedure;
+            LRelation.ProcedureRecord := LReferencedProcedure;
             LRelation.ReferenceRecord := LReference;
             LRelation.Evidence := reExplicit;
             AGraph.ProcedureReferenceRelations.Add(LRelation);
@@ -649,84 +650,94 @@ begin
 end;
 
 procedure TDumpRelationBuilder.BuildExportRelations(AGraph: TDumpRelationGraph);
+var
+  LSegment: UInt64;
+  LStartOffset: UInt64;
+  LEndOffset: UInt64;
+  LAliasGroup: TDumpExportAliasGroup;
 begin
   // Build exact-address indexes once.  Exports must match a procedure entry,
   // never an arbitrary address inside a procedure's generated-code range.
   var LProcedureByAddress :=
     TDictionary<string, TDumpAlignSymbolRecord>.Create;
-  var LReferenceByAddress :=
-    TDictionary<string, TDumpGlobalSymbolRecord>.Create;
-  var LExportCounts := TDictionary<UInt64, Integer>.Create;
-  var LAliasGroups := TDictionary<UInt64, TDumpExportAliasGroup>.Create;
   try
-    for var LAlignSection in AGraph.Document.AlignSymbolSections do
-      for var LProcedure in LAlignSection.Records do
-      begin
-        var LSegment: UInt64;
-        var LStartOffset: UInt64;
-        var LEndOffset: UInt64;
-        if (LProcedure.Kind = bsrkProcedure) and
-          TryGetProcedureCodeRange(LProcedure, LSegment, LStartOffset,
-            LEndOffset) and
-          not LProcedureByAddress.ContainsKey(AddressKey(LSegment, LStartOffset)) then
-          LProcedureByAddress.Add(AddressKey(LSegment, LStartOffset), LProcedure);
-      end;
-    for var LGlobalSection in AGraph.Document.GlobalSymbolSections do
-      for var LReference in LGlobalSection.Records do
-        if (LReference.Kind = bsrkProcedureReference) and LReference.HasAddress and
-          not LReferenceByAddress.ContainsKey(
-            AddressKey(LReference.Segment, LReference.Address)) then
-          LReferenceByAddress.Add(
-            AddressKey(LReference.Segment, LReference.Address), LReference);
-    for var LExport in AGraph.Document.ExportList do
-      if LExport.HasRVA then
-      begin
-        var LCount := 0;
-        LExportCounts.TryGetValue(LExport.RVA, LCount);
-        LExportCounts.AddOrSetValue(LExport.RVA, LCount + 1);
-      end;
+    var LReferenceByAddress :=
+      TDictionary<string, TDumpGlobalSymbolRecord>.Create;
+    try
+      var LExportCounts := TDictionary<UInt64, Integer>.Create;
+      try
+        var LAliasGroups := TDictionary<UInt64, TDumpExportAliasGroup>.Create;
+        try
+          for var LAlignSection in AGraph.Document.AlignSymbolSections do
+            for var LProcedure in LAlignSection.Records do
+            begin
+              if (LProcedure.Kind = bsrkProcedure) and
+                TryGetProcedureCodeRange(LProcedure, LSegment, LStartOffset,
+                  LEndOffset) and
+                not LProcedureByAddress.ContainsKey(AddressKey(LSegment, LStartOffset)) then
+                LProcedureByAddress.Add(AddressKey(LSegment, LStartOffset), LProcedure);
+            end;
+          for var LGlobalSection in AGraph.Document.GlobalSymbolSections do
+            for var LReference in LGlobalSection.Records do
+              if (LReference.Kind = bsrkProcedureReference) and LReference.HasAddress and
+                not LReferenceByAddress.ContainsKey(
+                  AddressKey(LReference.Segment, LReference.Address)) then
+                LReferenceByAddress.Add(
+                  AddressKey(LReference.Segment, LReference.Address), LReference);
+          for var LExport in AGraph.Document.ExportList do
+            if LExport.HasRVA then
+            begin
+              var LCount := 0;
+              LExportCounts.TryGetValue(LExport.RVA, LCount);
+              LExportCounts.AddOrSetValue(LExport.RVA, LCount + 1);
+            end;
 
-    // One target relation is produced per RVA-bearing export, even if its RVA
-    // cannot be placed in a section.  This preserves incomplete TDUMP evidence.
-    for var LExport in AGraph.Document.ExportList do
-      if LExport.HasRVA then
-      begin
-        var LRelation := TDumpExportTargetRelation.Create;
-        LRelation.ExportEntry := LExport;
-        if AGraph.TryResolveRVA(LExport.RVA, LRelation.Location) then
-        begin
-          var LAddress := AddressKey(LRelation.Location.Segment,
-            LRelation.Location.Offset);
-          LProcedureByAddress.TryGetValue(LAddress, LRelation.ProcedureRecord);
-          if LRelation.ProcedureRecord = nil then
-            LReferenceByAddress.TryGetValue(LAddress,
-              LRelation.ProcedureReference);
-          LRelation.Evidence := reAddressDerived;
-        end
-        else
-          LRelation.Evidence := reExplicit;
-        AGraph.ExportTargetRelations.Add(LRelation);
+          // One target relation is produced per RVA-bearing export, even if its RVA
+          // cannot be placed in a section.  This preserves incomplete TDUMP evidence.
+          for var LExport in AGraph.Document.ExportList do
+            if LExport.HasRVA then
+            begin
+              var LRelation := TDumpExportTargetRelation.Create;
+              LRelation.ExportEntry := LExport;
+              if AGraph.TryResolveRVA(LExport.RVA, LRelation.Location) then
+              begin
+                var LAddress := AddressKey(LRelation.Location.Segment,
+                  LRelation.Location.Offset);
+                LProcedureByAddress.TryGetValue(LAddress, LRelation.ProcedureRecord);
+                if LRelation.ProcedureRecord = nil then
+                  LReferenceByAddress.TryGetValue(LAddress,
+                    LRelation.ProcedureReference);
+                LRelation.Evidence := reAddressDerived;
+              end
+              else
+                LRelation.Evidence := reExplicit;
+              AGraph.ExportTargetRelations.Add(LRelation);
 
-        // Preserve document order while grouping duplicate implementation RVAs.
-        var LCount := 0;
-        LExportCounts.TryGetValue(LExport.RVA, LCount);
-        if LCount > 1 then
-        begin
-          var LAliasGroup: TDumpExportAliasGroup;
-          if not LAliasGroups.TryGetValue(LExport.RVA, LAliasGroup) then
-          begin
-            LAliasGroup := TDumpExportAliasGroup.Create;
-            LAliasGroup.RVA := LExport.RVA;
-            AGraph.ExportAliasGroups.Add(LAliasGroup);
-            LAliasGroups.Add(LExport.RVA, LAliasGroup);
-          end;
-          LAliasGroup.Entries.Add(LExport);
+              // Preserve document order while grouping duplicate implementation RVAs.
+              var LCount := 0;
+              LExportCounts.TryGetValue(LExport.RVA, LCount);
+              if LCount > 1 then
+              begin
+                if not LAliasGroups.TryGetValue(LExport.RVA, LAliasGroup) then
+                begin
+                  LAliasGroup := TDumpExportAliasGroup.Create;
+                  LAliasGroup.RVA := LExport.RVA;
+                  AGraph.ExportAliasGroups.Add(LAliasGroup);
+                  LAliasGroups.Add(LExport.RVA, LAliasGroup);
+                end;
+                LAliasGroup.Entries.Add(LExport);
+              end;
+            end;
+        finally
+          LAliasGroups.Free;
         end;
+      finally
+        LExportCounts.Free;
       end;
+    finally
+      LReferenceByAddress.Free;
+    end;
   finally
-    LAliasGroups.Free;
-    LExportCounts.Free;
-    LReferenceByAddress.Free;
     LProcedureByAddress.Free;
   end;
 end;
@@ -772,6 +783,8 @@ end;
 
 procedure TDumpRelationBuilder.BuildDataDefinitionRelations(
   AGraph: TDumpRelationGraph);
+var
+  LMatchingGlobalRecord: TDumpGlobalSymbolRecord;
 begin
   // Address alone can collide in imperfect dumps.  Include the display name
   // in a one-time index before joining definitions to the global-symbol index.
@@ -788,13 +801,12 @@ begin
       for var LDefinition in LAlignSection.Records do
         if (LDefinition.Kind = bsrkGlobalData) and LDefinition.HasAddress then
         begin
-          var LGlobalRecord: TDumpGlobalSymbolRecord;
           if LGlobalDataByIdentity.TryGetValue(DataDefinitionKey(LDefinition),
-            LGlobalRecord) then
+            LMatchingGlobalRecord) then
           begin
             var LRelation := TDumpDataDefinitionRelation.Create;
             LRelation.DefinitionRecord := LDefinition;
-            LRelation.GlobalRecord := LGlobalRecord;
+            LRelation.GlobalRecord := LMatchingGlobalRecord;
             AGraph.TryResolveAddress(LDefinition.Segment, LDefinition.Address,
               LRelation.Location);
             LRelation.Evidence := reExplicit;

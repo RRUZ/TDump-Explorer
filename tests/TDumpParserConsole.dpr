@@ -357,11 +357,9 @@ end;
 begin
   ReportMemoryLeaksOnShutdown := True;
   try
-    var LFileName: string;
+    var LFileName := '..\fixtures\PlainVanilla.Delphi.Package.bpl.tdump';
     if ParamCount > 0 then
-      LFileName := ParamStr(1)
-    else
-      LFileName := '..\fixtures\PlainVanilla.Delphi.Package.bpl.tdump';
+      LFileName := ParamStr(1);
 
     var LParser := TDumpParser.Create;
     try

@@ -149,28 +149,34 @@ procedure TPhosphorFont.DrawIcon(ADC: HDC; ACode: Word;
   const ADestRect: TRect; AColor: TColor; AWeight: TPhosphorFontWeight);
 begin
   var LGraphics := TGPGraphics.Create(ADC);
-  var LFont: TGPFont := nil;
-  var LBrush: TGPSolidBrush := nil;
-  var LStringFormat: TGPStringFormat := nil;
   try
     LGraphics.SetTextRenderingHint(TextRenderingHintAntiAliasGridFit);
-    LFont := TGPFont.Create(cFontNames[AWeight], ADestRect.Height,
+    var LFont := TGPFont.Create(cFontNames[AWeight], ADestRect.Height,
       FontStyleRegular, UnitPixel,
       TGPPrivateFontCollection(FFontCollections[AWeight]));
-    var LColor := ColorToRGB(AColor);
-    LBrush := TGPSolidBrush.Create(MakeColor(255, GetRValue(LColor),
-      GetGValue(LColor), GetBValue(LColor)));
-    var LRect := MakeRect(ADestRect.Left * 1.0, ADestRect.Top * 1.0,
-      ADestRect.Width * 1.0, ADestRect.Height * 1.0);
-    LStringFormat := TGPStringFormat.Create;
-    LStringFormat.SetAlignment(StringAlignmentCenter);
-    LStringFormat.SetLineAlignment(StringAlignmentCenter);
-    var LText: string := Char(ACode);
-    LGraphics.DrawString(LText, -1, LFont, LRect, LStringFormat, LBrush);
+    try
+      var LColor := ColorToRGB(AColor);
+      var LBrush := TGPSolidBrush.Create(MakeColor(255, GetRValue(LColor),
+        GetGValue(LColor), GetBValue(LColor)));
+      try
+        var LRect := MakeRect(ADestRect.Left * 1.0, ADestRect.Top * 1.0,
+          ADestRect.Width * 1.0, ADestRect.Height * 1.0);
+        var LStringFormat := TGPStringFormat.Create;
+        try
+          LStringFormat.SetAlignment(StringAlignmentCenter);
+          LStringFormat.SetLineAlignment(StringAlignmentCenter);
+          var LText: string := Char(ACode);
+          LGraphics.DrawString(LText, -1, LFont, LRect, LStringFormat, LBrush);
+        finally
+          LStringFormat.Free;
+        end;
+      finally
+        LBrush.Free;
+      end;
+    finally
+      LFont.Free;
+    end;
   finally
-    LStringFormat.Free;
-    LBrush.Free;
-    LFont.Free;
     LGraphics.Free;
   end;
 end;
@@ -180,6 +186,9 @@ function TPhosphorFont.GetIconCodes(
 const
   cPrivateUseFirst = $E000;
   cPrivateUseLast = $F8FF;
+var
+  LCharacters: TArray<WideChar>;
+  LGlyphIndexes: TArray<Word>;
 begin
   var LDC := GetDC(0);
   if LDC = 0 then
@@ -194,8 +203,6 @@ begin
       RaiseLastOSError;
     LOldFont := SelectObject(LDC, LFont);
     var LCharacterCount := cPrivateUseLast - cPrivateUseFirst + 1;
-    var LCharacters: TArray<WideChar>;
-    var LGlyphIndexes: TArray<Word>;
     SetLength(LCharacters, LCharacterCount);
     SetLength(LGlyphIndexes, LCharacterCount);
     for var LIndex := 0 to LCharacterCount - 1 do

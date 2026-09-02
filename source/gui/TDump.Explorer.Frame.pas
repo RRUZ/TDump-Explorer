@@ -153,6 +153,8 @@ type
     procedure CMStyleChanged(var AMessage: TMessage); message CM_STYLECHANGED;
     procedure ApplyTreeTheme;
     procedure ApplyTheme;
+    function DocumentIconName: string;
+    procedure UpdateDocumentIcon;
   protected
     procedure SetParent(AParent: TWinControl); override;
   public
@@ -200,8 +202,27 @@ begin
   SetLabelColor(lblSizeCaption, TExplorerTheme.ActiveTheme.InactiveText);
   SetLabelColor(lblSizeValue, TExplorerTheme.ActiveTheme.NumberColor);
 
-  VirtualImage1.ImageName := 'binary_' + if not IsLightThemeActive then 'dark' else 'light';
+  UpdateDocumentIcon;
   ApplyTreeTheme;
+end;
+
+function TDumpDocumentFrame.DocumentIconName: string;
+var
+  LExtension: string;
+begin
+  Result := 'binary';
+  if FDocument = nil then
+    Exit;
+
+  LExtension := LowerCase(ExtractFileExt(FDocument.SourceFileName));
+  if (LExtension = '.tdump') or (LExtension = '.txt') then
+    Result := 'file-text';
+end;
+
+procedure TDumpDocumentFrame.UpdateDocumentIcon;
+begin
+  VirtualImage1.ImageName := DocumentIconName + '_' +
+    if IsLightThemeActive then 'light' else 'dark';
 end;
 
 procedure TDumpDocumentFrame.ApplyTreeTheme;
@@ -367,6 +388,7 @@ begin
     lblArchitectureValue.Caption := '';
     lblTimestampValue.Caption := '';
     lblSizeValue.Caption := '';
+    UpdateDocumentIcon;
     Exit;
   end;
 
@@ -392,6 +414,7 @@ begin
     lblTimestampValue.Caption := '';
     lblSizeValue.Caption := '';
   end;
+  UpdateDocumentIcon;
 end;
 
 function TDumpDocumentFrame.EnsureHighlighterDetailControl(
@@ -995,6 +1018,9 @@ begin
 end;
 
 procedure TDumpDocumentFrame.SyncRawViewToNode(ANode: PVirtualNode);
+var
+  LStartLine: Integer;
+  LEndLine: Integer;
 begin
   if FSelectingTreeFromRawView then
     Exit;
@@ -1005,8 +1031,6 @@ begin
   end;
 
   var LNodeData := PTreeItemData(Tree.GetNodeData(ANode));
-  var LStartLine: Integer;
-  var LEndLine: Integer;
   ResolveNodeSourceSpan(LNodeData, LStartLine, LEndLine);
   frRawView.ShowLines(LStartLine, LEndLine);
 end;

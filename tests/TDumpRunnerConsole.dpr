@@ -40,6 +40,10 @@ begin
   Writeln('Unsupported structures: ', ADocument.UnsupportedStructures.Count);
 end;
 
+var
+  LInstallation: TDumpInstallation;
+  LRun: TDumpRunResult;
+
 begin
   ReportMemoryLeaksOnShutdown := True;
   try
@@ -91,7 +95,6 @@ begin
     try
       var LInstallations := LFinder.Find;
       try
-        var LInstallation: TDumpInstallation;
         if LToolRequested then
         begin
           if LToolKind = tkTDump64 then
@@ -122,7 +125,6 @@ begin
 
         var LRunner := TDumpRunner.Create;
         try
-          var LRun: TDumpRunResult;
           if LParseResult then
           begin
             if LUseBestOptions then

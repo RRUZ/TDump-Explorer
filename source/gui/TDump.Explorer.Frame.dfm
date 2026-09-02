@@ -386,6 +386,10 @@ object DumpDocumentFrame: TDumpDocumentFrame
         StyleElements = [seFont, seClient, seBorder]
         ExplicitTop = 0
       end
+      inherited lblFilterMatches: TLabel
+        Left = 666
+        Height = 32
+      end
       inherited SearchFilterBox: TSearchBox
         Left = 883
         Top = 2

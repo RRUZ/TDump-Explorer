@@ -146,6 +146,8 @@ class procedure TPEView.PopulateRelocationBlock(AControl: THighlighterControl;
   ABlock: TDumpRelocationBlock);
 const
   cRelocationsPerRow = 4;
+var
+  LColumns: TArray<string>;
 begin
   if (AControl = nil) or (ABlock = nil) then Exit;
   AControl.ParserMode := tpmTDumpValues;
@@ -164,7 +166,6 @@ begin
       tpmTDumpValues, tpmTDumpValues, tpmTDumpValues, tpmTDumpValues,
       tpmTDumpValues, tpmTDumpValues, tpmTDumpValues, tpmTDumpValues]);
 
-    var LColumns: TArray<string>;
     SetLength(LColumns, cRelocationsPerRow * 2);
     for var LEntryIndex := 0 to ABlock.Entries.Count - 1 do
     begin

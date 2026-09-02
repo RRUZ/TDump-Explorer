@@ -554,6 +554,8 @@ end;
 
 procedure TDocumentTreeBuilder.AddELFNodes(AParent: PVirtualNode;
   ADocument: TDumpDocument);
+var
+  LSectionEntryCount: Integer;
 begin
   if (ADocument.FileKind = dfELFObject) and (ADocument.Symbols.Count > 0) then
     AddNode(AParent, Format('Symbol Table [%d symbols]',
@@ -570,27 +572,29 @@ begin
   var LRelocationsNode := AddNode(AParent, Format('Relocations [%d entries]',
     [ADocument.ELFRelocations.Count]), tdkELFRelocations);
   var LSectionCounts := TDictionary<string, Integer>.Create;
-  var LSectionOrder := TList<string>.Create;
   try
-    for var LRelocation in ADocument.ELFRelocations do
-    begin
-      var LEntryCount := 0;
-      if not LSectionCounts.TryGetValue(LRelocation.SectionName, LEntryCount) then
-        LSectionOrder.Add(LRelocation.SectionName);
-      LSectionCounts.AddOrSetValue(LRelocation.SectionName, LEntryCount + 1);
-    end;
-    for var LSectionName in LSectionOrder do
-    begin
-      var LEntryCount: Integer;
-      LSectionCounts.TryGetValue(LSectionName, LEntryCount);
-      var LSectionNode := AddNode(LRelocationsNode,
-        Format('%s [%d entries]', [LSectionName, LEntryCount]),
-        tdkELFRelocations);
-      PTreeItemData(FTree.GetNodeData(LSectionNode))^
-        .ELFRelocationSectionName := LSectionName;
+    var LSectionOrder := TList<string>.Create;
+    try
+      for var LRelocation in ADocument.ELFRelocations do
+      begin
+        var LEntryCount := 0;
+        if not LSectionCounts.TryGetValue(LRelocation.SectionName, LEntryCount) then
+          LSectionOrder.Add(LRelocation.SectionName);
+        LSectionCounts.AddOrSetValue(LRelocation.SectionName, LEntryCount + 1);
+      end;
+      for var LSectionName in LSectionOrder do
+      begin
+        LSectionCounts.TryGetValue(LSectionName, LSectionEntryCount);
+        var LSectionNode := AddNode(LRelocationsNode,
+          Format('%s [%d entries]', [LSectionName, LSectionEntryCount]),
+          tdkELFRelocations);
+        PTreeItemData(FTree.GetNodeData(LSectionNode))^
+          .ELFRelocationSectionName := LSectionName;
+      end;
+    finally
+      LSectionOrder.Free;
     end;
   finally
-    LSectionOrder.Free;
     LSectionCounts.Free;
   end;
 end;

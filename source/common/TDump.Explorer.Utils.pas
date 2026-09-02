@@ -88,13 +88,14 @@ begin
 end;
 
 function GetExecutableVersion(const AFileName: string): string;
+var
+  LVersionInfo: TBytes;
 begin
   var LHandle: DWORD := 0;
   var LVersionInfoSize := GetFileVersionInfoSize(PChar(AFileName), LHandle);
   if LVersionInfoSize = 0 then
     Exit('');
 
-  var LVersionInfo: TBytes;
   SetLength(LVersionInfo, LVersionInfoSize);
   if not GetFileVersionInfo(PChar(AFileName), 0, LVersionInfoSize,
     @LVersionInfo[0]) then
@@ -139,62 +140,68 @@ begin
     Exit('');
 
   try
-    if not SetHandleInformation(LReadPipe, HANDLE_FLAG_INHERIT, 0) then
-      Exit('');
-
-    ZeroMemory(@LStartupInfo, SizeOf(LStartupInfo));
-    LStartupInfo.cb := SizeOf(LStartupInfo);
-    LStartupInfo.dwFlags := STARTF_USESHOWWINDOW or STARTF_USESTDHANDLES;
-    LStartupInfo.wShowWindow := SW_HIDE;
-    LStartupInfo.hStdInput := GetStdHandle(STD_INPUT_HANDLE);
-    LStartupInfo.hStdOutput := LWritePipe;
-    LStartupInfo.hStdError := LWritePipe;
-
-    LCommandLine := Format('"%s" %s', [AExecutableFileName, AParameters]);
-    UniqueString(LCommandLine);
-    ZeroMemory(@LProcessInfo, SizeOf(LProcessInfo));
-    if not CreateProcess(nil, PChar(LCommandLine), nil, nil, True,
-      CREATE_NO_WINDOW, nil, PChar(ExtractFileDir(AExecutableFileName)),
-      LStartupInfo, LProcessInfo) then
-      Exit('');
-
     try
-      CloseHandle(LWritePipe);
-      LWritePipe := 0;
-      SetLength(LBuffer, cBufferSize);
-      repeat
-        while PeekNamedPipe(LReadPipe, nil, 0, nil, @LAvailable, nil) and
-          (LAvailable > 0) do
-        begin
-          LBytesToRead := LAvailable;
-          if LBytesToRead > cBufferSize then
-            LBytesToRead := cBufferSize;
-          if not ReadFile(LReadPipe, LBuffer[0], LBytesToRead, LBytesRead, nil) or
-            (LBytesRead = 0) then
-            Break;
-          Result := Result + TEncoding.Default.GetString(LBuffer, 0, LBytesRead);
-        end;
-        LWaitResult := WaitForSingleObject(LProcessInfo.hProcess, 10);
-      until LWaitResult <> WAIT_TIMEOUT;
+      if not SetHandleInformation(LReadPipe, HANDLE_FLAG_INHERIT, 0) then
+        Exit('');
 
-      while PeekNamedPipe(LReadPipe, nil, 0, nil, @LAvailable, nil) and
-        (LAvailable > 0) do
-      begin
-        LBytesToRead := LAvailable;
-        if LBytesToRead > cBufferSize then
-          LBytesToRead := cBufferSize;
-        if not ReadFile(LReadPipe, LBuffer[0], LBytesToRead, LBytesRead, nil) or
-          (LBytesRead = 0) then
-          Break;
-        Result := Result + TEncoding.Default.GetString(LBuffer, 0, LBytesRead);
+      ZeroMemory(@LStartupInfo, SizeOf(LStartupInfo));
+      LStartupInfo.cb := SizeOf(LStartupInfo);
+      LStartupInfo.dwFlags := STARTF_USESHOWWINDOW or STARTF_USESTDHANDLES;
+      LStartupInfo.wShowWindow := SW_HIDE;
+      LStartupInfo.hStdInput := GetStdHandle(STD_INPUT_HANDLE);
+      LStartupInfo.hStdOutput := LWritePipe;
+      LStartupInfo.hStdError := LWritePipe;
+
+      LCommandLine := Format('"%s" %s', [AExecutableFileName, AParameters]);
+      UniqueString(LCommandLine);
+      ZeroMemory(@LProcessInfo, SizeOf(LProcessInfo));
+      if not CreateProcess(nil, PChar(LCommandLine), nil, nil, True,
+        CREATE_NO_WINDOW, nil, PChar(ExtractFileDir(AExecutableFileName)),
+        LStartupInfo, LProcessInfo) then
+        Exit('');
+
+      try
+        try
+          CloseHandle(LWritePipe);
+          LWritePipe := 0;
+          SetLength(LBuffer, cBufferSize);
+          repeat
+            while PeekNamedPipe(LReadPipe, nil, 0, nil, @LAvailable, nil) and
+              (LAvailable > 0) do
+            begin
+              LBytesToRead := LAvailable;
+              if LBytesToRead > cBufferSize then
+                LBytesToRead := cBufferSize;
+              if not ReadFile(LReadPipe, LBuffer[0], LBytesToRead, LBytesRead, nil) or
+                (LBytesRead = 0) then
+                Break;
+              Result := Result + TEncoding.Default.GetString(LBuffer, 0, LBytesRead);
+            end;
+            LWaitResult := WaitForSingleObject(LProcessInfo.hProcess, 10);
+          until LWaitResult <> WAIT_TIMEOUT;
+
+          while PeekNamedPipe(LReadPipe, nil, 0, nil, @LAvailable, nil) and
+            (LAvailable > 0) do
+          begin
+            LBytesToRead := LAvailable;
+            if LBytesToRead > cBufferSize then
+              LBytesToRead := cBufferSize;
+            if not ReadFile(LReadPipe, LBuffer[0], LBytesToRead, LBytesRead, nil) or
+              (LBytesRead = 0) then
+              Break;
+            Result := Result + TEncoding.Default.GetString(LBuffer, 0, LBytesRead);
+          end;
+        finally
+          CloseHandle(LProcessInfo.hThread);
+        end;
+      finally
+        CloseHandle(LProcessInfo.hProcess);
       end;
     finally
-      CloseHandle(LProcessInfo.hThread);
-      CloseHandle(LProcessInfo.hProcess);
+      if LWritePipe <> 0 then
+        CloseHandle(LWritePipe);
     end;
   finally
-    if LWritePipe <> 0 then
-      CloseHandle(LWritePipe);
     if LReadPipe <> 0 then
       CloseHandle(LReadPipe);
   end;

@@ -1342,9 +1342,8 @@ end;
 
 function LastToken(var S: string): string;
 begin
-  var LIndex: Integer;
   S := TrimRight(S);
-  LIndex := Length(S);
+  var LIndex: Integer := Length(S);
   while (LIndex > 0) and not CharInSet(S[LIndex], [' ', #9]) do
     Dec(LIndex);
   Result := Copy(S, LIndex + 1, MaxInt);
@@ -1353,9 +1352,8 @@ end;
 
 function FirstToken(var S: string): string;
 begin
-  var LIndex: Integer;
   S := TrimLeft(S);
-  LIndex := 1;
+  var LIndex: Integer := 1;
   while (LIndex <= Length(S)) and not CharInSet(S[LIndex], [' ', #9]) do
     Inc(LIndex);
   Result := Copy(S, 1, LIndex - 1);
@@ -2206,6 +2204,8 @@ begin
 end;
 
 function TDumpParser.ClassifyTDumpLine(const ALine: string): TDumpLineKind;
+var
+  LNameIndex: UInt64;
 begin
   var LTrimmed := Trim(ALine);
   if LTrimmed = '' then
@@ -2232,7 +2232,6 @@ begin
     Exit(tlkGlobalTypeDetail);
   if (Length(LTrimmed) > 5) and (LTrimmed[5] = ':') then
   begin
-    var LNameIndex: UInt64;
     if TryParseHexUIntToken(Copy(LTrimmed, 1, 4), LNameIndex) then
       Exit(tlkNameEntry);
   end;
@@ -2793,8 +2792,9 @@ end;
 
 procedure TDumpParser.AddDiagnostic(ASeverity: TDumpDiagnosticSeverity;
   ALineNumber: Integer; const AMessage, ARawLine: string);
+var
+  LDiagnostic: TDumpDiagnostic;
 begin
-  var LDiagnostic: TDumpDiagnostic;
   LDiagnostic.Severity := ASeverity;
   LDiagnostic.LineNumber := ALineNumber;
   LDiagnostic.Message := AMessage;
@@ -2864,8 +2864,9 @@ begin
 end;
 
 procedure TDumpParser.BuildGenericFallbackBlocks;
+var
+  LCoveredLines: TArray<Boolean>;
 begin
-  var LCoveredLines: TArray<Boolean>;
   SetLength(LCoveredLines, FLines.Count);
   var LHasSemanticNode := False;
   for var LNode in FDocument.Nodes do
@@ -2993,6 +2994,8 @@ begin
 end;
 
 procedure TDumpParser.ParseOldExecutableHeader;
+var
+  LProperty: TDumpProperty;
 begin
   var LHeaderStart := FMarkerLines[lmOldExecutableHeader];
 
@@ -3021,7 +3024,6 @@ begin
       var LLine := FLines[LIndex];
       if (LIndex = LHeaderStart) or (Trim(LLine) = '') then
         Continue;
-      var LProperty: TDumpProperty;
       if TryParsePropertyLine(LLine, LIndex + 1, LProperty) then
       begin
         LHeader.Properties.Add(LProperty);
@@ -3037,6 +3039,9 @@ begin
 end;
 
 procedure TDumpParser.ParsePortableExecutableHeader;
+var
+  LDirectory: TDumpDataDirectory;
+  LProperty: TDumpProperty;
 begin
   var LHeaderStart := FMarkerLines[lmPortableExecutableHeader];
   if LHeaderStart < 0 then
@@ -3081,8 +3086,6 @@ begin
       begin
         if (Trim(LLine) = '') or (Pos('----', LLine) > 0) then
           Continue;
-        var LDirectory: TDumpDataDirectory;
-        var LProperty: TDumpProperty;
         if TryParseDataDirectoryLine(LLine, LIndex + 1, LDirectoryIndex,
           LDirectory, LProperty) then
         begin
@@ -3101,7 +3104,6 @@ begin
         Continue;
       end;
 
-      var LProperty: TDumpProperty;
       if TryParsePropertyLine(LLine, LIndex + 1, LProperty) then
       begin
         LHeader.Properties.Add(LProperty);
@@ -3120,6 +3122,10 @@ begin
 end;
 
 procedure TDumpParser.ParseObjectTable;
+var
+  LDescriptionProperty: TDumpProperty;
+  LSection: TDumpSection;
+  LProperty: TDumpProperty;
 begin
   var LTableStart := FMarkerLines[lmObjectTable];
   if LTableStart < 0 then
@@ -3162,7 +3168,6 @@ begin
       // before the first "Section:" block. It is not an object-table row.
       if StartsWithText(LTrimmedLine, 'Description:') then
       begin
-        var LDescriptionProperty: TDumpProperty;
         if TryParsePropertyLine(LLine, LIndex + 1, LDescriptionProperty) then
         begin
           LNode.Properties.Add(LDescriptionProperty);
@@ -3171,8 +3176,6 @@ begin
         Continue;
       end;
 
-      var LSection: TDumpSection;
-      var LProperty: TDumpProperty;
       if TryParseObjectTableLine(LLine, LIndex + 1, LSection, LProperty) then
       begin
         FDocument.Sections.Add(LSection);
@@ -3189,6 +3192,9 @@ begin
 end;
 
 procedure TDumpParser.ParseImportSection;
+var
+  LProperty: TDumpProperty;
+  LImport: TDumpImport;
 begin
   var LSectionStart := FMarkerLines[lmImportSection];
   var LCompactMode := LSectionStart < 0;
@@ -3396,7 +3402,6 @@ begin
 
       if LCurrentModule = nil then
       begin
-        var LProperty: TDumpProperty;
         if TryParsePropertyLine(LLine, LIndex + 1, LProperty) then
         begin
           LNode.Properties.Add(LProperty);
@@ -3422,7 +3427,6 @@ begin
 
       if LDelayedMode then
       begin
-        var LProperty: TDumpProperty;
         if TryParsePropertyLine(LLine, LIndex + 1, LProperty) then
         begin
           LCurrentModule.Properties.Add(LProperty);
@@ -3432,14 +3436,12 @@ begin
         end;
       end;
 
-      var LImport: TDumpImport;
       if TryParseImportLine(LLine, LIndex + 1, LImport) then
       begin
         LImport.SourceSpan.SyntaxHint := rshCppBuilderMethod;
         LCurrentModule.Entries.Add(LImport);
         if LModuleNode <> nil then
         begin
-          var LProperty: TDumpProperty;
           LProperty.Name := LImport.Name;
           LProperty.RawValue := LImport.RawText;
           LProperty.ValueKind := vkText;
@@ -3472,6 +3474,10 @@ begin
 end;
 
 procedure TDumpParser.ParseExportSection;
+var
+  LMetadataProperty: TDumpProperty;
+  LExport: TDumpExport;
+  LProperty: TDumpProperty;
 begin
   var LSectionStart := FMarkerLines[lmExportSection];
   var LCompactMode := LSectionStart < 0;
@@ -3553,7 +3559,6 @@ begin
         end;
         Continue;
       end;
-      var LMetadataProperty: TDumpProperty;
       if TryParsePropertyLine(LLine, LIndex + 1, LMetadataProperty) then
       begin
         FDocument.ExportMetadata.Properties.Add(LMetadataProperty);
@@ -3574,13 +3579,11 @@ begin
         (Pos('exported name(s)', LowerCase(LTrimmed)) > 0) then
         Continue;
 
-      var LExport: TDumpExport;
       if TryParseExportLine(LLine, LIndex + 1, LExport) then
       begin
         LExport.SourceSpan.SyntaxHint := rshCppBuilderMethod;
         FDocument.ExportList.Add(LExport);
 
-        var LProperty: TDumpProperty;
         LProperty.Name := LExport.Name;
         LProperty.RawValue := LExport.RawText;
         LProperty.ValueKind := vkRVA;
@@ -3594,6 +3597,14 @@ begin
 end;
 
 procedure TDumpParser.ParseResourceSection;
+var
+  LIndent: Integer;
+  LResource: TDumpResource;
+  LProperty: TDumpProperty;
+  LMetadataProperty: TDumpProperty;
+  LNamedCount: UInt64;
+  LIdCount: UInt64;
+  LHexValue: UInt64;
 begin
   var LSectionStart := FMarkerLines[lmResourceSection];
   if LSectionStart < 0 then
@@ -3632,147 +3643,148 @@ begin
   FDocument.ResourceMetadata.StartLine := LSectionStart + 1;
   FDocument.ResourceMetadata.EndLine := LSectionEnd + 1;
   var LResourceStack := TList<TDumpResource>.Create;
-  var LNodeStack := TList<TDumpNode>.Create;
-  var LIndentStack := TList<Integer>.Create;
   try
-    for var LIndex := LSectionStart to LSectionEnd do
-    begin
-      var LLine := FLines[LIndex];
-      var LTrimmed := Trim(LLine);
-      var LIndent: Integer;
-      var LResource: TDumpResource;
-      var LProperty: TDumpProperty;
-      var LMetadataProperty: TDumpProperty;
-      if TryParsePropertyLine(LLine, LIndex + 1, LMetadataProperty) then
-      begin
-        FDocument.ResourceMetadata.Properties.Add(LMetadataProperty);
-        if SameText(LMetadataProperty.Name, 'File Offset') then
+    var LNodeStack := TList<TDumpNode>.Create;
+    try
+      var LIndentStack := TList<Integer>.Create;
+      try
+        for var LIndex := LSectionStart to LSectionEnd do
         begin
-          var LFileOffsetText := LMetadataProperty.RawValue;
-          FDocument.ResourceMetadata.RawFileOffset := FirstToken(LFileOffsetText);
-          FDocument.ResourceMetadata.HasFileOffset := TryParseHexUIntToken(
-            FDocument.ResourceMetadata.RawFileOffset,
-            FDocument.ResourceMetadata.FileOffset);
-        end;
-      end;
-      if TryParseResourceLine(LLine, LIndex + 1, LIndent, LResource) then
-      begin
-        while (LIndentStack.Count > 0) and (LIndent <= LIndentStack.Last) do
-        begin
-          LResourceStack.Last.EndLine := LIndex;
-          LResourceStack.Delete(LResourceStack.Count - 1);
-          LNodeStack.Delete(LNodeStack.Count - 1);
-          LIndentStack.Delete(LIndentStack.Count - 1);
-        end;
-
-        var LResourceNode := TDumpNode.Create;
-        LResourceNode.Kind := nkResources;
-        LResourceNode.Title := LResource.Name;
-        LResourceNode.StartLine := LIndex + 1;
-        LResourceNode.EndLine := LIndex + 1;
-        for var LPropertyIndex := 0 to LResource.Properties.Count - 1 do
-          LResourceNode.Properties.Add(LResource.Properties[LPropertyIndex]);
-        if LResourceStack.Count = 0 then
-        begin
-          FDocument.Resources.Add(LResource);
-          LNode.Children.Add(LResourceNode);
-        end
-        else
-        begin
-          LResourceStack.Last.Children.Add(LResource);
-          LNodeStack.Last.Children.Add(LResourceNode);
-        end;
-        LResourceStack.Add(LResource);
-        LNodeStack.Add(LResourceNode);
-        LIndentStack.Add(LIndent);
-        Continue;
-      end;
-
-      if StartsWithText(LTrimmed, '[') and
-        (Pos('named entries', LTrimmed) > 0) and (Pos('ID entries', LTrimmed) > 0) then
-      begin
-        var LCountsText := Copy(LTrimmed, 2, MaxInt);
-        var LNamedText := FirstToken(LCountsText);
-        var LCommaPos := Pos(',', LCountsText);
-        if LCommaPos > 0 then
-          LCountsText := Trim(Copy(LCountsText, LCommaPos + 1, MaxInt));
-        var LIdText := FirstToken(LCountsText);
-        var LNamedCount: UInt64;
-        var LIdCount: UInt64;
-        if TryParseNumericToken(LNamedText, ncDecimal, LNamedCount) and
-          TryParseNumericToken(LIdText, ncDecimal, LIdCount) then
-        begin
-          if LResourceStack.Count > 0 then
+          var LLine := FLines[LIndex];
+          var LTrimmed := Trim(LLine);
+          if TryParsePropertyLine(LLine, LIndex + 1, LMetadataProperty) then
           begin
-            LResourceStack.Last.NamedEntryCount := LNamedCount;
-            LResourceStack.Last.IdEntryCount := LIdCount;
-            LResourceStack.Last.HasDirectoryCounts := True;
+            FDocument.ResourceMetadata.Properties.Add(LMetadataProperty);
+            if SameText(LMetadataProperty.Name, 'File Offset') then
+            begin
+              var LFileOffsetText := LMetadataProperty.RawValue;
+              FDocument.ResourceMetadata.RawFileOffset := FirstToken(LFileOffsetText);
+              FDocument.ResourceMetadata.HasFileOffset := TryParseHexUIntToken(
+                FDocument.ResourceMetadata.RawFileOffset,
+                FDocument.ResourceMetadata.FileOffset);
+            end;
+          end;
+          if TryParseResourceLine(LLine, LIndex + 1, LIndent, LResource) then
+          begin
+            while (LIndentStack.Count > 0) and (LIndent <= LIndentStack.Last) do
+            begin
+              LResourceStack.Last.EndLine := LIndex;
+              LResourceStack.Delete(LResourceStack.Count - 1);
+              LNodeStack.Delete(LNodeStack.Count - 1);
+              LIndentStack.Delete(LIndentStack.Count - 1);
+            end;
+
+            var LResourceNode := TDumpNode.Create;
+            LResourceNode.Kind := nkResources;
+            LResourceNode.Title := LResource.Name;
+            LResourceNode.StartLine := LIndex + 1;
+            LResourceNode.EndLine := LIndex + 1;
+            for var LPropertyIndex := 0 to LResource.Properties.Count - 1 do
+              LResourceNode.Properties.Add(LResource.Properties[LPropertyIndex]);
+            if LResourceStack.Count = 0 then
+            begin
+              FDocument.Resources.Add(LResource);
+              LNode.Children.Add(LResourceNode);
+            end
+            else
+            begin
+              LResourceStack.Last.Children.Add(LResource);
+              LNodeStack.Last.Children.Add(LResourceNode);
+            end;
+            LResourceStack.Add(LResource);
+            LNodeStack.Add(LResourceNode);
+            LIndentStack.Add(LIndent);
+            Continue;
+          end;
+
+          if StartsWithText(LTrimmed, '[') and
+            (Pos('named entries', LTrimmed) > 0) and (Pos('ID entries', LTrimmed) > 0) then
+          begin
+            var LCountsText := Copy(LTrimmed, 2, MaxInt);
+            var LNamedText := FirstToken(LCountsText);
+            var LCommaPos := Pos(',', LCountsText);
+            if LCommaPos > 0 then
+              LCountsText := Trim(Copy(LCountsText, LCommaPos + 1, MaxInt));
+            var LIdText := FirstToken(LCountsText);
+            if TryParseNumericToken(LNamedText, ncDecimal, LNamedCount) and
+              TryParseNumericToken(LIdText, ncDecimal, LIdCount) then
+            begin
+              if LResourceStack.Count > 0 then
+              begin
+                LResourceStack.Last.NamedEntryCount := LNamedCount;
+                LResourceStack.Last.IdEntryCount := LIdCount;
+                LResourceStack.Last.HasDirectoryCounts := True;
+              end
+              else
+              begin
+                FDocument.ResourceMetadata.RootNamedEntryCount := LNamedCount;
+                FDocument.ResourceMetadata.RootIdEntryCount := LIdCount;
+                FDocument.ResourceMetadata.HasRootDirectoryCounts := True;
+              end;
+            end;
+            Continue;
+          end;
+
+          if (LResourceStack.Count = 0) or not TryParsePropertyLine(LLine, LIndex + 1, LProperty) then
+            Continue;
+
+          LResourceStack.Last.Properties.Add(LProperty);
+          LResourceStack.Last.EndLine := LIndex + 1;
+          LNodeStack.Last.Properties.Add(LProperty);
+          LNodeStack.Last.EndLine := LIndex + 1;
+          if SameText(LProperty.Name, 'Size') and TryParseHexUIntToken(
+            FirstToken(LProperty.RawValue), LHexValue) then
+          begin
+            LResourceStack.Last.Size := LHexValue;
+            LResourceStack.Last.HasSize := True;
           end
-          else
+          else if SameText(LProperty.Name, 'Offset') and TryParseHexUIntToken(
+            FirstToken(LProperty.RawValue), LHexValue) then
           begin
-            FDocument.ResourceMetadata.RootNamedEntryCount := LNamedCount;
-            FDocument.ResourceMetadata.RootIdEntryCount := LIdCount;
-            FDocument.ResourceMetadata.HasRootDirectoryCounts := True;
+            LResourceStack.Last.RVA := LHexValue;
+            LResourceStack.Last.HasRVA := True;
+            LResourceStack.Last.DataOffset := LHexValue;
+            LResourceStack.Last.HasDataOffset := True;
+            if SameText(LResourceStack.Last.ResourceType, 'Unknown') and
+              LResourceStack.Last.HasId then
+            begin
+              LResourceStack.Last.RawLanguage := IntToStr(LResourceStack.Last.Id);
+              LResourceStack.Last.Language := LResourceStack.Last.RawLanguage;
+            end;
+          end
+          else if SameText(LProperty.Name, 'Code Page') and TryParseHexUIntToken(
+            FirstToken(LProperty.RawValue), LHexValue) then
+          begin
+            LResourceStack.Last.CodePage := LHexValue;
+            LResourceStack.Last.HasCodePage := True;
+          end
+          else if SameText(LProperty.Name, 'Reserved') and TryParseHexUIntToken(
+            FirstToken(LProperty.RawValue), LHexValue) then
+          begin
+            LResourceStack.Last.Reserved := LHexValue;
+            LResourceStack.Last.HasReserved := True;
           end;
         end;
-        Continue;
-      end;
-
-      if (LResourceStack.Count = 0) or not TryParsePropertyLine(LLine, LIndex + 1, LProperty) then
-        Continue;
-
-      LResourceStack.Last.Properties.Add(LProperty);
-      LResourceStack.Last.EndLine := LIndex + 1;
-      LNodeStack.Last.Properties.Add(LProperty);
-      LNodeStack.Last.EndLine := LIndex + 1;
-      var LHexValue: UInt64;
-      if SameText(LProperty.Name, 'Size') and TryParseHexUIntToken(
-        FirstToken(LProperty.RawValue), LHexValue) then
-      begin
-        LResourceStack.Last.Size := LHexValue;
-        LResourceStack.Last.HasSize := True;
-      end
-      else if SameText(LProperty.Name, 'Offset') and TryParseHexUIntToken(
-        FirstToken(LProperty.RawValue), LHexValue) then
-      begin
-        LResourceStack.Last.RVA := LHexValue;
-        LResourceStack.Last.HasRVA := True;
-        LResourceStack.Last.DataOffset := LHexValue;
-        LResourceStack.Last.HasDataOffset := True;
-        if SameText(LResourceStack.Last.ResourceType, 'Unknown') and
-          LResourceStack.Last.HasId then
+        while LResourceStack.Count > 0 do
         begin
-          LResourceStack.Last.RawLanguage := IntToStr(LResourceStack.Last.Id);
-          LResourceStack.Last.Language := LResourceStack.Last.RawLanguage;
+          LResourceStack.Last.EndLine := LSectionEnd + 1;
+          LResourceStack.Delete(LResourceStack.Count - 1);
+          LIndentStack.Delete(LIndentStack.Count - 1);
         end;
-      end
-      else if SameText(LProperty.Name, 'Code Page') and TryParseHexUIntToken(
-        FirstToken(LProperty.RawValue), LHexValue) then
-      begin
-        LResourceStack.Last.CodePage := LHexValue;
-        LResourceStack.Last.HasCodePage := True;
-      end
-      else if SameText(LProperty.Name, 'Reserved') and TryParseHexUIntToken(
-        FirstToken(LProperty.RawValue), LHexValue) then
-      begin
-        LResourceStack.Last.Reserved := LHexValue;
-        LResourceStack.Last.HasReserved := True;
+      finally
+        LIndentStack.Free;
       end;
-    end;
-    while LResourceStack.Count > 0 do
-    begin
-      LResourceStack.Last.EndLine := LSectionEnd + 1;
-      LResourceStack.Delete(LResourceStack.Count - 1);
-      LIndentStack.Delete(LIndentStack.Count - 1);
+    finally
+      LNodeStack.Free;
     end;
   finally
-    LIndentStack.Free;
-    LNodeStack.Free;
     LResourceStack.Free;
   end;
 end;
 
 procedure TDumpParser.ParseRelocationSection;
+var
+  LRelocation: TDumpRelocation;
 begin
   var LSectionStart := FMarkerLines[lmFixupTable];
   if LSectionStart < 0 then
@@ -3811,7 +3823,6 @@ begin
         if LRelocationType = '' then
           Break;
         var LOffsetText := FirstToken(LEntryText);
-        var LRelocation: TDumpRelocation;
         if not TryParseRelocationEntry(LRelocationType + ' ' + LOffsetText,
           LIndex + 1, LBlockIndex, LPageRVA, LBlockSize, LRelocation) then
         begin
@@ -3831,6 +3842,14 @@ begin
 end;
 
 procedure TDumpParser.ParseBorlandSymbolIndex;
+var
+  LDirectoryEntry: TDumpSymbolSubsection;
+  LModIndex: Integer;
+  LFileOffset: UInt64;
+  LSubsectionType: string;
+  LRecordOffset: UInt64;
+  LSourceFile: TDumpSourceFile;
+  LSourceRange: TDumpSourceRange;
 begin
   var LTableStart := FMarkerLines[lmBorlandSymbols];
   if LTableStart < 0 then
@@ -3872,7 +3891,6 @@ begin
     end;
     if LInDirectory and StartsWithText(LTrimmed, 'ModIndex:') then
     begin
-      var LDirectoryEntry: TDumpSymbolSubsection;
       if TryParseBorlandSubsectionDirectoryLine(LLine, LIndex + 1,
         LDirectoryEntry) then
         FDocument.SymbolSubsections.Add(LDirectoryEntry);
@@ -3882,9 +3900,6 @@ begin
     if StartsWithText(LTrimmed, 'ModIndex:') and
       (Pos(' sst', LTrimmed) > 0) then
     begin
-      var LModIndex: Integer;
-      var LFileOffset: UInt64;
-      var LSubsectionType: string;
       if not TryParseBorlandSubsectionHeader(LLine, LModIndex, LFileOffset,
         LSubsectionType) then
         Continue;
@@ -3968,7 +3983,6 @@ begin
       var LIsRecord := False;
       if LRecordPos > 1 then
       begin
-        var LRecordOffset: UInt64;
         LIsRecord := TryParseHexUIntToken(
           Trim(Copy(LTrimmed, 1, LRecordPos - 1)), LRecordOffset);
       end;
@@ -4022,7 +4036,6 @@ begin
       var LIsRecord := False;
       if LRecordPos > 1 then
       begin
-        var LRecordOffset: UInt64;
         LIsRecord := TryParseHexUIntToken(
           Trim(Copy(LTrimmed, 1, LRecordPos - 1)), LRecordOffset);
       end;
@@ -4055,7 +4068,6 @@ begin
       var LIsTypeRecord := False;
       if LTypePos > 1 then
       begin
-        var LRecordOffset: UInt64;
         LIsTypeRecord := TryParseHexUIntToken(
           Trim(Copy(LTrimmed, 1, LTypePos - 1)), LRecordOffset);
       end;
@@ -4085,7 +4097,6 @@ begin
       LCurrentSourceModule.EndLine := LIndex + 1;
       if StartsWithText(LTrimmed, 'File:') then
       begin
-        var LSourceFile: TDumpSourceFile;
         if TryParseBorlandSourceFileLine(LLine, LIndex + 1, LSourceFile) then
         begin
           LCurrentSourceModule.SourceFiles.Add(LSourceFile);
@@ -4097,7 +4108,6 @@ begin
       else if StartsWithText(LTrimmed, 'Range:') and
         (LCurrentSourceFile <> nil) then
       begin
-        var LSourceRange: TDumpSourceRange;
         if TryParseBorlandSourceRangeLine(LLine, LIndex + 1, LSourceRange) then
         begin
           LCurrentSourceFile.Ranges.Add(LSourceRange);
@@ -4109,7 +4119,6 @@ begin
         LReadingSourceLines := True
       else if (LCurrentSourceFile = nil) then
       begin
-        var LSourceRange: TDumpSourceRange;
         if TryParseBorlandSourceRangeLine(LLine, LIndex + 1, LSourceRange) then
           LCurrentSourceModule.SegmentRanges.Add(LSourceRange)
         else if LReadingSourceLines and (LCurrentSourceRange <> nil) then
@@ -4149,6 +4158,23 @@ begin
 end;
 
 procedure TDumpParser.ParseBorlandSymbolTable;
+var
+  LProperty: TDumpProperty;
+  LSymbol: TDumpSymbol;
+  LSymbolSearch: TDumpSymbolSearch;
+  LSourceFile: TDumpSourceFile;
+  LSourceRange: TDumpSourceRange;
+  LSubsection: TDumpSymbolSubsection;
+  LSubsectionModIndex: Integer;
+  LSubsectionFileOffset: UInt64;
+  LSubsectionType: string;
+  LValue: UInt64;
+  LModuleSegment: TDumpSymbolModuleSegment;
+  LNameIndex: UInt64;
+  LBorlandName: TDumpBorlandName;
+  LGlobalProperty: TDumpProperty;
+  LGlobalTypeRecord: TDumpGlobalTypeRecord;
+  LRecordOffset: UInt64;
 begin
   var LTableStart := FMarkerLines[lmBorlandSymbols];
   if LTableStart < 0 then
@@ -4182,11 +4208,6 @@ begin
     begin
       var LLine := FLines[LIndex];
       var LTrimmed := Trim(LLine);
-      var LProperty: TDumpProperty;
-      var LSymbol: TDumpSymbol;
-      var LSymbolSearch: TDumpSymbolSearch;
-      var LSourceFile: TDumpSourceFile;
-      var LSourceRange: TDumpSourceRange;
       if Assigned(FOnProgress) then
         ReportProgress(ppBorlandSymbols, LIndex + 1);
 
@@ -4233,7 +4254,6 @@ begin
       if LInSubsectionDirectory and StartsWithText(LTrimmed, 'ModIndex:') then
       begin
         LDirectoryNode.EndLine := LIndex + 1;
-        var LSubsection: TDumpSymbolSubsection;
         if TryParseBorlandSubsectionDirectoryLine(LLine, LIndex + 1, LSubsection) then
         begin
           FDocument.SymbolSubsections.Add(LSubsection);
@@ -4278,9 +4298,6 @@ begin
         if LCurrentBorlandSubsection <> nil then
           LCurrentBorlandSubsection.EndLine := LIndex;
 
-        var LSubsectionModIndex: Integer;
-        var LSubsectionFileOffset: UInt64;
-        var LSubsectionType: string;
         if not TryParseBorlandSubsectionHeader(LLine, LSubsectionModIndex,
           LSubsectionFileOffset, LSubsectionType) then
           Continue;
@@ -4372,7 +4389,6 @@ begin
       begin
         if StartsWithText(LTrimmed, 'OvlNum:') then
         begin
-          var LValue: UInt64;
           LCurrentModule.Name := ValueForLabel(LLine, 'Name:');
           var LNameOpenBracket := LastDelimiter('[', LCurrentModule.Name);
           var LNameCloseBracket := LastDelimiter(']', LCurrentModule.Name);
@@ -4397,7 +4413,6 @@ begin
             LCurrentModule.Properties.Add(LProperty);
         end;
 
-        var LModuleSegment: TDumpSymbolModuleSegment;
         if TryParseBorlandModuleSegmentLine(LLine, LIndex + 1, LModuleSegment) then
           LCurrentModule.Segments.Add(LModuleSegment);
         LCurrentModule.EndLine := LIndex + 1;
@@ -4441,10 +4456,8 @@ begin
         if LColonPos > 0 then
         begin
           var LNameIndexText := Trim(Copy(LTrimmed, 1, LColonPos - 1));
-          var LNameIndex: UInt64;
           if TryParseHexUIntToken(LNameIndexText, LNameIndex) then
           begin
-            var LBorlandName: TDumpBorlandName;
             LBorlandName.Index := LNameIndex;
             LBorlandName.RawIndex := LNameIndexText;
             LBorlandName.Value := Trim(Copy(LTrimmed, LColonPos + 1, MaxInt));
@@ -4467,7 +4480,6 @@ begin
             var LRawValue := ValueForLabel(LLine, LLabel);
             if LRawValue = '' then
               Continue;
-            var LGlobalProperty: TDumpProperty;
             LGlobalProperty.Name := Copy(LLabel, 1, Length(LLabel) - 1);
             LGlobalProperty.RawValue := LRawValue;
             LGlobalProperty.ValueKind := vkUInt;
@@ -4494,7 +4506,6 @@ begin
             LCurrentGlobalTypeSection.TypeCount);
         end;
 
-        var LGlobalTypeRecord: TDumpGlobalTypeRecord;
         if TryParseBorlandGlobalTypeLine(LLine, LIndex + 1, LGlobalTypeRecord) then
         begin
           if LCurrentGlobalTypeRecord <> nil then
@@ -4518,7 +4529,6 @@ begin
       if LRecordPos > 1 then
       begin
         var LRecordOffsetText := Trim(Copy(LTrimmed, 1, LRecordPos - 1));
-        var LRecordOffset: UInt64;
         LIsRecord := TryParseHexUIntToken(LRecordOffsetText, LRecordOffset);
       end;
       if LIsRecord then
@@ -4688,8 +4698,9 @@ end;
 
 procedure TDumpParser.BuildDebugInformation;
   procedure ResolveMethodSource(AMethod: TDumpMethod);
+  var
+    LSegment: UInt64;
   begin
-    var LSegment: UInt64;
     if not TryParseHexUIntToken(AMethod.Symbol.SectionName, LSegment) then
       Exit;
     for var LSourceModule in FDocument.SourceModules do
@@ -4766,6 +4777,8 @@ begin
 end;
 
 procedure TDumpParser.ParseStrings;
+var
+  LOffset: UInt64;
 begin
   if Pos('.strings.', LowerCase(FDocument.SourceFileName)) = 0 then
     Exit;
@@ -4777,7 +4790,6 @@ begin
     if LColonPos <= 1 then
       Continue;
     var LOffsetText := Trim(Copy(FLines[LIndex], 1, LColonPos - 1));
-    var LOffset: UInt64;
     if not TryParseNumericToken(LOffsetText, ncDecimal, LOffset) then
       Continue;
     var LValue := Trim(Copy(FLines[LIndex], LColonPos + 1, MaxInt));
@@ -4798,6 +4810,14 @@ begin
 end;
 
 procedure TDumpParser.ParseOMF;
+var
+  LRawOffset: string;
+  LRecordKind: string;
+  LRemainder: string;
+  LOffset: UInt64;
+  LDetail: TDumpProperty;
+  LFixUp: TDumpOMFFixUp;
+  LDataRow: TDumpOMFHexDataRow;
   function TryRecordHeader(const ALine: string; out ARawOffset,
     ARecordKind, ARemainder: string; out AOffset: UInt64): Boolean;
   begin
@@ -4847,6 +4867,8 @@ procedure TDumpParser.ParseOMF;
 
   function TryParseLEDataLine(const ALine: string; ALineNumber: Integer;
     out ADataRow: TDumpOMFHexDataRow): Boolean;
+  var
+    LOffset: UInt64;
   begin
     ADataRow := nil;
     var LLine := Trim(ALine);
@@ -4854,7 +4876,6 @@ procedure TDumpParser.ParseOMF;
     if LColonPosition <= 1 then
       Exit(False);
     var LRawOffset := Trim(Copy(LLine, 1, LColonPosition - 1));
-    var LOffset: UInt64;
     if not TryParseHexUIntToken(LRawOffset, LOffset) then
       Exit(False);
 
@@ -4969,8 +4990,6 @@ begin
   var LCurrentMember: TDumpLibraryMember := nil;
   for var LIndex := LStartLine to FLines.Count - 1 do
   begin
-    var LRawOffset, LRecordKind, LRemainder: string;
-    var LOffset: UInt64;
     if not TryRecordHeader(FLines[LIndex], LRawOffset, LRecordKind, LRemainder,
       LOffset) then
       Continue;
@@ -5009,7 +5028,6 @@ begin
         var LDetailText := Trim(FLines[LLineIndex]);
         if LDetailText = '' then
           Continue;
-        var LDetail: TDumpProperty;
         if not TryParsePropertyLine(LDetailText, LLineIndex + 1, LDetail) then
         begin
           LDetail.Name := 'Detail';
@@ -5021,13 +5039,11 @@ begin
         LRecord.Details.Add(LDetail);
         if SameText(LRecord.RecordKind, 'FIXU32') then
         begin
-          var LFixUp: TDumpOMFFixUp;
           if TryParseFixUp32Line(FLines[LLineIndex], LLineIndex + 1, LFixUp) then
             LRecord.FixUps.Add(LFixUp);
         end;
         if SameText(LRecord.RecordKind, 'LEDATA') then
         begin
-          var LDataRow: TDumpOMFHexDataRow;
           if TryParseLEDataLine(FLines[LLineIndex], LLineIndex + 1, LDataRow) then
             LRecord.HexDataRows.Add(LDataRow);
         end;
@@ -5038,6 +5054,9 @@ begin
 end;
 
 procedure TDumpParser.ParseARArchive;
+var
+  LParsedMember: TDumpArchiveMember;
+  LSymbol: TDumpArchiveSymbol;
   function IsArchiveBanner(const ALine: string): Boolean;
   begin
     Result := StartsWithText(Trim(ALine), 'Ar ') and
@@ -5046,11 +5065,12 @@ procedure TDumpParser.ParseARArchive;
 
   function TryParseArchiveMember(const ALine: string; ALineNumber: Integer;
     out AMember: TDumpArchiveMember): Boolean;
+  var
+    LIndex: Integer;
   begin
     AMember := nil;
     var LWork := Trim(ALine);
     var LIndexText := FirstToken(LWork);
-    var LIndex: Integer;
     if not TryStrToInt(LIndexText, LIndex) then
       Exit(False);
     var LName := FirstToken(LWork);
@@ -5081,11 +5101,12 @@ procedure TDumpParser.ParseARArchive;
   function TryParseArchiveSymbol(const ALine: string; ALineNumber: Integer;
     const ACurrentMember: TDumpArchiveMember;
     out ASymbol: TDumpArchiveSymbol): Boolean;
+  var
+    LIndex: Integer;
   begin
     ASymbol := nil;
     var LWork := Trim(ALine);
     var LIndexText := FirstToken(LWork);
-    var LIndex: Integer;
     if not TryStrToInt(LIndexText, LIndex) then
       Exit(False);
     var LName := FirstToken(LWork);
@@ -5174,11 +5195,10 @@ begin
 
     if LInMembers then
     begin
-      var LMember: TDumpArchiveMember;
-      if TryParseArchiveMember(FLines[LIndex], LIndex + 1, LMember) then
+      if TryParseArchiveMember(FLines[LIndex], LIndex + 1, LParsedMember) then
       begin
-        FDocument.ArchiveMembers.Add(LMember);
-        LCurrentMember := LMember;
+        FDocument.ArchiveMembers.Add(LParsedMember);
+        LCurrentMember := LParsedMember;
         if LMemberStartLine < 0 then
           LMemberStartLine := LIndex;
         LMemberEndLine := LIndex;
@@ -5202,7 +5222,6 @@ begin
           end;
       end;
 
-      var LSymbol: TDumpArchiveSymbol;
       if TryParseArchiveSymbol(FLines[LIndex], LIndex + 1, LCurrentMember,
         LSymbol) then
       begin
@@ -5231,6 +5250,11 @@ begin
 end;
 
 procedure TDumpParser.ParseMach;
+var
+  LProperty: TDumpProperty;
+  LCommandIndex: UInt64;
+  LSymbol: TDumpMachSymbol;
+  LDynamicSymbol: TDumpMachDynamicSymbol;
   procedure CreateReportSection(var ATarget: TDumpMachReportSection;
     const ACaption: string; AStartIndex, AItemStartIndex, AEndIndex: Integer);
   begin
@@ -5294,11 +5318,12 @@ procedure TDumpParser.ParseMach;
 
   function TryParseMachSymbolLine(const ALine: string; ALineNumber: Integer;
     out ASymbol: TDumpMachSymbol): Boolean;
+  var
+    LIndex: UInt64;
   begin
     ASymbol := nil;
     var LWork := Trim(ALine);
     var LIndexText := FirstToken(LWork);
-    var LIndex: UInt64;
     if not TryParseNumericToken(LIndexText, ncDecimal, LIndex) then
       Exit(False);
 
@@ -5326,11 +5351,12 @@ procedure TDumpParser.ParseMach;
 
   function TryParseMachDynamicSymbolLine(const ALine: string;
     ALineNumber: Integer; out ASymbol: TDumpMachDynamicSymbol): Boolean;
+  var
+    LIndex: UInt64;
   begin
     ASymbol := nil;
     var LWork := Trim(ALine);
     var LIndexText := FirstToken(LWork);
-    var LIndex: UInt64;
     if not TryParseNumericToken(LIndexText, ncDecimal, LIndex) or
       (LWork = '') then
       Exit(False);
@@ -5396,7 +5422,6 @@ begin
     LMachHeader.EndLine := LLoadCommandsLine;
     for var LIndex := LHeaderLine + 1 to LLoadCommandsLine - 1 do
     begin
-      var LProperty: TDumpProperty;
       if TryParseMachPropertyLine(FLines[LIndex], LIndex + 1, LProperty) then
         LMachHeader.Properties.Add(LProperty);
     end;
@@ -5428,7 +5453,6 @@ begin
       var LCommandText := LTrimmed;
       var LIndexText := FirstToken(LCommandText);
       Delete(LIndexText, 1, 1);
-      var LCommandIndex: UInt64;
       if not TryParseNumericToken(LIndexText, ncDecimal, LCommandIndex) then
         Continue;
       LCurrentCommand := TDumpMachLoadCommand.Create;
@@ -5455,7 +5479,6 @@ begin
         LSymbolTableStart := LIndex;
         Break;
       end;
-      var LProperty: TDumpProperty;
       if TryParseMachPropertyLine(FLines[LIndex], LIndex + 1, LProperty) then
       begin
         if SameText(LProperty.Name, 'section name') then
@@ -5505,7 +5528,6 @@ begin
         LSymbolTableEnd := LIndex;
         Break;
       end;
-      var LSymbol: TDumpMachSymbol;
       if TryParseMachSymbolLine(FLines[LIndex], LIndex + 1, LSymbol) then
         FDocument.MachSymbols.Add(LSymbol);
     end;
@@ -5538,7 +5560,6 @@ begin
       if LDynamicMode = 0 then
         Continue;
 
-      var LDynamicSymbol: TDumpMachDynamicSymbol;
       if TryParseMachDynamicSymbolLine(FLines[LIndex], LIndex + 1,
         LDynamicSymbol) then
       begin
@@ -5636,8 +5657,14 @@ begin
 end;
 
 procedure TDumpParser.ParseRawMachHexDump;
+var
+  LPrefix: TBytes;
+  LStartLine: Integer;
+  LProperty: TDumpProperty;
   function TryReadHexPrefix(out APrefix: TBytes;
     out AStartLine: Integer): Boolean;
+  var
+    LByteValue: Integer;
   begin
     SetLength(APrefix, 0);
     AStartLine := 0;
@@ -5654,7 +5681,6 @@ procedure TDumpParser.ParseRawMachHexDump;
         var LToken := FirstToken(LWork);
         if Length(LToken) <> 2 then
           Break;
-        var LByteValue: Integer;
         if not TryStrToInt('$' + LToken, LByteValue) then
           Break;
         SetLength(APrefix, Length(APrefix) + 1);
@@ -5686,8 +5712,6 @@ begin
   if FDocument.FileKind = dfMach then
     Exit;
 
-  var LPrefix: TBytes;
-  var LStartLine: Integer;
   if not TryReadHexPrefix(LPrefix, LStartLine) or not IsMachMagic(LPrefix) then
     Exit;
 
@@ -5703,7 +5727,6 @@ begin
   LHeader.Name := 'Mach Header (raw hex dump)';
   LHeader.StartLine := LStartLine;
   LHeader.EndLine := LStartLine;
-  var LProperty: TDumpProperty;
   FillChar(LProperty, SizeOf(LProperty), 0);
   LProperty.Name := 'Magic';
   LProperty.RawValue := LMagic;
@@ -5716,6 +5739,9 @@ begin
 end;
 
 procedure TDumpParser.ParseELF;
+var
+  LProperty: TDumpProperty;
+  LSectionIndex: UInt64;
   procedure AddELFTableNode(AKind: TDumpNodeKind; const ATitle: string;
     AStartLine, AEndLine: Integer);
   begin
@@ -5733,9 +5759,12 @@ procedure TDumpParser.ParseELF;
 
   procedure ParseELFSectionRow(const ALine: string; ALineNumber: Integer;
     ASection: TDumpSection; AContinuation: Boolean);
+  var
+    LAddressValue: UInt64;
     procedure AddProperty(const AName, AValue: string);
+    var
+      LProperty: TDumpProperty;
     begin
-      var LProperty: TDumpProperty;
       LProperty.Name := AName;
       LProperty.RawValue := AValue;
       LProperty.TextValue := AValue;
@@ -5753,7 +5782,6 @@ procedure TDumpParser.ParseELF;
     var LType := FirstToken(LWork);
     var LFlagsOrAddress := FirstToken(LWork);
     var LAddress := LFlagsOrAddress;
-    var LAddressValue: UInt64;
     var LFlags := '';
     if not TryParseHexUIntToken(LFlagsOrAddress, LAddressValue) then
     begin
@@ -5782,9 +5810,13 @@ procedure TDumpParser.ParseELF;
   end;
 
   procedure ParseELFSymbolRow(const ALine: string; ALineNumber: Integer);
+  var
+    LIndex: UInt64;
+    LValueNumber: UInt64;
     procedure AddProperty(ASymbol: TDumpSymbol; const AName, AValue: string);
+    var
+      LProperty: TDumpProperty;
     begin
-      var LProperty: TDumpProperty;
       LProperty.Name := AName;
       LProperty.RawValue := AValue;
       LProperty.TextValue := AValue;
@@ -5795,12 +5827,10 @@ procedure TDumpParser.ParseELF;
   begin
     var LWork := Trim(ALine);
     var LIndexText := FirstToken(LWork);
-    var LIndex: UInt64;
     if not TryParseNumericToken(LIndexText, ncDecimal, LIndex) then
       Exit;
     var LNameOrValue := FirstToken(LWork);
     var LValue := LNameOrValue;
-    var LValueNumber: UInt64;
     var LName := '';
     if not TryParseHexUIntToken(LNameOrValue, LValueNumber) then
     begin
@@ -5838,10 +5868,11 @@ procedure TDumpParser.ParseELF;
 
   procedure ParseELFRelocationRow(const ALine, ASectionName: string;
     ALineNumber: Integer);
+  var
+    LIndex: UInt64;
   begin
     var LWork := Trim(ALine);
     var LIndexText := FirstToken(LWork);
-    var LIndex: UInt64;
     if not TryParseNumericToken(LIndexText, ncDecimal, LIndex) then
       Exit;
 
@@ -5865,10 +5896,11 @@ procedure TDumpParser.ParseELF;
 
   procedure ParseELFProgramHeaderRow(const ALine: string;
     ALineNumber: Integer);
+  var
+    LIndex: UInt64;
   begin
     var LWork := Trim(ALine);
     var LIndexText := FirstToken(LWork);
-    var LIndex: UInt64;
     if not TryParseNumericToken(LIndexText, ncDecimal, LIndex) then
       Exit;
 
@@ -5891,10 +5923,11 @@ procedure TDumpParser.ParseELF;
   end;
 
   procedure ParseELFDynamicRow(const ALine: string; ALineNumber: Integer);
+  var
+    LIndex: UInt64;
   begin
     var LWork := Trim(ALine);
     var LIndexText := FirstToken(LWork);
-    var LIndex: UInt64;
     if not TryParseNumericToken(LIndexText, ncDecimal, LIndex) then
       Exit;
 
@@ -5926,7 +5959,6 @@ begin
     LHeader.EndLine);
   for var LPropertyIndex := LHeaderLine + 1 to LHeaderEnd do
   begin
-    var LProperty: TDumpProperty;
     if TryParsePropertyLine(FLines[LPropertyIndex], LPropertyIndex + 1,
       LProperty) then
     begin
@@ -5949,7 +5981,6 @@ begin
         var LRowText := Trim(FLines[LRow]);
         var LProbe := LRowText;
         var LIndexText := FirstToken(LProbe);
-        var LSectionIndex: UInt64;
         if TryParseNumericToken(LIndexText, ncDecimal, LSectionIndex) then
         begin
           LCurrentSection := TDumpSection.Create;
@@ -6135,6 +6166,10 @@ end;
 
 function TDumpParser.TryParsePropertyLine(const ALine: string;
   ALineNumber: Integer; out AProperty: TDumpProperty): Boolean;
+var
+  LNameText: string;
+  LRawValue: string;
+  LValue: UInt64;
   function LooksLikeValueStart(AIndex: Integer): Boolean;
   begin
     var LChar := ALine[AIndex];
@@ -6144,15 +6179,9 @@ function TDumpParser.TryParsePropertyLine(const ALine: string;
 
 begin
   var LStartValue := 0;
-  var LSpacePos: Integer;
-  var LColonPos: Integer;
-  var LNameText: string;
-  var LRawValue: string;
-  var LFirst: string;
-  var LValue: UInt64;
   FillChar(AProperty, SizeOf(AProperty), 0);
   Result := False;
-  LColonPos := Pos(':', ALine);
+  var LColonPos: Integer := Pos(':', ALine);
   if (LColonPos > 1) and (ALine[LColonPos - 1] <> ' ') and
     (Pos('(', Copy(ALine, 1, LColonPos - 1)) = 0) then
   begin
@@ -6178,8 +6207,8 @@ begin
   if (LNameText = '') or (LRawValue = '') then
     Exit;
 
-  LFirst := LRawValue;
-  LSpacePos := Pos(' ', LFirst);
+  var LFirst: string := LRawValue;
+  var LSpacePos: Integer := Pos(' ', LFirst);
   if LSpacePos > 0 then
     LFirst := Copy(LFirst, 1, LSpacePos - 1);
 
@@ -6208,20 +6237,17 @@ end;
 function TDumpParser.TryParseDataDirectoryLine(const ALine: string;
   ALineNumber: Integer; AIndex: Integer; out ADirectory: TDumpDataDirectory;
   out AProperty: TDumpProperty): Boolean;
+var
+  LRVAValue: UInt64;
+  LSizeValue: UInt64;
 begin
-  var LWork: string;
-  var LRawSize: string;
-  var LRawRVA: string;
-  var LName: string;
-  var LRVAValue: UInt64;
-  var LSizeValue: UInt64;
   FillChar(ADirectory, SizeOf(ADirectory), 0);
   FillChar(AProperty, SizeOf(AProperty), 0);
   Result := False;
-  LWork := Trim(ALine);
-  LRawSize := LastToken(LWork);
-  LRawRVA := LastToken(LWork);
-  LName := Trim(LWork);
+  var LWork: string := Trim(ALine);
+  var LRawSize: string := LastToken(LWork);
+  var LRawRVA: string := LastToken(LWork);
+  var LName: string := Trim(LWork);
   if (LName = '') or (LRawRVA = '') or (LRawSize = '') then
     Exit;
   if not TryParseHexUIntToken(LRawRVA, LRVAValue) then
@@ -6250,15 +6276,15 @@ end;
 function TDumpParser.TryParseObjectTableLine(const ALine: string;
   ALineNumber: Integer; out ASection: TDumpSection;
   out AProperty: TDumpProperty): Boolean;
+var
+  LToken: string;
+  LFlagsToken: string;
+  LValue: UInt64;
 begin
-  var LWork: string;
-  var LToken: string;
-  var LFlagsToken: string;
-  var LValue: UInt64;
   ASection := nil;
   FillChar(AProperty, SizeOf(AProperty), 0);
   Result := False;
-  LWork := Trim(ALine);
+  var LWork: string := Trim(ALine);
 
   ASection := TDumpSection.Create;
   try
@@ -6318,13 +6344,13 @@ end;
 
 function TDumpParser.TryParseImportLine(const ALine: string;
   ALineNumber: Integer; out AImport: TDumpImport): Boolean;
+var
+  LHintText: string;
+  LClosePos: Integer;
+  LValue: UInt64;
 begin
-  var LText: string;
-  var LHintText: string;
-  var LClosePos: Integer;
-  var LValue: UInt64;
   AImport := nil;
-  LText := Trim(ALine);
+  var LText: string := Trim(ALine);
   Result := False;
   if LText = '' then
     Exit;
@@ -6465,6 +6491,8 @@ end;
 function TDumpParser.TryParseResourceLine(const ALine: string;
   ALineNumber: Integer; out AIndent: Integer;
   out AResource: TDumpResource): Boolean;
+var
+  LProperty: TDumpProperty;
 begin
   AIndent := 0;
   AResource := nil;
@@ -6508,7 +6536,6 @@ begin
           Trim(LDirectoryOffsetText), AResource.DirectoryOffset);
       end;
 
-      var LProperty: TDumpProperty;
       LProperty.Name := 'Type';
       LProperty.RawValue := AResource.ResourceType + ' (' + LIdText + ')';
       LProperty.ValueKind := vkText;
@@ -6551,7 +6578,6 @@ begin
         Trim(LDirectoryOffsetText), AResource.DirectoryOffset);
     end;
 
-    var LProperty: TDumpProperty;
     LProperty.Name := 'Directory metadata';
     LProperty.RawValue := Trim(Copy(LText, LOpenParen, MaxInt));
     LProperty.ValueKind := vkText;
@@ -6569,6 +6595,10 @@ end;
 
 function TDumpParser.TryParseBorlandSymbolLine(const ARecordKind, ALine: string;
   ALineNumber: Integer; out ASymbol: TDumpSymbol): Boolean;
+var
+  LSectionValue: UInt64;
+  LAddressValue: UInt64;
+  LProperty: TDumpProperty;
 begin
   ASymbol := nil;
   Result := False;
@@ -6592,8 +6622,6 @@ begin
     if LRangePos > 0 then
       LAddressText := Copy(LAddressText, 1, LRangePos - 1);
 
-    var LSectionValue: UInt64;
-    var LAddressValue: UInt64;
     if TryParseHexUIntToken(LSectionText, LSectionValue) and
       TryParseHexUIntToken(LAddressText, LAddressValue) then
     begin
@@ -6617,7 +6645,6 @@ begin
       ASymbol.RawText := ALine;
       ASymbol.StartLine := ALineNumber;
 
-      var LProperty: TDumpProperty;
       LProperty.Name := 'Address';
       LProperty.RawValue := LSectionText + ':' + LAddressText;
       LProperty.ValueKind := vkAddress;
@@ -6635,6 +6662,13 @@ end;
 
 function TDumpParser.TryParseBorlandSymbolSearchLine(const ALine: string;
   ALineNumber: Integer; out ASearch: TDumpSymbolSearch): Boolean;
+var
+  LRecordOffset: UInt64;
+  LSegment: UInt64;
+  LAddress: UInt64;
+  LCodeSymbols: UInt64;
+  LDataSymbols: UInt64;
+  LFirstData: UInt64;
   function ValueAfterLabel(const ALabel: string): string;
   begin
     var LLabelPos := Pos(ALabel, ALine);
@@ -6670,12 +6704,6 @@ begin
 
   ASearch := TDumpSymbolSearch.Create;
   try
-    var LRecordOffset: UInt64;
-    var LSegment: UInt64;
-    var LAddress: UInt64;
-    var LCodeSymbols: UInt64;
-    var LDataSymbols: UInt64;
-    var LFirstData: UInt64;
     if not TryParseHexUIntToken(LRecordOffsetText, LRecordOffset) or
       not TryParseHexUIntToken(LSegmentText, LSegment) or
       not TryParseHexUIntToken(LAddressText, LAddress) or
@@ -6705,6 +6733,10 @@ end;
 
 function TDumpParser.TryParseBorlandGlobalTypeLine(const ALine: string;
   ALineNumber: Integer; out ATypeRecord: TDumpGlobalTypeRecord): Boolean;
+var
+  LRecordOffset: UInt64;
+  LTypeIndex: UInt64;
+  LLength: UInt64;
 begin
   ATypeRecord := nil;
   Result := False;
@@ -6724,9 +6756,6 @@ begin
     (LTypeKind = '') then
     Exit;
 
-  var LRecordOffset: UInt64;
-  var LTypeIndex: UInt64;
-  var LLength: UInt64;
   if not TryParseHexUIntToken(LRecordOffsetText, LRecordOffset) or
     not TryParseHexUIntToken(LTypeIndexText, LTypeIndex) or
     not TryParseHexUIntToken(LLengthText, LLength) then
@@ -6748,11 +6777,14 @@ end;
 procedure TDumpParser.ParseBorlandSymbolRecordDetails(
   ARecord: TDumpBorlandSymbolRecord; const ALine: string;
   ALineNumber: Integer);
+var
+  LProperty: TDumpProperty;
   procedure AddProperty(const AName, ARawValue: string);
+  var
+    LProperty: TDumpProperty;
   begin
     if ARawValue = '' then
       Exit;
-    var LProperty: TDumpProperty;
     LProperty.Name := AName;
     LProperty.RawValue := ARawValue;
     LProperty.ValueKind := PropertyValueKind(AName);
@@ -6763,11 +6795,12 @@ procedure TDumpParser.ParseBorlandSymbolRecordDetails(
   end;
 
   procedure ReadTypeIndex;
+  var
+    LTypeIndex: UInt64;
   begin
     var LTypeText := ValueForLabel(ALine, 'Type:');
     if LTypeText = '' then
       LTypeText := ValueForLabel(ALine, 'type:');
-    var LTypeIndex: UInt64;
     if TryParseHexUIntToken(LTypeText, LTypeIndex) then
     begin
       ARecord.TypeIndex := LTypeIndex;
@@ -6805,6 +6838,9 @@ procedure TDumpParser.ParseBorlandSymbolRecordDetails(
   end;
 
   procedure ReadAddress;
+  var
+    LSegment: UInt64;
+    LAddress: UInt64;
   begin
     var LText := Trim(ALine);
     var LIsDebugRange := StartsWithText(LText, 'Debug:');
@@ -6826,8 +6862,6 @@ procedure TDumpParser.ParseBorlandSymbolRecordDetails(
         LAddressText := Copy(LRangeText, 1, LDashPos - 1);
         LEndAddressText := Copy(LRangeText, LDashPos + 1, MaxInt);
       end;
-      var LSegment: UInt64;
-      var LAddress: UInt64;
       if TryParseHexUIntToken(LSegmentText, LSegment) and
         TryParseHexUIntToken(LAddressText, LAddress) then
       begin
@@ -6871,7 +6905,6 @@ procedure TDumpParser.ParseBorlandSymbolRecordDetails(
 
 begin
   ARecord.Kind := BorlandSymbolRecordKind(ARecord.RecordKind);
-  var LProperty: TDumpProperty;
   if TryParsePropertyLine(ALine, ALineNumber, LProperty) then
     ARecord.Properties.Add(LProperty);
   ReadTypeIndex;
@@ -6915,12 +6948,15 @@ end;
 procedure TDumpParser.ParseBorlandGlobalTypeDetails(
   AGlobalType: TDumpGlobalTypeRecord; const ALine: string;
   ALineNumber: Integer);
+var
+  LProperty: TDumpProperty;
   procedure AddDetailProperty(ADetail: TDumpGlobalTypeDetail;
     const AName, ARawValue: string);
+  var
+    LProperty: TDumpProperty;
   begin
     if ARawValue = '' then
       Exit;
-    var LProperty: TDumpProperty;
     LProperty.Name := AName;
     LProperty.RawValue := ARawValue;
     LProperty.ValueKind := PropertyValueKind(AName);
@@ -6939,8 +6975,9 @@ procedure TDumpParser.ParseBorlandGlobalTypeDetails(
   end;
 
   procedure AddTypeReference(const AText: string);
+  var
+    LTypeIndex: UInt64;
   begin
-    var LTypeIndex: UInt64;
     if TryParseHexUIntToken(AText, LTypeIndex) and
       (LTypeIndex <> AGlobalType.TypeIndex) and
       (AGlobalType.ReferencedTypeIndices.IndexOf(LTypeIndex) < 0) then
@@ -6948,7 +6985,6 @@ procedure TDumpParser.ParseBorlandGlobalTypeDetails(
   end;
 
 begin
-  var LProperty: TDumpProperty;
   if TryParsePropertyLine(ALine, ALineNumber, LProperty) then
     AGlobalType.Properties.Add(LProperty);
 
@@ -7092,6 +7128,9 @@ begin
 end;
 
 procedure TDumpParser.ResolveBorlandReferences;
+var
+  LResolvedName: string;
+  LReferencedType: TDumpGlobalTypeRecord;
 begin
   var LTypeLookup := TDictionary<UInt64, TDumpGlobalTypeRecord>.Create;
   try
@@ -7107,7 +7146,6 @@ begin
             LRecord.ResolvedName);
         for var LNameIndex in LRecord.NameIndices do
         begin
-          var LResolvedName: string;
           if FDocument.BorlandNameLookup.TryGetValue(LNameIndex, LResolvedName) then
             LRecord.ResolvedNames.Add(LResolvedName);
         end;
@@ -7122,7 +7160,6 @@ begin
             LRecord.ResolvedName);
         for var LNameIndex in LRecord.NameIndices do
         begin
-          var LResolvedName: string;
           if FDocument.BorlandNameLookup.TryGetValue(LNameIndex, LResolvedName) then
             LRecord.ResolvedNames.Add(LResolvedName);
         end;
@@ -7137,7 +7174,6 @@ begin
             LTypeRecord.ResolvedName);
         for var LTypeIndex in LTypeRecord.ReferencedTypeIndices do
         begin
-          var LReferencedType: TDumpGlobalTypeRecord;
           if LTypeLookup.TryGetValue(LTypeIndex, LReferencedType) then
             LTypeRecord.ReferencedTypes.Add(LReferencedType);
         end;
@@ -7215,6 +7251,8 @@ end;
 
 function TDumpParser.TryParseBorlandSubsectionDirectoryLine(const ALine: string;
   ALineNumber: Integer; out ASubsection: TDumpSymbolSubsection): Boolean;
+var
+  LModIndex: UInt64;
   function ValueForLabel(const ALabel: string): string;
   begin
     var LLabelPos := Pos(ALabel, ALine);
@@ -7235,7 +7273,6 @@ begin
     (ASubsection.RawSize = '') or (ASubsection.SubsectionType = '') then
     Exit;
 
-  var LModIndex: UInt64;
   if not TryParseHexUIntToken(ASubsection.RawModIndex, LModIndex) then
     Exit;
   if not TryParseHexUIntToken(ASubsection.RawFileOffset, ASubsection.FileOffset) then
@@ -7251,6 +7288,8 @@ end;
 function TDumpParser.TryParseBorlandSubsectionHeader(const ALine: string;
   out AModIndex: Integer; out AFileOffset: UInt64;
   out ASubsectionType: string): Boolean;
+var
+  LModIndex: UInt64;
 begin
   AModIndex := 0;
   AFileOffset := 0;
@@ -7262,7 +7301,6 @@ begin
   if not StartsWithText(ASubsectionType, 'sst') then
     Exit(False);
 
-  var LModIndex: UInt64;
   Result := TryParseHexUIntToken(LModIndexText, LModIndex) and
     TryParseHexUIntToken(LFileOffsetText, AFileOffset);
   if Result then
@@ -7339,6 +7377,8 @@ end;
 
 function TDumpParser.TryParseBorlandSourceFileLine(const ALine: string;
   ALineNumber: Integer; out ASourceFile: TDumpSourceFile): Boolean;
+var
+  LOffsetValue: UInt64;
 begin
   ASourceFile := nil;
   Result := False;
@@ -7355,7 +7395,6 @@ begin
   if LNameEnd > 0 then
     LNameText := Trim(Copy(LNameText, 1, LNameEnd - 1));
   var LOffsetText := ValueForLabel(LText, 'Offset:');
-  var LOffsetValue: UInt64;
   if (LNameText = '') or not TryParseHexUIntToken(LOffsetText, LOffsetValue) then
     Exit;
 
@@ -7379,6 +7418,8 @@ end;
 
 procedure TDumpParser.AddBorlandSourceLinePairs(const ALine: string;
   ALineNumber: Integer; ARange: TDumpSourceRange);
+var
+  LSourceLine: TDumpSourceLineInfo;
 begin
   var LText := Trim(ALine);
   var LSearchStart := 1;
@@ -7398,7 +7439,6 @@ begin
 
     var LLineText := Copy(LText, LLeftStart, LColonPos - LLeftStart);
     var LOffsetText := Copy(LText, LColonPos + 1, LRightEnd - LColonPos - 1);
-    var LSourceLine: TDumpSourceLineInfo;
     if TryStrToInt(LLineText, LSourceLine.LineNumber) and
       TryParseHexUIntToken(LOffsetText, LSourceLine.Offset) then
     begin
@@ -7425,18 +7465,17 @@ end;
 
 function TDumpParser.TryParseNumericToken(const AToken: string;
   AContext: TDumpNumericContext; out AValue: UInt64): Boolean;
+var
+  LDigit: Integer;
 begin
-  var LToken: string;
-  var LBase: Integer;
-  var LDigit: Integer;
   AValue := 0;
-  LToken := Trim(AToken);
+  var LToken: string := Trim(AToken);
   Result := False;
   if (LToken = '') or (Pos('?', LToken) > 0) or (Pos(':', LToken) > 0) or
     (Pos('/', LToken) > 0) then
     Exit;
 
-  LBase := 0;
+  var LBase: Integer := 0;
   if (Length(LToken) > 1) and SameText(Copy(LToken, Length(LToken), 1), 'h') then
   begin
     LBase := 16;

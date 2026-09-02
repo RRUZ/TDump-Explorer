@@ -198,6 +198,8 @@ begin
 end;
 
 function IsTDumpReportFile(const AFileName: string): Boolean;
+var
+  LBytes: TBytes;
 begin
   var LStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyWrite);
   try
@@ -206,7 +208,6 @@ begin
       LReadCount := Integer(LStream.Size);
     if LReadCount <= 0 then
       Exit(False);
-    var LBytes: TBytes;
     SetLength(LBytes, LReadCount);
     LStream.ReadBuffer(LBytes[0], LReadCount);
     Result := IsTDumpReport(TEncoding.Default.GetString(LBytes));
@@ -271,19 +272,23 @@ begin
   Result := TPath.GetTempFileName;
   try
     var LOutput := TFileStream.Create(Result, fmCreate or fmShareDenyWrite);
-    var LFirstInput: TFileStream := nil;
-    var LSecondInput: TFileStream := nil;
     try
-      LFirstInput := TFileStream.Create(AFirstFileName,
+      var LFirstInput := TFileStream.Create(AFirstFileName,
         fmOpenRead or fmShareDenyNone);
-      LOutput.CopyFrom(LFirstInput, 0);
-      LOutput.WriteBuffer(cLineBreak, SizeOf(cLineBreak));
-      LSecondInput := TFileStream.Create(ASecondFileName,
-        fmOpenRead or fmShareDenyNone);
-      LOutput.CopyFrom(LSecondInput, 0);
+      try
+        LOutput.CopyFrom(LFirstInput, 0);
+        LOutput.WriteBuffer(cLineBreak, SizeOf(cLineBreak));
+        var LSecondInput := TFileStream.Create(ASecondFileName,
+          fmOpenRead or fmShareDenyNone);
+        try
+          LOutput.CopyFrom(LSecondInput, 0);
+        finally
+          LSecondInput.Free;
+        end;
+      finally
+        LFirstInput.Free;
+      end;
     finally
-      LSecondInput.Free;
-      LFirstInput.Free;
       LOutput.Free;
     end;
   except
@@ -537,6 +542,9 @@ end;
 function TDumpRunner.Execute(const AInputFileName, AToolPath: string;
   AToolKind: TDumpToolKind; const AOptions, AListFileName: string):
   TDumpRunResult;
+var
+  LStartupInfo: TStartupInfo;
+  LProcessInformation: TProcessInformation;
 begin
   if not FileExists(AInputFileName) then
     raise EFOpenError.CreateFmt('TDUMP input file was not found: %s',
@@ -581,7 +589,6 @@ begin
             LCommandLine := LCommandLine + ' ' +
               QuoteCommandLineArgument(Result.ListFileName);
 
-          var LStartupInfo: TStartupInfo;
           ZeroMemory(@LStartupInfo, SizeOf(LStartupInfo));
           LStartupInfo.cb := SizeOf(LStartupInfo);
           LStartupInfo.dwFlags := STARTF_USESTDHANDLES;
@@ -589,34 +596,36 @@ begin
           LStartupInfo.hStdOutput := LOutputStream.Handle;
           LStartupInfo.hStdError := LOutputStream.Handle;
 
-          var LProcessInformation: TProcessInformation;
           ZeroMemory(@LProcessInformation, SizeOf(LProcessInformation));
           if not CreateProcess(nil, PChar(LCommandLine), nil, nil, True,
             CREATE_NO_WINDOW, nil, nil, LStartupInfo, LProcessInformation) then
             RaiseLastError('Starting TDUMP');
           var LExecutionStopwatch := TStopwatch.StartNew;
           try
-            while True do
-            begin
-              if IsCancellationRequested then
+            try
+              while True do
               begin
-                TerminateProcess(LProcessInformation.hProcess, ERROR_CANCELLED);
-                WaitForSingleObject(LProcessInformation.hProcess, INFINITE);
-                raise EAbort.Create('TDUMP analysis was cancelled.');
+                if IsCancellationRequested then
+                begin
+                  TerminateProcess(LProcessInformation.hProcess, ERROR_CANCELLED);
+                  WaitForSingleObject(LProcessInformation.hProcess, INFINITE);
+                  raise EAbort.Create('TDUMP analysis was cancelled.');
+                end;
+                case WaitForSingleObject(LProcessInformation.hProcess, 50) of
+                  WAIT_OBJECT_0:
+                    Break;
+                  WAIT_FAILED:
+                    RaiseLastError('Waiting for TDUMP');
+                end;
               end;
-              case WaitForSingleObject(LProcessInformation.hProcess, 50) of
-                WAIT_OBJECT_0:
-                  Break;
-                WAIT_FAILED:
-                  RaiseLastError('Waiting for TDUMP');
-              end;
+              if not GetExitCodeProcess(LProcessInformation.hProcess, Result.ExitCode) then
+                RaiseLastError('Reading the TDUMP exit code');
+            finally
+              LExecutionStopwatch.Stop;
+              Result.ExecutionMilliseconds := LExecutionStopwatch.ElapsedMilliseconds;
+              CloseHandle(LProcessInformation.hThread);
             end;
-            if not GetExitCodeProcess(LProcessInformation.hProcess, Result.ExitCode) then
-              RaiseLastError('Reading the TDUMP exit code');
           finally
-            LExecutionStopwatch.Stop;
-            Result.ExecutionMilliseconds := LExecutionStopwatch.ElapsedMilliseconds;
-            CloseHandle(LProcessInformation.hThread);
             CloseHandle(LProcessInformation.hProcess);
           end;
         finally

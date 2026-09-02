@@ -118,6 +118,8 @@ procedure TTinyHighlighter.DrawTokenizedText(ACanvas: TCanvas;
   const ARect: TRect; AX, AY: Integer; const AText, ADisplayedText: string;
   const ATheme: TExplorerTheme; ATextFormat: TTextFormat;
   AParserMode: TTinyParserMode; ADataType: TTinyHighlightDataType);
+var
+  LWholeTextToken: TTinyToken;
 begin
   var LVisibleLength := Length(AText);
   var LHasEllipsis := (ADisplayedText <> AText) and
@@ -138,24 +140,23 @@ begin
     FParser.Tokenize(AText, AParserMode, FTokens)
   else
   begin
-    var LToken: TTinyToken;
-    LToken.StartIndex := 1;
-    LToken.Length := Length(AText);
-    LToken.Text := AText;
+    LWholeTextToken.StartIndex := 1;
+    LWholeTextToken.Length := Length(AText);
+    LWholeTextToken.Text := AText;
     case ADataType of
-      thdtStringLiteral: LToken.Kind := ttkStringLiteral;
-      thdtInteger: LToken.Kind := ttkInteger;
-      thdtHexadecimal: LToken.Kind := ttkHexadecimal;
-      thdtFloat: LToken.Kind := ttkFloat;
-      thdtDate: LToken.Kind := ttkDate;
-      thdtTime: LToken.Kind := ttkTime;
-      thdtDateTime: LToken.Kind := ttkDateTime;
-      thdtSymbol: LToken.Kind := ttkSymbol;
-      thdtMethod: LToken.Kind := ttkMethodName;
+      thdtStringLiteral: LWholeTextToken.Kind := ttkStringLiteral;
+      thdtInteger: LWholeTextToken.Kind := ttkInteger;
+      thdtHexadecimal: LWholeTextToken.Kind := ttkHexadecimal;
+      thdtFloat: LWholeTextToken.Kind := ttkFloat;
+      thdtDate: LWholeTextToken.Kind := ttkDate;
+      thdtTime: LWholeTextToken.Kind := ttkTime;
+      thdtDateTime: LWholeTextToken.Kind := ttkDateTime;
+      thdtSymbol: LWholeTextToken.Kind := ttkSymbol;
+      thdtMethod: LWholeTextToken.Kind := ttkMethodName;
     else
-      LToken.Kind := ttkString;
+      LWholeTextToken.Kind := ttkString;
     end;
-    FTokens.Add(LToken);
+    FTokens.Add(LWholeTextToken);
   end;
   var LOriginalFontColor := ACanvas.Font.Color;
   var LOriginalBrushStyle := ACanvas.Brush.Style;

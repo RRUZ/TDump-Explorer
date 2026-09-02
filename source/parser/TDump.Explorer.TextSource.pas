@@ -274,10 +274,11 @@ begin
 end;
 
 function TDumpMappedTextSource.GetText: string;
+var
+  LAnsi: RawByteString;
 begin
   if FSize = 0 then
     Exit('');
-  var LAnsi: RawByteString;
   SetString(LAnsi, PAnsiChar(FView), FSize);
   Result := string(LAnsi);
 end;

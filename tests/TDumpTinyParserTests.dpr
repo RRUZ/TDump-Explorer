@@ -683,53 +683,56 @@ begin
     'The generated Mach fixture must be available for linker-tokenization coverage.');
 
   var LNames := TDictionary<string, Byte>.Create;
-  var LParser := TTinyParser.Create;
-  var LSpecialMemberCount := 0;
   try
-    for var LMatch in TRegEx.Matches(TFile.ReadAllText(cMachFixture),
-      cItaniumSymbolPattern) do
-      LNames.TryAdd(LMatch.Value, 0);
-    Require(LNames.Count > 1000,
-      'The Mach fixture must provide broad Itanium linker-name coverage.');
+    var LParser := TTinyParser.Create;
+    try
+      var LSpecialMemberCount := 0;
+      for var LMatch in TRegEx.Matches(TFile.ReadAllText(cMachFixture),
+        cItaniumSymbolPattern) do
+        LNames.TryAdd(LMatch.Value, 0);
+      Require(LNames.Count > 1000,
+        'The Mach fixture must provide broad Itanium linker-name coverage.');
 
-    for var LName in LNames.Keys do
-    begin
-      var LTokens := LParser.Tokenize(LName, tpmMachLinker);
-      try
-        var LHasStructure := False;
-        for var LToken in LTokens do
-        begin
-          LHasStructure := LHasStructure or
-            (LToken.Kind in [ttkNamespace, ttkTypeName, ttkMethodName]);
-          Require(not ((LToken.Kind in [ttkNamespace, ttkTypeName]) and
-            (Length(LToken.Text) > 1) and (LToken.Text[1] = '_') and
-            CharInSet(LToken.Text[2], ['0'..'9'])),
-            'Itanium substitutions must not become pseudo type/namespace tokens: ' + LName);
+      for var LName in LNames.Keys do
+      begin
+        var LTokens := LParser.Tokenize(LName, tpmMachLinker);
+        try
+          var LHasStructure := False;
+          for var LToken in LTokens do
+          begin
+            LHasStructure := LHasStructure or
+              (LToken.Kind in [ttkNamespace, ttkTypeName, ttkMethodName]);
+            Require(not ((LToken.Kind in [ttkNamespace, ttkTypeName]) and
+              (Length(LToken.Text) > 1) and (LToken.Text[1] = '_') and
+              CharInSet(LToken.Text[2], ['0'..'9'])),
+              'Itanium substitutions must not become pseudo type/namespace tokens: ' + LName);
+          end;
+          Require(LHasStructure,
+            'Every supported Mach Itanium linker name must expose semantic structure: ' + LName);
+          Require(not HasToken(LTokens, ttkMethodName, LName),
+            'A supported Mach Itanium linker name must not collapse into one method token: ' + LName);
+          if ContainsText(LName, 'cctr') then
+          begin
+            Inc(LSpecialMemberCount);
+            Require(HasToken(LTokens, ttkKeyword, 'cctr'),
+              'Every Mach cctr marker must remain visibly highlighted: ' + LName);
+          end;
+          if ContainsText(LName, 'cdtr') then
+          begin
+            Inc(LSpecialMemberCount);
+            Require(HasToken(LTokens, ttkKeyword, 'cdtr'),
+              'Every Mach cdtr marker must remain visibly highlighted: ' + LName);
+          end;
+        finally
+          LTokens.Free;
         end;
-        Require(LHasStructure,
-          'Every supported Mach Itanium linker name must expose semantic structure: ' + LName);
-        Require(not HasToken(LTokens, ttkMethodName, LName),
-          'A supported Mach Itanium linker name must not collapse into one method token: ' + LName);
-        if ContainsText(LName, 'cctr') then
-        begin
-          Inc(LSpecialMemberCount);
-          Require(HasToken(LTokens, ttkKeyword, 'cctr'),
-            'Every Mach cctr marker must remain visibly highlighted: ' + LName);
-        end;
-        if ContainsText(LName, 'cdtr') then
-        begin
-          Inc(LSpecialMemberCount);
-          Require(HasToken(LTokens, ttkKeyword, 'cdtr'),
-            'Every Mach cdtr marker must remain visibly highlighted: ' + LName);
-        end;
-      finally
-        LTokens.Free;
       end;
+      Require(LSpecialMemberCount > 0,
+        'The Mach fixture must contain generated constructor/destructor markers.');
+    finally
+      LParser.Free;
     end;
-    Require(LSpecialMemberCount > 0,
-      'The Mach fixture must contain generated constructor/destructor markers.');
   finally
-    LParser.Free;
     LNames.Free;
   end;
 end;

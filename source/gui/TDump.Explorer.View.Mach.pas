@@ -271,8 +271,9 @@ begin
       LCount := ADocument.MachDynamicImports.Count;
     AControl.SetItemProvider(TCallbackHighlighterRowProvider.Create(LCount,
       function(AIndex: Integer): string
+      var
+        LSymbol: TDumpMachDynamicSymbol;
       begin
-        var LSymbol: TDumpMachDynamicSymbol;
         if LUseImports then
           LSymbol := ADocument.MachDynamicImports[AIndex]
         else

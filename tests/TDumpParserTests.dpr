@@ -409,6 +409,8 @@ begin
 end;
 
 procedure TestUnknownFallback;
+var
+  LCoveredLines: TArray<Boolean>;
 begin
   var LDocument := ParseGeneratedFixture('AR.Library.Win64.invalid-data.tdump');
   try
@@ -416,7 +418,6 @@ begin
       'Invalid TDUMP input must be split into fallback blocks.');
     Require(LDocument.UnsupportedStructures[0].Node.Kind = nkUnknown,
       'Fallback must use an unknown node.');
-    var LCoveredLines: TArray<Boolean>;
     SetLength(LCoveredLines, LDocument.Lines.Count);
     for var LStructure in LDocument.UnsupportedStructures do
       for var LLineNumber := LStructure.Node.StartLine to LStructure.Node.EndLine do
@@ -541,17 +542,20 @@ begin
   end;
 
   var LFirst := ParseGeneratedFixture('VCL.Win32.pe-core.tdump');
-  var LSecond := ParseGeneratedFixture('VCL.Win64.pe-core.tdump');
   try
-    var LMerge := LFirst.MergeWith(LSecond);
+    var LSecond := ParseGeneratedFixture('VCL.Win64.pe-core.tdump');
     try
-      Require((LMerge.Documents.Count = 2) and (LMerge.Runs.Count = 2),
-        'A merge must retain both real fixture documents and runs.');
+      var LMerge := LFirst.MergeWith(LSecond);
+      try
+        Require((LMerge.Documents.Count = 2) and (LMerge.Runs.Count = 2),
+          'A merge must retain both real fixture documents and runs.');
+      finally
+        LMerge.Free;
+      end;
     finally
-      LMerge.Free;
+      LSecond.Free;
     end;
   finally
-    LSecond.Free;
     LFirst.Free;
   end;
 end;

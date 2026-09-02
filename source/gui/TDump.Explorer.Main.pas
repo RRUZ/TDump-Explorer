@@ -120,6 +120,7 @@ type
     procedure CreateTabs;
     procedure CreateEmptyState;
     function DocumentTabImageName: System.UITypes.TImageName;
+    function RecentFileImageName(const AFileName: string): System.UITypes.TImageName;
     function IsTextFile(const AFileName: string): Boolean;
     function ProcessDroppedFile(const AFileName: string;
       AActivateTabWhenComplete: Boolean = False): Boolean;
@@ -700,6 +701,22 @@ begin
     Result := 'binary_dark';
 end;
 
+function TFrmMain.RecentFileImageName(
+  const AFileName: string): System.UITypes.TImageName;
+var
+  LBaseName: string;
+begin
+  LBaseName := 'binary';
+  var LExtension := LowerCase(ExtractFileExt(AFileName));
+  if (LExtension = '.tdump') or (LExtension = '.txt') then
+    LBaseName := 'file-text';
+
+  if IsLightThemeActive then
+    Result := LBaseName + '_light'
+  else
+    Result := LBaseName + '_dark';
+end;
+
 procedure TFrmMain.InitializeTabImages;
 begin
   if not Assigned(DataModule1) or not Assigned(FTabImages) then
@@ -708,6 +725,8 @@ begin
   FTabImages.ImageCollection := DataModule1.ImageCollection1;
   FTabImages.Add('binary_dark', 'binary_dark');
   FTabImages.Add('binary_light', 'binary_light');
+  FTabImages.Add('file-text_dark', 'file-text_dark');
+  FTabImages.Add('file-text_light', 'file-text_light');
 end;
 
 procedure TFrmMain.RemoveDocumentCard(ACard: TCard; ADeleteTab: Boolean);
@@ -825,10 +844,6 @@ begin
   if not Assigned(FRecentFilesPopupMenu) then
     Exit;
 
-  var LIconName := 'binary_dark';
-  if IsLightThemeActive then
-    LIconName := 'binary_light';
-
   var LInactiveItems := TList<Integer>.Create;
   try
     var LMenuItems := FRecentFilesPopupMenu.MenuItems;
@@ -845,7 +860,8 @@ begin
         var LVisibleIndex := FRecentFilesPopupFiles.Count;
         FRecentFilesPopupFiles.Add(LFileName);
         LMenuItems.Add(Format('%s  %s', [
-          RecentFileShortcutCaption(LVisibleIndex), LFileName]), LIconName);
+          RecentFileShortcutCaption(LVisibleIndex), LFileName]),
+          RecentFileImageName(LFileName));
         if not FileExists(LFileName) then
           LInactiveItems.Add(LVisibleIndex);
       end;
@@ -1339,8 +1355,9 @@ begin
 end;
 
 procedure TFrmMain.DrainAnalysisMessages;
+var
+  LMessage: TMsg;
 begin
-  var LMessage: TMsg;
   while PeekMessage(LMessage, Handle, cWMAnalysisProgress,
     cWMAnalysisCompleted, PM_REMOVE) do
     DispatchMessage(LMessage);
@@ -1374,6 +1391,8 @@ begin
 end;
 
 function TFrmMain.IsTextFile(const AFileName: string): Boolean;
+var
+  LBytes: TBytes;
 begin
   var LStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyWrite);
   try
@@ -1383,7 +1402,6 @@ begin
     if LReadCount = 0 then
       Exit(True);
 
-    var LBytes: TBytes;
     SetLength(LBytes, LReadCount);
     LStream.ReadBuffer(LBytes[0], LReadCount);
     if ((LReadCount >= 2) and (LBytes[0] = $FF) and (LBytes[1] = $FE)) or
@@ -1670,10 +1688,11 @@ end;
 
 function TFrmMain.ProcessDroppedFile(const AFileName: string;
   AActivateTabWhenComplete: Boolean): Boolean;
+var
+  LKind: TAnalysisKind;
 begin
   Result := False;
   var LExpandedFileName := ExpandFileName(AFileName);
-  var LKind: TAnalysisKind;
   try
     if TFile.GetSize(LExpandedFileName) > cMaxTDumpReportSize then
     begin

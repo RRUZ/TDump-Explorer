@@ -138,9 +138,10 @@ begin
 end;
 
 destructor TRawViewFrame.Destroy;
+var
+  LMessage: TMsg;
 begin
   CancelFilterTask(True);
-  var LMessage: TMsg;
   while PeekMessage(LMessage, Handle, cWmRawFilterReady,
     cWmRawFilterReady, PM_REMOVE) do
     TObject(LMessage.lParam).Free;
@@ -456,6 +457,9 @@ begin
 end;
 
 procedure TRawViewFrame.ShowLines(AStartLine, AEndLine: Integer);
+var
+  LFirstVisibleIndex: Integer;
+  LLastVisibleIndex: Integer;
 begin
   FLastSourceStartLine := AStartLine;
   FLastSourceEndLine := AEndLine;
@@ -466,8 +470,6 @@ begin
 
   var LFirstSourceIndex := AStartLine - 1;
   var LLastSourceIndex := Max(LFirstSourceIndex, AEndLine - 1);
-  var LFirstVisibleIndex: Integer;
-  var LLastVisibleIndex: Integer;
   if FUsingFilteredIndexes then
   begin
     LFirstVisibleIndex := FindFirstVisibleIndexAtOrAfter(LFirstSourceIndex);

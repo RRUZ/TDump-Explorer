@@ -1096,6 +1096,8 @@ end;
 
 procedure DrawDashedRoundedRectangle(const ACanvas: TCanvas;
   const ARect: TRect; ABorderColor: TColor; ARadius: Integer);
+var
+  LDashPattern: array[0..1] of Single;
 begin
   var LRect := ARect;
   InflateRect(LRect, -1, -1);
@@ -1116,7 +1118,6 @@ begin
     LGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);
     var LPen := TGPPen.Create(ColorToGPColor(ABorderColor), 2.5);
     try
-      var LDashPattern: array[0..1] of Single;
       LDashPattern[0] := 4.0;
       LDashPattern[1] := 2.5;
       LPen.SetDashStyle(DashStyleCustom);
@@ -1185,19 +1186,13 @@ end;
 procedure DrawExplorerChevron(const ACanvas: TCanvas; const ACenter: TPoint;
   AColor: TColor; ADirection: TExplorerChevronDirection;
   ADeviceScale: Single);
-var
-  LRGBColor: TColor;
-  LColor: TGPColor;
-  LGraphics: TGPGraphics;
-  LHalfWidth: Single;
-  LHalfHeight: Single;
 begin
-  LRGBColor := ColorToRGB(AColor);
-  LColor := MakeColor(255, GetRValue(LRGBColor), GetGValue(LRGBColor),
+  var LRGBColor: TColor := ColorToRGB(AColor);
+  var LColor: TGPColor := MakeColor(255, GetRValue(LRGBColor), GetGValue(LRGBColor),
     GetBValue(LRGBColor));
-  LHalfWidth := 3.0 * ADeviceScale;
-  LHalfHeight := 2.0 * ADeviceScale;
-  LGraphics := TGPGraphics.Create(ACanvas.Handle);
+  var LHalfWidth: Single := 3.0 * ADeviceScale;
+  var LHalfHeight: Single := 2.0 * ADeviceScale;
+  var LGraphics: TGPGraphics := TGPGraphics.Create(ACanvas.Handle);
   try
     LGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
     LGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);

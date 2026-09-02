@@ -27,8 +27,9 @@ type
   end;
 
 function CurrentPrivateBytes: UInt64;
+var
+  LCounters: TProcessMemoryCountersEx;
 begin
-  var LCounters: TProcessMemoryCountersEx;
   ZeroMemory(@LCounters, SizeOf(LCounters));
   LCounters.cb := SizeOf(LCounters);
   if not GetProcessMemoryInfo(GetCurrentProcess,
@@ -167,6 +168,9 @@ begin
       Length(AProfile.UnsupportedStructures), ' more unsupported block(s)');
 end;
 
+var
+  LFiles: TArray<string>;
+
 begin
   ReportMemoryLeaksOnShutdown := True;
   try
@@ -177,7 +181,6 @@ begin
     var LIterations := 1;
     if ParamCount >= 2 then
       LIterations := ParseIterationCount(ParamStr(2));
-    var LFiles: TArray<string>;
     if TFile.Exists(LFixtureDirectory) then
       LFiles := [LFixtureDirectory]
     else if TDirectory.Exists(LFixtureDirectory) then
