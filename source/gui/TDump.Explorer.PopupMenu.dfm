@@ -8,10 +8,12 @@ object ExplorerPopupMenuForm: TExplorerPopupMenuForm
   Color = clBtnFace
   CustomTitleBar.Control = TitleBarPanel1
   CustomTitleBar.Enabled = True
-  CustomTitleBar.Height = 4
+  CustomTitleBar.Height = 2
   CustomTitleBar.SystemHeight = False
   CustomTitleBar.ShowCaption = False
+  CustomTitleBar.ShowIcon = False
   CustomTitleBar.SystemColors = False
+  CustomTitleBar.SystemButtons = False
   CustomTitleBar.BackgroundColor = clWhite
   CustomTitleBar.ForegroundColor = 65793
   CustomTitleBar.InactiveBackgroundColor = clWhite
@@ -30,8 +32,7 @@ object ExplorerPopupMenuForm: TExplorerPopupMenuForm
   Font.Height = -12
   Font.Name = 'Segoe UI'
   Font.Style = []
-  GlassFrame.Enabled = False
-  GlassFrame.Top = 4
+  GlassFrame.Top = 2
   PopupMode = pmExplicit
   Position = poDesigned
   RoundedCorners = rcOn
@@ -41,11 +42,11 @@ object ExplorerPopupMenuForm: TExplorerPopupMenuForm
   inline MenuItemsControl: THighlighterControl
     AlignWithMargins = True
     Left = 8
-    Top = 3
+    Top = 5
     Width = 233
-    Height = 158
+    Height = 156
     Margins.Left = 8
-    Margins.Top = 0
+    Margins.Top = 4
     Margins.Right = 8
     Margins.Bottom = 0
     Align = alClient
@@ -56,7 +57,7 @@ object ExplorerPopupMenuForm: TExplorerPopupMenuForm
     ExplicitHeight = 158
     inherited ControlList1: TControlList
       Width = 233
-      Height = 134
+      Height = 132
       ItemHeight = 40
       ExplicitWidth = 233
       ExplicitHeight = 134
@@ -70,7 +71,8 @@ object ExplorerPopupMenuForm: TExplorerPopupMenuForm
     Left = 0
     Top = 0
     Width = 249
-    Height = 3
+    Height = 1
     CustomButtons = <>
+    ExplicitHeight = 3
   end
 end

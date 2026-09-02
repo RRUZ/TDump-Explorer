@@ -67,9 +67,7 @@ begin
   Color := LTheme.BackgroundColor;
   MenuItemsControl.Color := LTheme.BackgroundColor;
   MenuItemsControl.ControlList1.Color := LTheme.BackgroundColor;
-  // A VCL style otherwise overrides the custom colors below with its active
-  // caption color. Popup title bars must always follow the Explorer palette.
-  CustomTitleBar.StyleColors := False;
+  //CustomTitleBar.StyleColors := False;
   CustomTitleBar.BackgroundColor := LTheme.BackgroundColor;
   CustomTitleBar.ForegroundColor := LTheme.TextColor;
   CustomTitleBar.InactiveBackgroundColor := LTheme.BackgroundColor;
@@ -77,11 +75,9 @@ begin
   CustomTitleBar.ButtonForegroundColor := LTheme.TextColor;
   CustomTitleBar.ButtonBackgroundColor := LTheme.BackgroundColor;
   CustomTitleBar.ButtonHoverForegroundColor := LTheme.TextColor;
-  CustomTitleBar.ButtonHoverBackgroundColor := ColorBlendRGB(
-    LTheme.SelectionColor, LTheme.BackgroundColor, 0.82);
+  CustomTitleBar.ButtonHoverBackgroundColor := ColorBlendRGB(LTheme.SelectionColor, LTheme.BackgroundColor, 0.82);
   CustomTitleBar.ButtonPressedForegroundColor := LTheme.TextColor;
-  CustomTitleBar.ButtonPressedBackgroundColor := ColorBlendRGB(
-    LTheme.SelectionColor, LTheme.BackgroundColor, 0.68);
+  CustomTitleBar.ButtonPressedBackgroundColor := ColorBlendRGB(LTheme.SelectionColor, LTheme.BackgroundColor, 0.68);
   CustomTitleBar.ButtonInactiveForegroundColor := LTheme.InactiveText;
   CustomTitleBar.ButtonInactiveBackgroundColor := LTheme.BackgroundColor;
 end;
@@ -96,7 +92,7 @@ constructor TExplorerPopupMenuForm.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
 
-  GlassFrame.Enabled := False;
+  //GlassFrame.Enabled := False;
 
   // These settings are not published by THighlighterControl, so they cannot
   // be streamed from the DFM.  The visual frame itself and its static layout

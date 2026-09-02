@@ -3,13 +3,16 @@ program TDumpExplorerComponentTests;
 {$APPTYPE CONSOLE}
 
 uses
+  Winapi.Windows,
   System.SysUtils,
   System.StrUtils,
+  System.Math,
   System.Types,
   System.IOUtils,
   System.JSON,
   System.Generics.Collections,
   Vcl.Graphics,
+  Vcl.Controls,
   Vcl.Forms,
   DUnitX.TestFramework,
   DUnitX.Loggers.Xml.NUnit,
@@ -53,6 +56,7 @@ type
     [Test] procedure TextFormatDrawing;
     [Test] procedure ViewExportFormats;
     [Test] procedure HighlighterSortingAndLayouts;
+    [Test] procedure HighlighterSortGlyphPlacement;
     [Test] procedure LogFilteringNavigation;
     [Test] procedure SettingsRoundTrip;
   end;
@@ -242,6 +246,70 @@ begin
   end;
 end;
 
+procedure TestHighlighterSortGlyphPlacement;
+var
+  LDrawItem: TDrawItemStruct;
+begin
+  var LHost := TComponentTestHostForm.Create(nil);
+  try
+    LHost.SetBounds(-32000, -32000, 640, 480);
+    LHost.Show;
+    Application.ProcessMessages;
+    var LControl := LHost.HighlighterControl;
+    LControl.AutoSizeColumns := False;
+    LControl.SetColumnHeaders(['Severity', 'Line', 'Message']);
+    LControl.Add('Error' + #9 + '4' + #9 + 'Invalid data');
+    var LHeader := LControl.HeaderControl1;
+    var LBitmap := TBitmap.Create;
+    try
+      LBitmap.SetSize(LHeader.Width, LHeader.Height);
+      var LAccent := ColorToRGB(TExplorerTheme.ActiveTheme.SelectionColor);
+      // Cover the caption-overlap regression, an ellipsized caption, a roomy
+      // header, and a column too narrow to display a complete sort glyph.
+      for var LWidth in TArray<Integer>.Create(76, 52, 160, 20) do
+      begin
+        LHeader.Sections[0].Width := Round(LWidth * LControl.ScaleFactor);
+        LHeader.OnSectionResize(LHeader, LHeader.Sections[0]);
+        for var LDirection := 0 to 1 do
+        begin
+          LHeader.OnSectionClick(LHeader, LHeader.Sections[0]);
+          // Send the same owner-draw notification as the native header,
+          // targeting the test bitmap rather than its on-screen window DC.
+          LDrawItem := Default(TDrawItemStruct);
+          LDrawItem.itemID := 0;
+          LDrawItem.hwndItem := LHeader.Handle;
+          LDrawItem.hDC := LBitmap.Canvas.Handle;
+          LDrawItem.rcItem := Rect(0, 0, LHeader.Sections[0].Width, LHeader.Height);
+          LHeader.Perform(CN_DRAWITEM, 0, LPARAM(@LDrawItem));
+          var LFirstGlyphX := LHeader.Sections[0].Width;
+          for var LY := 0 to LBitmap.Height - 1 do
+            for var LX := 0 to LHeader.Sections[0].Width - 1 do
+              if ColorToRGB(LBitmap.Canvas.Pixels[LX, LY]) = LAccent then
+                LFirstGlyphX := Min(LFirstGlyphX, LX);
+          var LGlyphSlotWidth := Round(18 * LControl.ScaleFactor);
+          if LHeader.Sections[0].Width < 16 + LGlyphSlotWidth then
+            Require(LFirstGlyphX = LHeader.Sections[0].Width,
+              'A tiny header must not draw a clipped sort arrow.')
+          else
+          begin
+            Require(LFirstGlyphX < LHeader.Sections[0].Width,
+              'Sorted header must display its sort arrow.');
+            LBitmap.Canvas.Font.Assign(LHeader.Font);
+            var LTextRight := Min(LHeader.Sections[0].Width - 8 - LGlyphSlotWidth,
+              8 + LBitmap.Canvas.TextWidth('Severity'));
+            Require(LFirstGlyphX >= LTextRight + Round(3 * LControl.ScaleFactor),
+              'Sort arrow must follow the text/ellipsis without overlapping it.');
+          end;
+        end;
+      end;
+    finally
+      LBitmap.Free;
+    end;
+  finally
+    LHost.Free;
+  end;
+end;
+
 procedure TestLogFilteringNavigation;
 begin
   var LHost := TComponentTestHostForm.Create(nil);
@@ -338,6 +406,11 @@ end;
 procedure TExplorerComponentFixture.HighlighterSortingAndLayouts;
 begin
   TestHighlighterSortingAndLayouts;
+end;
+
+procedure TExplorerComponentFixture.HighlighterSortGlyphPlacement;
+begin
+  TestHighlighterSortGlyphPlacement;
 end;
 
 procedure TExplorerComponentFixture.LogFilteringNavigation;

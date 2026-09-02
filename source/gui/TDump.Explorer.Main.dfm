@@ -31,7 +31,7 @@ object FrmMain: TFrmMain
   Font.Style = []
   GlassFrame.Enabled = True
   GlassFrame.Top = 40
-  Position = poDesktopCenter
+  Position = poScreenCenter
   StyleElements = [seFont, seClient]
   OnCreate = FormCreate
   OnShow = FormShow
@@ -78,6 +78,7 @@ object FrmMain: TFrmMain
       inherited lblFilterMatches: TLabel
         Left = 827
         Height = 32
+        ExplicitLeft = 827
       end
       inherited SearchFilterBox: TSearchBox
         Left = 891

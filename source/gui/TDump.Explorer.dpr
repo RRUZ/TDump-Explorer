@@ -32,6 +32,7 @@ uses
   TDump.Explorer.View.Shared in 'TDump.Explorer.View.Shared.pas',
   TDump.Explorer.PopupMenu in 'TDump.Explorer.PopupMenu.pas',
   TDump.Explorer.Settings in 'TDump.Explorer.Settings.pas' {FrmSettings},
+  TDump.Explorer.About in 'TDump.Explorer.About.pas' {FrmAbout},
   TDump.Explorer.View.Borland in 'TDump.Explorer.View.Borland.pas';
 
 {$R *.res}

@@ -16,7 +16,7 @@ interface
 
 uses
   Winapi.Messages, Vcl.Graphics, System.Types, System.UITypes, System.Classes,
-  Vcl.Controls, Vcl.ExtCtrls, Vcl.Forms, Vcl.ImgList,
+  Vcl.Controls, Vcl.ExtCtrls, Vcl.Forms, Vcl.ImgList, Vcl.StdCtrls,
   TDump.Explorer.Tabs;
 
 type
@@ -50,6 +50,34 @@ type
     class function DarkTheme: TExplorerTheme; static;
     class function LightTheme: TExplorerTheme; static;
     class function ActiveTheme: TExplorerTheme; static;
+  end;
+
+  // Non-interactive, fixed-size label with DPI-aware rounded badge painting.
+  TExplorerBadgeLabel = class(TCustomLabel)
+  private
+    FBorderColor: TColor;
+    FCornerRadius: Integer;
+    procedure SetBorderColor(const AValue: TColor);
+    procedure SetCornerRadius(const AValue: Integer);
+  protected
+    procedure Paint; override;
+  public
+    constructor Create(AOwner: TComponent); override;
+    procedure ApplyTheme(const ATheme: TExplorerTheme);
+  published
+    property Align;
+    property Anchors;
+    property Caption;
+    property Color;
+    property Constraints;
+    property Enabled;
+    property Font;
+    property ParentFont;
+    property ParentShowHint;
+    property ShowHint;
+    property Visible;
+    property BorderColor: TColor read FBorderColor write SetBorderColor;
+    property CornerRadius: Integer read FCornerRadius write SetCornerRadius default 5;
   end;
 
   TSimpleUIButtonPalette = record
@@ -264,6 +292,59 @@ const
   cInactiveTopBlend = 0.97;
   cHoverTopBlend = 0.82;
   cCloseHoverBlend = 0.72;
+
+{ TExplorerBadgeLabel }
+
+constructor TExplorerBadgeLabel.Create(AOwner: TComponent);
+begin
+  inherited Create(AOwner);
+  AutoSize := False;
+  Transparent := True;
+  ShowAccelChar := False;
+  FCornerRadius := 5;
+  SetBounds(0, 0, 72, 28);
+  ApplyTheme(TExplorerTheme.ActiveTheme);
+end;
+
+procedure TExplorerBadgeLabel.ApplyTheme(const ATheme: TExplorerTheme);
+begin
+  Color := ATheme.BackgroundColor;
+  Font.Color := ATheme.TextColor;
+  BorderColor := ColorBlendRGB(ATheme.TextColor, ATheme.BackgroundColor, 0.87);
+  Invalidate;
+end;
+
+procedure TExplorerBadgeLabel.SetBorderColor(const AValue: TColor);
+begin
+  if FBorderColor = AValue then
+    Exit;
+  FBorderColor := AValue;
+  Invalidate;
+end;
+
+procedure TExplorerBadgeLabel.SetCornerRadius(const AValue: Integer);
+begin
+  var LRadius := Max(0, AValue);
+  if FCornerRadius = LRadius then
+    Exit;
+  FCornerRadius := LRadius;
+  Invalidate;
+end;
+
+procedure TExplorerBadgeLabel.Paint;
+begin
+  DrawAntialiasedRoundedRectangle(Canvas, ClientRect, Color, FBorderColor,
+    ScaleValue(FCornerRadius), ScaleFactor);
+  Canvas.Font.Assign(Font);
+  if not Enabled then
+    Canvas.Font.Color := StyleServices.GetSystemColor(clGrayText);
+  Canvas.Brush.Style := bsClear;
+  var LTextRect := ClientRect;
+  InflateRect(LTextRect, -ScaleValue(8), 0);
+  Winapi.Windows.DrawText(Canvas.Handle, PChar(Caption), Length(Caption),
+    LTextRect, DrawTextBiDiModeFlags(DT_SINGLELINE or DT_CENTER or
+      DT_VCENTER or DT_NOPREFIX or DT_END_ELLIPSIS));
+end;
 
 function ColorToGPColor(AColor: TColor): TGPColor;
 begin

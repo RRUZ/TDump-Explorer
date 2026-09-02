@@ -100,11 +100,20 @@ type
     swShowRawPanel: TToggleSwitch;
     swFollowRawSelection: TToggleSwitch;
     ControlList1: TControlList;
+    pbCard: TPaintBox;
+    pbInputBorders: TPaintBox;
+    CheckBox1: TCheckBox;
+    CheckBox2: TCheckBox;
+    procedure CardPaint(Sender: TObject);
+    procedure InputBordersPaint(Sender: TObject);
+    procedure InputFocusChanged(Sender: TObject);
+    procedure InputBordersMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
     procedure FormShow(Sender: TObject);
     procedure btnSaveClick(Sender: TObject);
   private
-    FSettingsTabs: TExplorerTabStrip;
-    FSettingsTabImages: TVirtualImageList;
+    //FSettingsTabs: TExplorerTabStrip;
+    //FSettingsTabImages: TVirtualImageList;
     FButtonImages: TVirtualImageList;
     FBrowseButton: TSimpleUIButton;
     FCancelButton: TSimpleUIButton;
@@ -112,6 +121,8 @@ type
     FSelectedThemeOption: TThemeOption;
 
     procedure CreateSettingsButtons;
+    procedure UpdateSettingsLayout;
+    function InputBorderRect(AInput: TWinControl): TRect;
     procedure CreateSettingsTabs;
     procedure SettingsTabsBackgroundMouseDown(Sender: TObject;
       Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
@@ -124,8 +135,12 @@ type
     procedure BroadcastSettingsChanged;
     procedure ApplyTheme;
     procedure CMStyleChanged(var AMessage: TMessage); message CM_STYLECHANGED;
+  protected
+    procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override;
+    procedure DoAfterMonitorDpiChanged(OldDPI, NewDPI: Integer); override;
   public
     constructor Create(AOwner: TComponent); override;
+    procedure ScaleForPPI(NewPPI: Integer); override;
   end;
 
 implementation
@@ -139,7 +154,7 @@ uses
 
 const
   cSettingsTitleBarButtonMargin = 50;
-  cSettingsTitleBarHeight = 40;
+  cSettingsTitleBarHeight = 30;
   cSettingsTabHeight = 38;
   cSettingsTabBorderBlend = 0.82;
   cSettingsTabInactiveTopBlend = 0.97;
@@ -149,6 +164,11 @@ const
   cThemeOptionIconSize = 32;
   cThemeOptionCardMargin = 3;
   cThemeOptionIconTextGap = 4;
+  // All geometry is authored at 96 DPI, like the About dialog.
+  cSettingsCardBorderBlend = 0.87;
+  cSettingsInputBorderBlend = 0.78;
+  cSettingsInputPaddingX = 8;
+  cSettingsInputPaddingY = 5;
 
   cThemeOptionSystem = Ord(toSystem);
   cThemeOptionDark = Ord(toDark);
@@ -353,6 +373,59 @@ end;
 
 { TFrmSettings }
 
+function TFrmSettings.InputBorderRect(AInput: TWinControl): TRect;
+begin
+  Result := AInput.BoundsRect;
+  InflateRect(Result, ScaleValue(cSettingsInputPaddingX),
+    ScaleValue(cSettingsInputPaddingY));
+end;
+
+procedure TFrmSettings.CardPaint(Sender: TObject);
+begin
+  var LTheme := TExplorerTheme.ActiveTheme;
+  var LBorder := ColorBlendRGB(LTheme.TextColor, LTheme.BackgroundColor,
+    cSettingsCardBorderBlend);
+  DrawAntialiasedRoundedRectangle(pbCard.Canvas,
+    Rect(ScaleValue(12), ScaleValue(8), pbCard.Width - ScaleValue(12),
+      pbCard.Height - ScaleValue(8)), LTheme.BackgroundColor, LBorder,
+    ScaleValue(10), 1);
+  var LDividerY := pnlAppearance.Top - ScaleValue(10);
+  pbCard.Canvas.Pen.Color := LBorder;
+  pbCard.Canvas.MoveTo(ScaleValue(26), LDividerY);
+  pbCard.Canvas.LineTo(pbCard.Width - ScaleValue(26), LDividerY);
+end;
+
+procedure TFrmSettings.InputBordersPaint(Sender: TObject);
+  procedure DrawInput(AInput: TWinControl);
+  begin
+    var LTheme := TExplorerTheme.ActiveTheme;
+    var LBorder := if AInput.Focused then LTheme.SelectionColor else
+      ColorBlendRGB(LTheme.TextColor, LTheme.BackgroundColor,
+        cSettingsInputBorderBlend);
+    DrawAntialiasedRoundedRectangle(pbInputBorders.Canvas,
+      InputBorderRect(AInput), clNone, LBorder, ScaleValue(2), 1);
+  end;
+begin
+  DrawInput(edTDumpPath);
+  DrawInput(nbRecentItems);
+end;
+
+procedure TFrmSettings.InputFocusChanged(Sender: TObject);
+begin
+  pbInputBorders.Invalidate;
+end;
+
+procedure TFrmSettings.InputBordersMouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  if Button <> mbLeft then
+    Exit;
+  if InputBorderRect(edTDumpPath).Contains(Point(X, Y)) then
+    edTDumpPath.SetFocus
+  else if InputBorderRect(nbRecentItems).Contains(Point(X, Y)) then
+    nbRecentItems.SetFocus;
+end;
+
 procedure TFrmSettings.ApplyTheme;
   procedure ApplyLabel(ALabel: TLabel; AColor: TColor);
   begin
@@ -368,15 +441,13 @@ procedure TFrmSettings.ApplyTheme;
     AToggle.Font.Color := TExplorerTheme.ActiveTheme.TextColor;
   end;
 
-var
-  LTheme: TExplorerTheme;
-  LIconSuffix: string;
-  LTabPalette: TExplorerTabPalette;
 begin
-  LTheme := TExplorerTheme.ActiveTheme;
+  if not Assigned(pnContent) then
+    Exit;
+  var LTheme := TExplorerTheme.ActiveTheme;
   // Icon suffixes describe the surface they are intended for.  On a light
   // form use the visible light-UI glyphs, and vice versa.
-  LIconSuffix := if IsLightThemeActive then 'light' else 'dark';
+  var LIconSuffix := if IsLightThemeActive then 'light' else 'dark';
 
   Color := LTheme.BackgroundColor;
   pnContent.Color := LTheme.BackgroundColor;
@@ -397,17 +468,39 @@ begin
   ApplyLabel(lblInformation, LTheme.InactiveText);
   ApplyLabel(lblHint, LTheme.InactiveText);
 
+  // We own these controls' colors and outer frames. Keep the native edit
+  // path so a VCL style hook cannot repaint their borderless non-client area.
+  edTDumpPath.StyleName := 'Windows';
+  nbRecentItems.StyleName := 'Windows';
   edTDumpPath.Color := LTheme.BackgroundColor;
   edTDumpPath.Font.Color := LTheme.TextColor;
   nbRecentItems.Color := LTheme.BackgroundColor;
   nbRecentItems.Font.Color := LTheme.TextColor;
+  nbRecentItems.SpinButtonOptions.ArrowColor := LTheme.TextColor;
+  nbRecentItems.SpinButtonOptions.ArrowHotColor := LTheme.SelectionColor;
+  nbRecentItems.SpinButtonOptions.ArrowPressedColor := LTheme.SelectionColor;
+  nbRecentItems.SpinButtonOptions.ArrowDisabledColor := LTheme.InactiveText;
 
   ApplyExplorerThemeToButton(FBrowseButton, LTheme);
   ApplyExplorerThemeToButton(FCancelButton, LTheme);
-  ApplyExplorerThemeToButton(FSaveButton, LTheme);
+  if Assigned(FSaveButton) then
+  begin
+    var LPalette := ExplorerButtonPalette(LTheme);
+    LPalette.Background := LTheme.SelectionColor;
+    LPalette.Border := LTheme.SelectionColor;
+    LPalette.HotBackground := ColorBlendRGB(LTheme.SelectionColor,
+      LTheme.BackgroundColor, 0.15);
+    LPalette.PressedBackground := ColorBlendRGB(LTheme.SelectionColor,
+      LTheme.BackgroundColor, 0.28);
+    LPalette.Text := StyleServices.GetSystemColor(clHighlightText);
+    LPalette.HotText := LPalette.Text;
+    LPalette.PressedText := LPalette.Text;
+    LPalette.FocusedBorder := LTheme.TextColor;
+    FSaveButton.ApplyPalette(LPalette);
+  end;
   if Assigned(FBrowseButton) then
     FBrowseButton.ImageName := 'browse_' + LIconSuffix;
-
+      {
   if Assigned(FSettingsTabs) then
   begin
     LTabPalette.StripTop := LTheme.BackgroundColor;
@@ -432,7 +525,7 @@ begin
     if FSettingsTabs.Items.Count > 0 then
       FSettingsTabs.Items[0].ImageName := 'gear_' + LIconSuffix;
   end;
-
+      }
   CustomTitleBar.SystemHeight := False;
   CustomTitleBar.Height := ScaleValue(cSettingsTitleBarHeight);
   CustomTitleBar.SystemColors := False;
@@ -445,15 +538,16 @@ begin
   CustomTitleBar.BackgroundColor := LTheme.BackgroundColor;
   CustomTitleBar.ForegroundColor := LTheme.TextColor;
   CustomTitleBar.InactiveBackgroundColor := LTheme.BackgroundColor;
-  CustomTitleBar.InactiveForegroundColor := LTabPalette.InactiveText;
+  CustomTitleBar.InactiveForegroundColor := LTheme.InactiveText;
   CustomTitleBar.ButtonBackgroundColor := LTheme.BackgroundColor;
   CustomTitleBar.ButtonForegroundColor := LTheme.TextColor;
-  CustomTitleBar.ButtonHoverBackgroundColor := LTabPalette.HoverTop;
+  CustomTitleBar.ButtonHoverBackgroundColor := ColorBlendRGB(
+    LTheme.SelectionColor, LTheme.BackgroundColor, 0.82);
   CustomTitleBar.ButtonHoverForegroundColor := LTheme.TextColor;
   CustomTitleBar.ButtonPressedBackgroundColor := LTheme.SelectionColor;
   CustomTitleBar.ButtonPressedForegroundColor := LTheme.TextColor;
   CustomTitleBar.ButtonInactiveBackgroundColor := LTheme.BackgroundColor;
-  CustomTitleBar.ButtonInactiveForegroundColor := LTabPalette.InactiveText;
+  CustomTitleBar.ButtonInactiveForegroundColor := LTheme.InactiveText;
   //TitleBarPanel1.AlphaValue := 255;
   TitleBarPanel1.Invalidate;
 
@@ -463,6 +557,8 @@ begin
   ControlList1.Color := LTheme.BackgroundColor;
   ControlList1.ItemColor := LTheme.BackgroundColor;
   ControlList1.Invalidate;
+  pbCard.Invalidate;
+  pbInputBorders.Invalidate;
 end;
 
 procedure TFrmSettings.ConfigureThemeOptions;
@@ -568,34 +664,37 @@ begin
   if (LCardRect.Width <= 0) or (LCardRect.Height <= 0) then
     Exit;
 
-  ACanvas.Brush.Color := TExplorerTheme.ActiveTheme.BackgroundColor;
+  ACanvas.Brush.Style := bsSolid;
+  ACanvas.Brush.Color := LTheme.BackgroundColor;
   ACanvas.FillRect(ARect);
+  LFillColor := LTheme.BackgroundColor;
+  var LBorderColor := ColorBlendRGB(LTheme.TextColor, LTheme.BackgroundColor,
+    cSettingsCardBorderBlend);
   LTextColor := LTheme.TextColor;
   LIconColor := LTheme.TextColor;
   if (odSelected in AState) then
   begin
-    LFillColor := ColorBlendRGB(TExplorerTheme.ActiveTheme.SelectionColor, TExplorerTheme.ActiveTheme.BackgroundColor, 0.9);
-    DrawRoundedBar(ACanvas, ARect, LFillColor, TExplorerTheme.ActiveTheme.SelectionColor, 4.0);
+    LFillColor := ColorBlendRGB(LTheme.SelectionColor, LTheme.BackgroundColor, 0.9);
+    LBorderColor := LTheme.SelectionColor;
     LTextColor := LTheme.SelectionColor;
     LIconColor := LTheme.SelectionColor;
   end
   else if (odHotLight in AState) then
   begin
-    LFillColor := ColorBlendRGB(TExplorerTheme.ActiveTheme.SelectionColor, TExplorerTheme.ActiveTheme.BackgroundColor, 0.95);
-    ACanvas.Brush.Color := LFillColor;
-    ACanvas.FillRect(ARect);
+    LFillColor := ColorBlendRGB(LTheme.SelectionColor, LTheme.BackgroundColor, 0.95);
+    LBorderColor := ColorBlendRGB(LTheme.SelectionColor, LTheme.BackgroundColor, 0.5);
   end;
-
-
+  DrawAntialiasedRoundedRectangle(ACanvas, LCardRect, LFillColor,
+    LBorderColor, ScaleValue(2), 1);
+  ACanvas.Font.Assign(ControlList1.Font);
   ACanvas.Font.Name := TExplorerTheme.FontName;
-  ACanvas.Font.Size := TExplorerTheme.FontSize;
   //ACanvas.Font.Style := [fsBold];
   LIconSize := ScaleValue(cThemeOptionIconSize);
   LContentHeight := LIconSize + ScaleValue(cThemeOptionIconTextGap) + ACanvas.TextHeight(cThemeOptionCaptions[AIndex]);
   LIconX := LCardRect.Left + (LCardRect.Width - LIconSize) div 2;
   LIconY := LCardRect.Top + Max(0, (LCardRect.Height - LContentHeight) div 2);
   LIconRect := Rect(LIconX, LIconY, LIconX + LIconSize, LIconY + LIconSize);
-  PhosphorFont.DrawIcon(ACanvas.Handle, cThemeOptionIconCodes[AIndex], LIconRect, LIconColor, pfwRegular);
+  PhosphorFont.DrawIcon(ACanvas.Handle, cThemeOptionIconCodes[AIndex], LIconRect, LIconColor, pfwThin);
 
   LTextRect := LCardRect;
   LTextRect.Top := LIconY + LIconSize + ScaleValue(cThemeOptionIconTextGap);
@@ -619,16 +718,15 @@ end;
 procedure TFrmSettings.CreateSettingsButtons;
 begin
   FButtonImages := TVirtualImageList.Create(Self);
-  FButtonImages.Width := 16;
-  FButtonImages.Height := 16;
+  FButtonImages.Width := ScaleValue(16);
+  FButtonImages.Height := ScaleValue(16);
   FButtonImages.ImageCollection := DataModule1.ImageCollection1;
   FButtonImages.Add('browse_dark', 'file-magnifying-glass_dark');
   FButtonImages.Add('browse_light', 'file-magnifying-glass_light');
 
   FBrowseButton := TSimpleUIButton.Create(Self);
+  FBrowseButton.Name := 'btnBrowse';
   FBrowseButton.Parent := pnlGeneral;
-  FBrowseButton.SetBounds(edTDumpPath.Left + edTDumpPath.Width + ScaleValue(6),
-    edTDumpPath.Top - ScaleValue(1), ScaleValue(87), ScaleValue(25));
   FBrowseButton.Anchors := [akTop, akRight];
   FBrowseButton.Caption := 'Browse...';
   FBrowseButton.Images := FButtonImages;
@@ -637,17 +735,9 @@ begin
   FBrowseButton.TabOrder := 1;
   nbRecentItems.TabOrder := 2;
 
-  var LButtonWidth := ScaleValue(80);
-  var LButtonHeight := ScaleValue(25);
-  var LRightMargin := ScaleValue(31);
-  var LButtonGap := ScaleValue(6);
-  var LButtonTop := ScaleValue(29);
-
   FCancelButton := TSimpleUIButton.Create(Self);
+  FCancelButton.Name := 'btnCancel';
   FCancelButton.Parent := pnFooter;
-  FCancelButton.SetBounds(pnFooter.ClientWidth - LRightMargin -
-    (LButtonWidth * 2) - LButtonGap, LButtonTop, LButtonWidth,
-    LButtonHeight);
   FCancelButton.Anchors := [akTop, akRight];
   FCancelButton.Cancel := True;
   FCancelButton.Caption := 'Cancel';
@@ -656,9 +746,8 @@ begin
   FCancelButton.TabOrder := 0;
 
   FSaveButton := TSimpleUIButton.Create(Self);
+  FSaveButton.Name := 'btnSave';
   FSaveButton.Parent := pnFooter;
-  FSaveButton.SetBounds(pnFooter.ClientWidth - LRightMargin - LButtonWidth,
-    LButtonTop, LButtonWidth, LButtonHeight);
   FSaveButton.Anchors := [akTop, akRight];
   FSaveButton.Caption := 'Save';
   FSaveButton.Default := True;
@@ -666,12 +755,40 @@ begin
   FSaveButton.OnClick := btnSaveClick;
   FSaveButton.ParentFont := True;
   FSaveButton.TabOrder := 1;
+  UpdateSettingsLayout;
+end;
+
+procedure TFrmSettings.UpdateSettingsLayout;
+begin
+  if not Assigned(FSaveButton) then
+    Exit;
+  // Derive the edit width from the scaled panel to avoid cumulative rounding
+  // pushing Browse beyond the right edge at fractional display scales.
+  edTDumpPath.Width := Max(1, pnlGeneral.ClientWidth - edTDumpPath.Left -
+    ScaleValue(cSettingsInputPaddingX) - ScaleValue(8) - ScaleValue(87));
+  var LPathRect := InputBorderRect(edTDumpPath);
+  var LButtonHeight := ScaleValue(25);
+  FBrowseButton.SetBounds(LPathRect.Right + ScaleValue(8),
+    LPathRect.Top + (LPathRect.Height - LButtonHeight) div 2,
+    ScaleValue(87), LButtonHeight);
+  var LButtonWidth := ScaleValue(80);
+  var LRightMargin := ScaleValue(22);
+  var LButtonGap := ScaleValue(6);
+  var LButtonTop := ScaleValue(12);
+  FCancelButton.SetBounds(pnFooter.ClientWidth - LRightMargin -
+    (LButtonWidth * 2) - LButtonGap, LButtonTop, LButtonWidth, LButtonHeight);
+  FSaveButton.SetBounds(pnFooter.ClientWidth - LRightMargin - LButtonWidth,
+    LButtonTop, LButtonWidth, LButtonHeight);
+  FButtonImages.SetSize(ScaleValue(16), ScaleValue(16));
+  ConfigureThemeOptions;
+  pbCard.Invalidate;
+  pbInputBorders.Invalidate;
 end;
 
 procedure TFrmSettings.CreateSettingsTabs;
 begin
   TitleBarPanel1.Height := ScaleValue(cSettingsTitleBarHeight);
-
+  {
   FSettingsTabImages := TVirtualImageList.Create(Self);
   FSettingsTabImages.Width := 16;
   FSettingsTabImages.Height := 16;
@@ -700,6 +817,7 @@ begin
   FSettingsTabs.OnBackgroundMouseDown := SettingsTabsBackgroundMouseDown;
   FSettingsTabs.AddTab('Settings', 'gear_light', False, True);
   FSettingsTabs.SendToBack;
+  }
 end;
 
 procedure TFrmSettings.SettingsTabsBackgroundMouseDown(Sender: TObject;
@@ -721,6 +839,9 @@ end;
 constructor TFrmSettings.Create(AOwner: TComponent);
 begin
   inherited;
+  pbCard.SendToBack;
+  pbInputBorders.SendToBack;
+  Font.Name := TExplorerTheme.FontName;
   LoadSettings;
   ControlList1.OnAfterDrawItem := ControlList1AfterDrawItem;
   ControlList1.OnChange := ControlList1Change;
@@ -731,9 +852,35 @@ end;
 
 procedure TFrmSettings.FormShow(Sender: TObject);
 begin
-  Font.Name := TExplorerTheme.FontName;
-  Font.Size := TExplorerTheme.FontSize;
-  Font.Height := MulDiv(Font.Height, CurrentPPI, Font.PixelsPerInch);
+  UpdateSettingsLayout;
+  ApplyTheme;
+end;
+
+procedure TFrmSettings.ChangeScale(M, D: Integer; isDpiChange: Boolean);
+begin
+  inherited;
+  if Assigned(FSaveButton) then
+  begin
+    UpdateSettingsLayout;
+    ApplyTheme;
+  end;
+end;
+
+procedure TFrmSettings.ScaleForPPI(NewPPI: Integer);
+begin
+  inherited;
+  if Assigned(FSaveButton) then
+  begin
+    UpdateSettingsLayout;
+    ApplyTheme;
+  end;
+end;
+
+procedure TFrmSettings.DoAfterMonitorDpiChanged(OldDPI, NewDPI: Integer);
+begin
+  inherited;
+  UpdateSettingsLayout;
+  ApplyTheme;
 end;
 
 initialization

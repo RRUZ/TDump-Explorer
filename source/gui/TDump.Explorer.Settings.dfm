@@ -3,12 +3,13 @@ object FrmSettings: TFrmSettings
   Top = 0
   BorderStyle = bsDialog
   Caption = 'Settings'
-  ClientHeight = 388
+  ClientHeight = 448
   ClientWidth = 585
   Color = clWindow
   CustomTitleBar.Control = TitleBarPanel1
   CustomTitleBar.Enabled = True
-  CustomTitleBar.Height = 38
+  CustomTitleBar.Height = 30
+  CustomTitleBar.SystemHeight = False
   CustomTitleBar.BackgroundColor = clWhite
   CustomTitleBar.ForegroundColor = 65793
   CustomTitleBar.InactiveBackgroundColor = clWhite
@@ -28,35 +29,45 @@ object FrmSettings: TFrmSettings
   Font.Name = 'Segoe UI'
   Font.Style = []
   GlassFrame.Enabled = True
-  GlassFrame.Top = 38
-  Position = poScreenCenter
+  GlassFrame.Top = 30
+  Position = poOwnerFormCenter
   RoundedCorners = rcOn
   StyleElements = [seFont, seClient]
   OnShow = FormShow
   TextHeight = 15
   object pnContent: TPanel
     Left = 0
-    Top = 37
+    Top = 29
     Width = 585
-    Height = 282
+    Height = 361
     Align = alClient
     BevelOuter = bvNone
     Color = clWindow
-    Padding.Left = 20
-    Padding.Top = 14
-    Padding.Right = 20
-    Padding.Bottom = 14
+    Padding.Left = 26
+    Padding.Top = 20
+    Padding.Right = 26
+    Padding.Bottom = 20
     ParentBackground = False
     TabOrder = 0
     StyleElements = [seFont, seBorder]
-    ExplicitTop = 43
-    ExplicitHeight = 365
+    DesignSize = (
+      585
+      361)
+    object pbCard: TPaintBox
+      Left = 0
+      Top = 0
+      Width = 585
+      Height = 360
+      Anchors = [akLeft, akTop, akRight, akBottom]
+      OnPaint = CardPaint
+      ExplicitHeight = 322
+    end
     object pnlWorkspace: TPanel
       AlignWithMargins = True
-      Left = 20
-      Top = 293
-      Width = 545
-      Height = 1
+      Left = 26
+      Top = 371
+      Width = 533
+      Height = 2
       Margins.Left = 0
       Margins.Top = 0
       Margins.Right = 0
@@ -68,7 +79,7 @@ object FrmSettings: TFrmSettings
       TabOrder = 2
       Visible = False
       StyleElements = [seFont, seBorder]
-      ExplicitTop = 279
+      ExplicitTop = 306
       object lblWorkspace: TLabel
         Left = 0
         Top = 18
@@ -139,10 +150,10 @@ object FrmSettings: TFrmSettings
     end
     object pnlAppearance: TPanel
       AlignWithMargins = True
-      Left = 20
-      Top = 159
-      Width = 545
-      Height = 120
+      Left = 26
+      Top = 245
+      Width = 533
+      Height = 112
       Margins.Left = 0
       Margins.Top = 0
       Margins.Right = 0
@@ -150,16 +161,17 @@ object FrmSettings: TFrmSettings
       Align = alTop
       BevelOuter = bvNone
       Color = clWindow
-      Constraints.MaxHeight = 120
-      Constraints.MinHeight = 120
+      Constraints.MaxHeight = 112
+      Constraints.MinHeight = 112
       ParentBackground = False
       TabOrder = 1
       StyleElements = [seFont, seBorder]
+      ExplicitTop = 180
       object lblAppearance: TLabel
         Left = 0
         Top = 0
-        Width = 545
-        Height = 28
+        Width = 533
+        Height = 17
         Align = alTop
         Caption = 'Appearance'
         Font.Charset = DEFAULT_CHARSET
@@ -168,29 +180,30 @@ object FrmSettings: TFrmSettings
         Font.Name = 'Segoe UI'
         Font.Style = [fsBold]
         ParentFont = False
+        ExplicitWidth = 72
       end
       object lblPreferredTheme: TLabel
         Left = 0
-        Top = 28
-        Width = 545
-        Height = 24
+        Top = 17
+        Width = 533
+        Height = 15
         Align = alTop
         Caption = 'Preferred theme'
-        ExplicitTop = 24
+        ExplicitWidth = 85
       end
       object ControlList1: TControlList
         AlignWithMargins = True
         Left = 8
-        Top = 60
-        Width = 529
-        Height = 52
+        Top = 40
+        Width = 517
+        Height = 64
         Margins.Left = 8
         Margins.Top = 8
         Margins.Right = 8
         Margins.Bottom = 8
         Align = alClient
         BorderStyle = bsNone
-        ItemCount = 5
+        ItemCount = 3
         ItemWidth = 50
         ItemMargins.Left = 0
         ItemMargins.Top = 0
@@ -199,33 +212,42 @@ object FrmSettings: TFrmSettings
         ColumnLayout = cltMultiLeftToRight
         ParentColor = False
         TabOrder = 0
-        ExplicitLeft = 11
-        ExplicitTop = 58
-        ExplicitWidth = 539
-        ExplicitHeight = 75
       end
     end
     object pnlGeneral: TPanel
       AlignWithMargins = True
-      Left = 20
-      Top = 14
-      Width = 545
-      Height = 131
+      Left = 26
+      Top = 20
+      Width = 533
+      Height = 205
       Margins.Left = 0
       Margins.Top = 0
       Margins.Right = 0
-      Margins.Bottom = 14
+      Margins.Bottom = 20
       Align = alTop
       BevelOuter = bvNone
       Color = clWindow
       ParentBackground = False
       TabOrder = 0
       StyleElements = [seFont, seBorder]
+      DesignSize = (
+        533
+        205)
+      object pbInputBorders: TPaintBox
+        Left = 0
+        Top = 0
+        Width = 533
+        Height = 205
+        Anchors = [akLeft, akTop, akRight, akBottom]
+        OnMouseDown = InputBordersMouseDown
+        OnPaint = InputBordersPaint
+        ExplicitHeight = 140
+      end
       object lblGeneral: TLabel
         Left = 0
         Top = 0
-        Width = 545
-        Height = 28
+        Width = 533
+        Height = 17
         Align = alTop
         Caption = 'General'
         Font.Charset = DEFAULT_CHARSET
@@ -234,6 +256,7 @@ object FrmSettings: TFrmSettings
         Font.Name = 'Segoe UI'
         Font.Style = [fsBold]
         ParentFont = False
+        ExplicitWidth = 47
       end
       object lblTDumpPath: TLabel
         Left = 0
@@ -250,24 +273,51 @@ object FrmSettings: TFrmSettings
         Caption = 'Recent files max items'
       end
       object edTDumpPath: TEdit
-        Left = 0
-        Top = 52
-        Width = 441
-        Height = 23
+        Left = 8
+        Top = 56
+        Width = 422
+        Height = 18
+        Anchors = [akLeft, akTop, akRight]
+        AutoSize = False
+        BevelInner = bvNone
+        BevelOuter = bvNone
+        BorderStyle = bsNone
         TabOrder = 0
         Text = 'C:\Tools\RADStudio\bin\tdump.exe'
+        OnEnter = InputFocusChanged
+        OnExit = InputFocusChanged
       end
       object nbRecentItems: TNumberBox
-        Left = 0
-        Top = 106
+        Left = 8
+        Top = 111
         Width = 118
-        Height = 23
+        Height = 18
+        AutoSize = False
+        BorderStyle = bsNone
         MinValue = 1.000000000000000000
         MaxValue = 100.000000000000000000
-        TabOrder = 2
+        TabOrder = 1
         Value = 10.000000000000000000
         SpinButtonOptions.ButtonWidth = 20
         SpinButtonOptions.Placement = nbspInline
+        OnEnter = InputFocusChanged
+        OnExit = InputFocusChanged
+      end
+      object CheckBox1: TCheckBox
+        Left = 0
+        Top = 152
+        Width = 97
+        Height = 17
+        Caption = 'CheckBox1'
+        TabOrder = 2
+      end
+      object CheckBox2: TCheckBox
+        Left = 0
+        Top = 175
+        Width = 97
+        Height = 17
+        Caption = 'CheckBox2'
+        TabOrder = 3
       end
     end
   end
@@ -275,47 +325,42 @@ object FrmSettings: TFrmSettings
     Left = 0
     Top = 0
     Width = 585
-    Height = 37
+    Height = 29
     CustomButtons = <>
-    ExplicitTop = -6
   end
   object pnFooter: TPanel
     Left = 0
-    Top = 319
+    Top = 390
     Width = 585
-    Height = 69
+    Height = 58
     Align = alBottom
     BevelOuter = bvNone
     Color = clWindow
     ParentBackground = False
     TabOrder = 2
     StyleElements = [seFont, seBorder]
-    ExplicitTop = 333
-    DesignSize = (
-      585
-      69)
     object lblInformation: TLabel
-      Left = 20
-      Top = 22
-      Width = 17
-      Height = 28
+      Left = 26
+      Top = 10
+      Width = 16
+      Height = 25
       Caption = #9432
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clGrayText
-      Font.Height = -20
+      Font.Height = -18
       Font.Name = 'Segoe UI Symbol'
       Font.Style = []
       ParentFont = False
     end
     object lblHint: TLabel
-      Left = 43
-      Top = 31
-      Width = 263
-      Height = 17
+      Left = 49
+      Top = 17
+      Width = 236
+      Height = 15
       Caption = 'Changes apply on next open where required.'
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clGrayText
-      Font.Height = -13
+      Font.Height = -12
       Font.Name = 'Segoe UI'
       Font.Style = []
       ParentFont = False

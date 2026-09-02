@@ -1423,15 +1423,19 @@ begin
   LOriginalBrushStyle := HeaderControl.Canvas.Brush.Style;
   try
     HeaderControl.Canvas.Brush.Style := bsClear;
-    HeaderControl.Canvas.TextRect(LTextRect, LHeaderText, LTextFormat);
+    if LTextRect.Width > 0 then
+      HeaderControl.Canvas.TextRect(LTextRect, LHeaderText, LTextFormat);
   finally
     HeaderControl.Canvas.Brush.Style := LOriginalBrushStyle;
   end;
 
-  if not FSortEnabled or (Section.Index <> FSortColumn) then
+  if not FSortEnabled or (Section.Index <> FSortColumn) or
+    (ARect.Width < (CTextPadding * 2) + ScaleValue(CHeaderSortGlyphWidth)) then
     Exit;
 
-  LChevronCenter.X := Min(LTextRect.Right - ScaleValue(4),
+  // The clamp belongs in the reserved glyph slot, outside the text rectangle.
+  // Clamping inside LTextRect makes narrow headers paint the arrow over text.
+  LChevronCenter.X := Min(LTextRect.Right + ScaleValue(CHeaderSortGlyphWidth div 2),
     LTextRect.Left + HeaderControl.Canvas.TextWidth(LHeaderText) +
       ScaleValue(12));
   LChevronCenter.Y := (ARect.Top + ARect.Bottom) div 2;

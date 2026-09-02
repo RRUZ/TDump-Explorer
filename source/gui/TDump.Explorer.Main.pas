@@ -22,7 +22,7 @@ uses
   Vcl.Graphics, Vcl.Controls, Vcl.Forms,
   Vcl.Dialogs, Vcl.StdCtrls, Winapi.ShellAPI, TDump.Explorer.Finder,
   TDump.Explorer.Parser, TDump.Explorer.Phosphor.Font, TDump.Explorer.Runner,
-  TDump.Explorer.TextSource, TDump.Explorer.Settings,
+  TDump.Explorer.TextSource, TDump.Explorer.Settings, TDump.Explorer.About,
   TDump.Explorer.Frame, Vcl.ComCtrls, TDump.Explorer.LogControl, Vcl.ExtCtrls,
   Vcl.TitleBarCtrls, Vcl.WinXPanels, Vcl.VirtualImageList,
   TDump.Explorer.Tabs, TDump.Explorer.PopupMenu, TDump.Explorer.UI,
@@ -778,10 +778,19 @@ begin
   end;
 end;
 
-
 procedure TFrmMain.PopupMenuChangeThemeClick(Sender: TObject);
 begin
   ToggleActiveTheme;
+  if IsLightThemeActive and (TSettings.Instance.ThemeOption <> toLight) then
+  begin
+    TSettings.Instance.ThemeOption := toLight;
+    TSettings.Instance.Save;
+  end
+  else if not IsLightThemeActive and (TSettings.Instance.ThemeOption <> toDark) then
+  begin
+    TSettings.Instance.ThemeOption := toDark;
+    TSettings.Instance.Save;
+  end;
 end;
 
 procedure TFrmMain.ExplorerPopupMenuItemClick(Sender: TObject;
@@ -826,14 +835,14 @@ begin
   LMenuItems.BeginUpdate;
   try
     LMenuItems.Clear;
-    LMenuItems.Add('Settings', 'gear' + LIconSuffix);
+    LMenuItems.Add('Settings...', 'gear' + LIconSuffix);
 
     if IsLightThemeActive  then
-      LMenuItems.Add('Dark Theme', 'moon_light')
+      LMenuItems.Add('Toggle to Dark Theme', 'moon_light')
     else
-      LMenuItems.Add('Light Theme', 'sun_dark');
+      LMenuItems.Add('Toggle to Light Theme', 'sun_dark');
 
-    LMenuItems.Add('About', 'file-dashed' + LIconSuffix);
+    LMenuItems.Add('About TDump Explorer', 'file-dashed' + LIconSuffix);
   finally
     LMenuItems.EndUpdate;
   end;
@@ -927,7 +936,12 @@ end;
 
 procedure TFrmMain.PopupMenuAboutClick(Sender: TObject);
 begin
-  // About action stub.
+  var LAboutForm := TFrmAbout.Create(Self);
+  try
+    LAboutForm.ShowModal;
+  finally
+    LAboutForm.Free;
+  end;
 end;
 
 procedure TFrmMain.TabsAddButtonClick(Sender: TObject);
