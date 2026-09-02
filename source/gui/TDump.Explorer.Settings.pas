@@ -29,7 +29,9 @@ uses
   Vcl.VirtualImageList,
   Vcl.WinXCtrls,
   Vcl.TitleBarCtrls,
-  TDump.Explorer.GlassTabs, Vcl.ControlList;
+  TDump.Explorer.GlassTabs,
+  TDump.Explorer.UI,
+  Vcl.ControlList;
 
 const
   cWmTDumpSettingsChanged = WM_APP + $243;
@@ -78,13 +80,10 @@ type
     pnFooter: TPanel;
     lblHint: TLabel;
     lblInformation: TLabel;
-    btnCancel: TButton;
-    btnSave: TButton;
     pnlGeneral: TPanel;
     lblGeneral: TLabel;
     lblTDumpPath: TLabel;
     edTDumpPath: TEdit;
-    btnBrowse: TButton;
     lblRecentItems: TLabel;
     nbRecentItems: TNumberBox;
     pnlAppearance: TPanel;
@@ -104,8 +103,13 @@ type
   private
     FSettingsTabs: TGlassTabStrip;
     FSettingsTabImages: TVirtualImageList;
+    FButtonImages: TVirtualImageList;
+    FBrowseButton: TSimpleUIButton;
+    FCancelButton: TSimpleUIButton;
+    FSaveButton: TSimpleUIButton;
     FSelectedThemeOption: TThemeOption;
 
+    procedure CreateSettingsButtons;
     procedure CreateSettingsTabs;
     procedure SettingsTabsBackgroundMouseDown(Sender: TObject;
       Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
@@ -126,7 +130,7 @@ implementation
 
 uses
   Winapi.Windows, Winapi.ShlObj, System.IniFiles, System.SysUtils,
-  Vcl.GraphUtil, Vcl.Themes, TDump.Explorer.Resources, TDump.Explorer.UI,
+  Vcl.GraphUtil, Vcl.Themes, TDump.Explorer.Resources,
   TDump.Explorer.Phosphor.Font;
 
 {$R *.dfm}
@@ -389,6 +393,12 @@ begin
   nbRecentItems.Color := LTheme.BackgroundColor;
   nbRecentItems.Font.Color := LTheme.TextColor;
 
+  ApplyExplorerThemeToButton(FBrowseButton, LTheme);
+  ApplyExplorerThemeToButton(FCancelButton, LTheme);
+  ApplyExplorerThemeToButton(FSaveButton, LTheme);
+  if Assigned(FBrowseButton) then
+    FBrowseButton.ImageName := 'browse_' + LIconSuffix;
+
   if Assigned(FSettingsTabs) then
   begin
     LTabPalette.StripTop := LTheme.BackgroundColor;
@@ -597,6 +607,58 @@ begin
   ControlList1.Invalidate;
 end;
 
+procedure TFrmSettings.CreateSettingsButtons;
+begin
+  FButtonImages := TVirtualImageList.Create(Self);
+  FButtonImages.Width := 16;
+  FButtonImages.Height := 16;
+  FButtonImages.ImageCollection := DataModule1.ImageCollection1;
+  FButtonImages.Add('browse_dark', 'file-magnifying-glass_dark');
+  FButtonImages.Add('browse_light', 'file-magnifying-glass_light');
+
+  FBrowseButton := TSimpleUIButton.Create(Self);
+  FBrowseButton.Parent := pnlGeneral;
+  FBrowseButton.SetBounds(edTDumpPath.Left + edTDumpPath.Width + ScaleValue(6),
+    edTDumpPath.Top - ScaleValue(1), ScaleValue(87), ScaleValue(25));
+  FBrowseButton.Anchors := [akTop, akRight];
+  FBrowseButton.Caption := 'Browse...';
+  FBrowseButton.Images := FButtonImages;
+  FBrowseButton.ImageName := 'browse_light';
+  FBrowseButton.ParentFont := True;
+  FBrowseButton.TabOrder := 1;
+  nbRecentItems.TabOrder := 2;
+
+  var LButtonWidth := ScaleValue(80);
+  var LButtonHeight := ScaleValue(25);
+  var LRightMargin := ScaleValue(31);
+  var LButtonGap := ScaleValue(6);
+  var LButtonTop := ScaleValue(29);
+
+  FCancelButton := TSimpleUIButton.Create(Self);
+  FCancelButton.Parent := pnFooter;
+  FCancelButton.SetBounds(pnFooter.ClientWidth - LRightMargin -
+    (LButtonWidth * 2) - LButtonGap, LButtonTop, LButtonWidth,
+    LButtonHeight);
+  FCancelButton.Anchors := [akTop, akRight];
+  FCancelButton.Cancel := True;
+  FCancelButton.Caption := 'Cancel';
+  FCancelButton.ModalResult := mrCancel;
+  FCancelButton.ParentFont := True;
+  FCancelButton.TabOrder := 0;
+
+  FSaveButton := TSimpleUIButton.Create(Self);
+  FSaveButton.Parent := pnFooter;
+  FSaveButton.SetBounds(pnFooter.ClientWidth - LRightMargin - LButtonWidth,
+    LButtonTop, LButtonWidth, LButtonHeight);
+  FSaveButton.Anchors := [akTop, akRight];
+  FSaveButton.Caption := 'Save';
+  FSaveButton.Default := True;
+  FSaveButton.ModalResult := mrOk;
+  FSaveButton.OnClick := btnSaveClick;
+  FSaveButton.ParentFont := True;
+  FSaveButton.TabOrder := 1;
+end;
+
 procedure TFrmSettings.CreateSettingsTabs;
 begin
   TitleBarPanel1.Height := ScaleValue(cSettingsTitleBarHeight);
@@ -653,7 +715,7 @@ begin
   LoadSettings;
   ControlList1.OnAfterDrawItem := ControlList1AfterDrawItem;
   ControlList1.OnChange := ControlList1Change;
-  btnSave.OnClick := btnSaveClick;
+  CreateSettingsButtons;
   CreateSettingsTabs;
   ApplyTheme;
 end;

@@ -257,14 +257,6 @@ object FrmSettings: TFrmSettings
         TabOrder = 0
         Text = 'C:\Tools\RADStudio\bin\tdump.exe'
       end
-      object btnBrowse: TButton
-        Left = 447
-        Top = 51
-        Width = 87
-        Height = 25
-        Caption = 'Browse...'
-        TabOrder = 1
-      end
       object nbRecentItems: TNumberBox
         Left = 0
         Top = 106
@@ -327,28 +319,6 @@ object FrmSettings: TFrmSettings
       Font.Name = 'Segoe UI'
       Font.Style = []
       ParentFont = False
-    end
-    object btnSave: TButton
-      Left = 474
-      Top = 29
-      Width = 80
-      Height = 25
-      Anchors = [akTop, akRight]
-      Caption = 'Save'
-      Default = True
-      ModalResult = 1
-      TabOrder = 1
-    end
-    object btnCancel: TButton
-      Left = 388
-      Top = 29
-      Width = 80
-      Height = 25
-      Anchors = [akTop, akRight]
-      Cancel = True
-      Caption = 'Cancel'
-      ModalResult = 2
-      TabOrder = 0
     end
   end
 end

@@ -39,6 +39,7 @@ type
     procedure CMStyleChanged(var AMessage: TMessage); message CM_STYLECHANGED;
     procedure ApplyTheme;
     procedure AdjustSizeToContent;
+    procedure NavigateSelection(AKey: Word);
   protected
     procedure CreateParams(var Params: TCreateParams); override;
     //procedure CreateWnd; override;
@@ -55,7 +56,8 @@ type
 implementation
 
 uses
-  System.Math, Winapi.Windows, TDump.Explorer.UI, Vcl.Graphics;
+  System.Math, Winapi.Windows, TDump.Explorer.UI, Vcl.Graphics,
+  Vcl.GraphUtil;
 
 {$R *.dfm}
 
@@ -65,8 +67,23 @@ begin
   Color := LTheme.BackgroundColor;
   MenuItemsControl.Color := LTheme.BackgroundColor;
   MenuItemsControl.ControlList1.Color := LTheme.BackgroundColor;
+  // A VCL style otherwise overrides the custom colors below with its active
+  // caption color. Popup title bars must always follow the Explorer palette.
+  CustomTitleBar.StyleColors := False;
   CustomTitleBar.BackgroundColor := LTheme.BackgroundColor;
+  CustomTitleBar.ForegroundColor := LTheme.TextColor;
   CustomTitleBar.InactiveBackgroundColor := LTheme.BackgroundColor;
+  CustomTitleBar.InactiveForegroundColor := LTheme.InactiveText;
+  CustomTitleBar.ButtonForegroundColor := LTheme.TextColor;
+  CustomTitleBar.ButtonBackgroundColor := LTheme.BackgroundColor;
+  CustomTitleBar.ButtonHoverForegroundColor := LTheme.TextColor;
+  CustomTitleBar.ButtonHoverBackgroundColor := ColorBlendRGB(
+    LTheme.SelectionColor, LTheme.BackgroundColor, 0.82);
+  CustomTitleBar.ButtonPressedForegroundColor := LTheme.TextColor;
+  CustomTitleBar.ButtonPressedBackgroundColor := ColorBlendRGB(
+    LTheme.SelectionColor, LTheme.BackgroundColor, 0.68);
+  CustomTitleBar.ButtonInactiveForegroundColor := LTheme.InactiveText;
+  CustomTitleBar.ButtonInactiveBackgroundColor := LTheme.BackgroundColor;
 end;
 
 procedure TExplorerPopupMenuForm.CMStyleChanged(var AMessage: TMessage);
@@ -86,8 +103,13 @@ begin
   // are design-time components.
   MenuItemsControl.UseColumnMode := False;
   MenuItemsControl.AutoSizeColumns := False;
+  MenuItemsControl.ControlList1.MultiSelect := False;
   MenuItemsControl.ControlList1.ItemHeight := ScaleValue(40);
   MenuItemsControl.OnItemClick := MenuItemsClick;
+  // The general-purpose highlighter activates its OnItemClick handler after
+  // arrow-key navigation. Popup menus must retain focus and move selection
+  // until the user explicitly activates an item.
+  MenuItemsControl.ControlList1.OnKeyUp := nil;
   KeyPreview := True;
   OnKeyDown := FormKeyDown;
 
@@ -102,7 +124,7 @@ end;
 
 procedure TExplorerPopupMenuForm.AdjustSizeToContent;
 begin
-  var LMeasureBitmap := TBitmap.Create;
+  var LMeasureBitmap := Vcl.Graphics.TBitmap.Create;
   try
     LMeasureBitmap.Canvas.Font.Assign(MenuItemsControl.Font);
     var LContentWidth := 0;
@@ -135,6 +157,9 @@ end;
 
 procedure TExplorerPopupMenuForm.ShowAt(const APoint: TPoint);
 begin
+  // Popup forms do not reliably receive CM_STYLECHANGED while hidden, so
+  // refresh both the title bar and the content immediately before showing.
+  ApplyTheme;
   AdjustSizeToContent;
   var LPopupWidth := Width;
   var LPopupHeight := Height;
@@ -149,9 +174,14 @@ begin
   var LTop := EnsureRange(APoint.Y + ScaleValue(22), LWorkArea.Top,
     LWorkArea.Bottom - LPopupHeight);
   SetBounds(LLeft, LTop, LPopupWidth, LPopupHeight);
+  // TControlList updates its visual panel when ItemIndex changes. Set the
+  // initial selection before focusing it so that update cannot steal focus.
+  if (MenuItemsControl.Count > 0) and
+    (MenuItemsControl.ControlList1.ItemIndex < 0) then
+    MenuItemsControl.ControlList1.ItemIndex := 0;
   Show;
   BringToFront;
-  MenuItemsControl.SetFocus;
+  MenuItemsControl.ControlList1.SetFocus;
 end;
 
 procedure TExplorerPopupMenuForm.MenuItemsClick(Sender: TObject);
@@ -167,7 +197,22 @@ var
   LShortcut: Char;
 begin
   if not (ssAlt in Shift) then
+  begin
+    if Key in [VK_UP, VK_DOWN, VK_HOME, VK_END, VK_PRIOR, VK_NEXT] then
+    begin
+      NavigateSelection(Key);
+      Key := 0;
+      Exit;
+    end;
+
+    if (Key in [VK_RETURN, VK_SPACE]) and
+      (MenuItemsControl.ControlList1.ItemIndex >= 0) then
+    begin
+      MenuItemsClick(Self);
+      Key := 0;
+    end;
     Exit;
+  end;
 
   if Key in [Ord('1')..Ord('9')] then
     LShortcut := Char(Key)
@@ -181,6 +226,34 @@ begin
   if Assigned(FOnShortcut) then
     FOnShortcut(Self, LShortcut);
   Key := 0;
+end;
+
+procedure TExplorerPopupMenuForm.NavigateSelection(AKey: Word);
+var
+  LItemCount: Integer;
+  LItemIndex: Integer;
+  LPageSize: Integer;
+begin
+  LItemCount := MenuItemsControl.Count;
+  if LItemCount = 0 then
+    Exit;
+
+  LItemIndex := MenuItemsControl.ControlList1.ItemIndex;
+  if LItemIndex < 0 then
+    LItemIndex := 0;
+
+  LPageSize := Max(1, MenuItemsControl.ControlList1.ClientHeight div
+    Max(1, MenuItemsControl.ControlList1.ItemHeight));
+  case AKey of
+    VK_UP: Dec(LItemIndex);
+    VK_DOWN: Inc(LItemIndex);
+    VK_HOME: LItemIndex := 0;
+    VK_END: LItemIndex := LItemCount - 1;
+    VK_PRIOR: Dec(LItemIndex, LPageSize);
+    VK_NEXT: Inc(LItemIndex, LPageSize);
+  end;
+  MenuItemsControl.ControlList1.ItemIndex := EnsureRange(LItemIndex, 0,
+    LItemCount - 1);
 end;
 
 procedure TExplorerPopupMenuForm.FormDeactivate(Sender: TObject);

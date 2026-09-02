@@ -15,13 +15,13 @@ unit TDump.Explorer.HighlighterControl;
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, Winapi.GDIPAPI, Winapi.GDIPOBJ,
+  Winapi.Windows, Winapi.Messages,
   System.SysUtils, System.Classes, System.StrUtils,
   System.Types, System.UITypes, System.Math, System.Generics.Collections,
   System.Generics.Defaults, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.StdCtrls, Vcl.ControlList, Vcl.Clipbrd,
   TDump.Explorer.Highlighter, TDump.Explorer.TinyParser, Vcl.ExtCtrls, TDump.Explorer.UI,
-  Vcl.WinXCtrls, Vcl.ComCtrls, Vcl.ImgList;
+  Vcl.WinXCtrls, Vcl.ComCtrls, Vcl.ImgList, TDump.Explorer.Export;
 
 type
   // Supplies rows on demand. Implementations retain only row identifiers and
@@ -140,7 +140,9 @@ type
       Shift: TShiftState; X, Y: Integer);
     procedure ContextPopupMenuItemClick(Sender: TObject; AItemIndex: Integer);
     procedure ShowContextPopupMenu(const APoint: TPoint);
-    procedure CopySelectedItemsToClipboard;
+    function ExportHeaders: TArray<string>;
+    function ExportSelectedItems(AFormat: TDumpExportFormat): string;
+    procedure CopySelectedItemsToClipboard(AFormat: TDumpExportFormat);
     procedure ItemsChanged(Sender: TObject);
     procedure SetAutoSizeColumns(const AValue: Boolean);
     procedure SetUseColumnMode(const AValue: Boolean);
@@ -173,7 +175,8 @@ type
     procedure ClearHighlightedItems;
     procedure ResetSortOrder;
     procedure AutoAdjustColumnWidths;
-    procedure CopyToClipboard;
+    procedure CopyToClipboard; overload;
+    procedure CopyToClipboard(AFormat: TDumpExportFormat); overload;
     procedure EndUpdate;
     // Resets the shared detail control for a tabular view.  The next update
     // transaction applies the pending layout, avoiding intermediate redraws.
@@ -1260,7 +1263,7 @@ begin
         end;
       Ord('C'):
         begin
-          CopySelectedItemsToClipboard;
+          CopySelectedItemsToClipboard(defText);
           Key := 0;
         end;
     end;
@@ -1347,7 +1350,12 @@ end;
 
 procedure THighlighterControl.CopyToClipboard;
 begin
-  CopySelectedItemsToClipboard;
+  CopyToClipboard(defText);
+end;
+
+procedure THighlighterControl.CopyToClipboard(AFormat: TDumpExportFormat);
+begin
+  CopySelectedItemsToClipboard(AFormat);
 end;
 
 procedure THighlighterControl.HeaderControlDrawSection(
@@ -1356,13 +1364,8 @@ procedure THighlighterControl.HeaderControlDrawSection(
 var
   LTheme: TExplorerTheme;
   LTextRect: TRect;
-  LChevronCenterX: Single;
-  LChevronCenterY: Single;
-  LChevronColor: TColor;
-  LGraphics: TGPGraphics;
-  LPen: TGPPen;
-  LRGBColor: TColor;
-  LColor: TGPColor;
+  LChevronCenter: TPoint;
+  LChevronDirection: TExplorerChevronDirection;
   LTextFormat: TTextFormat;
   LHeaderText: string;
   LOriginalBrushStyle: TBrushStyle;
@@ -1396,41 +1399,13 @@ begin
   if not FSortEnabled or (Section.Index <> FSortColumn) then
     Exit;
 
-  LChevronColor := LTheme.SelectionColor;
-  LRGBColor := ColorToRGB(LChevronColor);
-  LColor := MakeColor(255, GetRValue(LRGBColor), GetGValue(LRGBColor),
-    GetBValue(LRGBColor));
-  LChevronCenterX := Min(LTextRect.Right - ScaleValue(4),
+  LChevronCenter.X := Min(LTextRect.Right - ScaleValue(4),
     LTextRect.Left + HeaderControl.Canvas.TextWidth(LHeaderText) +
-      ScaleValue(8));
-  LChevronCenterY := (ARect.Top + ARect.Bottom) / 2.0;
-  LGraphics := TGPGraphics.Create(HeaderControl.Canvas.Handle);
-  LPen := nil;
-  try
-    LGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
-    LGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);
-    LPen := TGPPen.Create(LColor, ScaleValue(2) * 0.8);
-    LPen.SetLineJoin(LineJoinRound);
-    if FSortAscending then
-    begin
-      LGraphics.DrawLine(LPen, LChevronCenterX - ScaleValue(3),
-        LChevronCenterY + ScaleValue(1), LChevronCenterX,
-        LChevronCenterY - ScaleValue(2));
-      LGraphics.DrawLine(LPen, LChevronCenterX, LChevronCenterY - ScaleValue(2),
-        LChevronCenterX + ScaleValue(3), LChevronCenterY + ScaleValue(1));
-    end
-    else
-    begin
-      LGraphics.DrawLine(LPen, LChevronCenterX - ScaleValue(3),
-        LChevronCenterY - ScaleValue(1), LChevronCenterX,
-        LChevronCenterY + ScaleValue(2));
-      LGraphics.DrawLine(LPen, LChevronCenterX, LChevronCenterY + ScaleValue(2),
-        LChevronCenterX + ScaleValue(3), LChevronCenterY - ScaleValue(1));
-    end;
-  finally
-    LPen.Free;
-    LGraphics.Free;
-  end;
+      ScaleValue(12));
+  LChevronCenter.Y := (ARect.Top + ARect.Bottom) div 2;
+  LChevronDirection := if FSortAscending then ecdUp else ecdDown;
+  DrawExplorerChevron(HeaderControl.Canvas, LChevronCenter,
+    LTheme.SelectionColor, LChevronDirection, CurrentPPI / 96.0);
 end;
 
 procedure THighlighterControl.ControlList1MouseUp(Sender: TObject;
@@ -1447,10 +1422,24 @@ end;
 procedure THighlighterControl.ContextPopupMenuItemClick(Sender: TObject;
   AItemIndex: Integer);
 begin
+  if not HeaderControl1.Visible then
+  begin
+    case AItemIndex of
+      0: CopyToClipboard(defText);
+      1: CopyToClipboard(defCsv);
+      2: CopyToClipboard(defJson);
+      3: CopyToClipboard(defMarkdown);
+    end;
+    Exit;
+  end;
+
   case AItemIndex of
     0: ResetSortOrder;
     1: AutoAdjustColumnWidths;
-    2: CopyToClipboard;
+    2: CopyToClipboard(defText);
+    3: CopyToClipboard(defCsv);
+    4: CopyToClipboard(defJson);
+    5: CopyToClipboard(defMarkdown);
   end;
 end;
 
@@ -1469,30 +1458,72 @@ begin
     LPopupMenu := TExplorerPopupMenuForm(FContextPopupMenu);
 
   LPopupMenu.MenuItems.Clear;
-  LPopupMenu.MenuItems.Add('Reset sort order');
-  LPopupMenu.MenuItems.Add('Auto adjust column widths');
-  LPopupMenu.MenuItems.Add('Copy to clipboard');
+  if HeaderControl1.Visible then
+  begin
+    LPopupMenu.MenuItems.Add('Reset sort order');
+    LPopupMenu.MenuItems.Add('Auto adjust column widths');
+  end;
+  LPopupMenu.MenuItems.Add('Copy to clipboard as TEXT');
+  LPopupMenu.MenuItems.Add('Copy to clipboard as CSV');
+  LPopupMenu.MenuItems.Add('Copy to clipboard as JSON');
+  LPopupMenu.MenuItems.Add('Copy to clipboard as MD');
   LPopupMenu.ShowAt(APoint);
 end;
 
-procedure THighlighterControl.CopySelectedItemsToClipboard;
+function THighlighterControl.ExportHeaders: TArray<string>;
 begin
-  var LText := TStringBuilder.Create;
+  if not HeaderControl1.Visible then
+    Exit;
+  SetLength(Result, FColumnHeaders.Count);
+  for var LColumnIndex := 0 to FColumnHeaders.Count - 1 do
+    Result[LColumnIndex] := FColumnHeaders[LColumnIndex];
+end;
+
+function THighlighterControl.ExportSelectedItems(
+  AFormat: TDumpExportFormat): string;
+var
+  LHeaders: TArray<string>;
+  LRows: TDumpExportRows;
+  LSelectedIndexes: TList<Integer>;
+  LColumnCount: Integer;
+begin
+  LHeaders := ExportHeaders;
+  LColumnCount := Max(1, Length(LHeaders));
+  LSelectedIndexes := TList<Integer>.Create;
   try
     for var LIndex in ControlList1.GetSelectedEnumerator do
-    begin
-      if LText.Length > 0 then
-        LText.AppendLine;
-      LText.Append(ItemText(LIndex));
-    end;
-    if (LText.Length = 0) and (ControlList1.ItemIndex >= 0) and
+      LSelectedIndexes.Add(LIndex);
+    if (LSelectedIndexes.Count = 0) and
+      (ControlList1.ItemIndex >= 0) and
       (ControlList1.ItemIndex < ItemCount) then
-      LText.Append(ItemText(ControlList1.ItemIndex));
-    if LText.Length > 0 then
-      Clipboard.AsText := LText.ToString;
+      LSelectedIndexes.Add(ControlList1.ItemIndex);
+
+    SetLength(LRows, LSelectedIndexes.Count);
+    for var LRowIndex := 0 to LSelectedIndexes.Count - 1 do
+    begin
+      var LItemIndex := LSelectedIndexes[LRowIndex];
+      SetLength(LRows[LRowIndex], LColumnCount);
+      for var LColumnIndex := 0 to LColumnCount - 1 do
+      begin
+        if Length(LHeaders) = 0 then
+          LRows[LRowIndex][LColumnIndex] := ItemText(LItemIndex)
+        else
+          LRows[LRowIndex][LColumnIndex] := ColumnText(LItemIndex,
+            LColumnIndex);
+      end;
+    end;
+    Result := ExportView(LHeaders, LRows, AFormat);
   finally
-    LText.Free;
+    LSelectedIndexes.Free;
   end;
+end;
+
+procedure THighlighterControl.CopySelectedItemsToClipboard(
+  AFormat: TDumpExportFormat);
+begin
+  var LText := ExportSelectedItems(AFormat);
+  if LText <> '' then
+    Clipboard.AsText := LText;
 end;
 
 procedure THighlighterControl.Notification(AComponent: TComponent;

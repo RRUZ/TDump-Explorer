@@ -31,7 +31,5 @@ object HighlighterControl: THighlighterControl
     Width = 640
     Height = 24
     Sections = <>
-    Style = hsButtons
-    NoSizing = False
   end
 end

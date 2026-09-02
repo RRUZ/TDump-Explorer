@@ -1368,6 +1368,21 @@ begin
       Break;
     Inc(FFirstVisibleIndex);
   end;
+
+  { Once the active tab fits, backfill complete tabs from the left. This is
+    especially important after a resize, deletion, or navigation to the final
+    tab: the previous scroll origin may otherwise leave usable space empty. }
+  while FFirstVisibleIndex > 0 do
+  begin
+    Dec(FFirstVisibleIndex);
+    var LActiveRect := GetTabRect(FActiveIndex);
+    var LRequiredRight := LActiveRect.Right +
+      ScaleValue(cSelectedShoulderWidth);
+    if LRequiredRight <= LViewport.Right then
+      Continue;
+    Inc(FFirstVisibleIndex);
+    Break;
+  end;
 end;
 
 function TGlassTabStrip.ResolveImageIndex(

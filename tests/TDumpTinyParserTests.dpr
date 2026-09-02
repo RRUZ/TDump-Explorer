@@ -12,7 +12,9 @@ uses
   Vcl.Graphics,
   DUnitX.TestFramework,
   DUnitX.Loggers.Xml.NUnit,
+  TDump.Explorer.GlassTabs in '..\source\common\TDump.Explorer.GlassTabs.pas',
   TDump.Explorer.UI in '..\source\common\TDump.Explorer.UI.pas',
+  TDump.Explorer.Export in '..\source\common\TDump.Explorer.Export.pas',
   TDump.Explorer.TinyParser in '..\source\common\TDump.Explorer.TinyParser.pas',
   TDump.Explorer.Highlighter in '..\source\common\TDump.Explorer.Highlighter.pas';
 
@@ -33,6 +35,7 @@ type
     [Test] procedure MachFixtureLinkerTokenization;
     [Test] procedure VclStringsBorlandTokenization;
     [Test] procedure TextFormatDrawing;
+    [Test] procedure ViewExportFormats;
   end;
 
 procedure Require(ACondition: Boolean; const AMessage: string);
@@ -807,6 +810,71 @@ begin
   TestTDumpValueTokenization;
 end;
 
+procedure TestViewExportFormats;
+const
+  cEscapedTextValue = 'Comma, "double", ''single'', slash ' + #92 + #92 +
+    ' tab ' + #92 + 'tend';
+  cEscapedTextLine = 'Line 1' + #92 + 'r' + #92 + 'nLine 2 | markdown';
+var
+  LHeaders: TArray<string>;
+  LRows: TDumpExportRows;
+begin
+  SetLength(LHeaders, 2);
+  LHeaders[0] := 'Name';
+  LHeaders[1] := 'Value';
+  SetLength(LRows, 2);
+  SetLength(LRows[0], 2);
+  LRows[0][0] := 'Alpha';
+  LRows[0][1] := 'Comma, "double", ''single'', slash ' + #92 +
+    ' tab ' + #9 + 'end';
+  SetLength(LRows[1], 2);
+  LRows[1][0] := 'Beta';
+  LRows[1][1] := 'Line 1' + #13#10 + 'Line 2 | markdown';
+
+  Require(ExportView(LHeaders, LRows, defText) =
+    'Name' + #9 + 'Value' + sLineBreak +
+    'Alpha' + #9 + cEscapedTextValue + sLineBreak +
+    'Beta' + #9 + cEscapedTextLine,
+    'Text export must retain headers while escaping row-breaking characters.');
+
+  Require(ExportView(LHeaders, LRows, defCsv) =
+    'Name,Value' + sLineBreak +
+    'Alpha,"Comma, ""double"", ''single'', slash ' + #92 + ' tab ' +
+    #9 + 'end"' + sLineBreak +
+    'Beta,"Line 1' + #13#10 + 'Line 2 | markdown"',
+    'CSV export must retain headers and quote commas, double quotes, tabs, and CR/LF.');
+
+  var LJson := ExportView(LHeaders, LRows, defJson);
+  Require(ContainsText(LJson, '"Name": "Alpha"') and
+    ContainsText(LJson, '"Value": "Comma, ' + #92 + '"double' + #92 +
+      '", ''single'', slash ' + #92 + #92 + ' tab ' + #92 + 'tend"') and
+    ContainsText(LJson, 'Line 1' + #92 + 'r' + #92 + 'nLine 2 | markdown'),
+    'JSON export must use column names and escape backslashes, quotes, tabs, and CR/LF.');
+
+  Require(ExportView(LHeaders, LRows, defMarkdown) =
+    '| Name | Value |' + sLineBreak +
+    '| --- | --- |' + sLineBreak +
+    '| Alpha | Comma, "double", ''single'', slash ' + #92 + #92 + ' tab ' +
+      #9 + 'end |' + sLineBreak +
+    '| Beta | Line 1<br>Line 2 ' + #92 + '| markdown |',
+    'Markdown export must create a table and preserve quote, slash, pipe, tab, and CR/LF content.');
+
+  SetLength(LHeaders, 0);
+  SetLength(LRows, 1);
+  SetLength(LRows[0], 1);
+  LRows[0][0] := 'Unstructured report row';
+  Require(ExportView(LHeaders, LRows, defText) =
+    'Text' + sLineBreak + 'Unstructured report row',
+    'Headless text export must still expose a fallback column name.');
+  Require(ExportView(LHeaders, LRows, defCsv) =
+    'Text' + sLineBreak + 'Unstructured report row',
+    'Headless CSV export must still expose a fallback column name.');
+  Require(ExportView(LHeaders, LRows, defMarkdown) =
+    '| Text |' + sLineBreak + '| --- |' + sLineBreak +
+    '| Unstructured report row |',
+    'Headless Markdown export must still expose a fallback column name.');
+end;
+
 procedure TTinyParserFixture.PEImportPropertyTokenization;
 begin
   TestPEImportPropertyTokenization;
@@ -835,6 +903,11 @@ end;
 procedure TTinyParserFixture.TextFormatDrawing;
 begin
   TestTextFormatDrawing;
+end;
+
+procedure TTinyParserFixture.ViewExportFormats;
+begin
+  TestViewExportFormats;
 end;
 
 begin

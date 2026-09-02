@@ -22,7 +22,7 @@
 
 TDump Explorer turns textual dump output into navigable trees and tables while keeping the original report available for verification. Open a binary or an existing `.tdump` report and inspect PE, ELF, Mach-O, OMF, archive, and Borland debug metadata without searching through thousands of lines of text.
 
-It is designed for build debugging, package inspection, and first-pass binary triage.
+It is designed for build debugging, package inspection, and Initial binary analysis.
 
 <p align="center">
   <img src="images/1.png" alt="Borland debug symbols with synchronized raw TDUMP output" width="100%"/>
@@ -44,7 +44,7 @@ The source code is available in this repository. Packaged builds, when published
 ## Typical uses
 
 - Diagnose unexpected imports, exports, sections, resources, and loader metadata.
-- Inspect Delphi and C++Builder packages, source modules, symbols, and Borland debug records.
+- Inspect Delphi and C++ Builder packages, source modules, symbols, and Borland debug records.
 - Review architecture, timestamps, dynamic metadata, and relocation information.
 - Perform first-pass inspection of an executable or library before moving to a debugger or disassembler.
 - Compare structured results with the exact TDUMP text that produced them.

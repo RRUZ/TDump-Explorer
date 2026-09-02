@@ -15,6 +15,7 @@ uses
   TDump.Explorer.CrossReferences in 'TDump.Explorer.CrossReferences.pas' {CrossReferencesFrame: TFrame},
   TDump.Explorer.RawView in 'TDump.Explorer.RawView.pas' {RawViewFrame: TFrame},
   TDump.Explorer.HighlighterControl in 'TDump.Explorer.HighlighterControl.pas' {HighlighterControl: TFrame},
+  TDump.Explorer.Export in '..\common\TDump.Explorer.Export.pas',
   TDump.Explorer.HighlighterProviders in 'TDump.Explorer.HighlighterProviders.pas',
   TDump.Explorer.TinyParser in '..\common\TDump.Explorer.TinyParser.pas',
   TDump.Explorer.Highlighter in '..\common\TDump.Explorer.Highlighter.pas',

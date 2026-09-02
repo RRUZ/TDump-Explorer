@@ -75,6 +75,10 @@ object FrmMain: TFrmMain
         Height = 32
         StyleElements = [seFont, seClient, seBorder]
       end
+      inherited lblFilterMatches: TLabel
+        Left = 827
+        Height = 32
+      end
       inherited SearchFilterBox: TSearchBox
         Left = 891
         Height = 24
