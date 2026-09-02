@@ -1,3 +1,15 @@
+//**************************************************************************************************
+//
+// Unit TDump.Explorer.Frame
+//
+// Per-document tree, detail, and raw-view coordination
+//
+// https://github.com/RRUZ/TDump-Explorer
+//
+// Copyright (c) 2026 Rodrigo Ruz V.
+// SPDX-License-Identifier: MIT
+//
+//**************************************************************************************************
 unit TDump.Explorer.Frame;
 
 interface
@@ -405,6 +417,7 @@ begin
     FHighlighterCards[ADetailKind] := FDetailCard;
     FHighlighterControls[ADetailKind] := FDetailControl;
   end;
+  FDetailControl.SetViewLayoutId('detail:' + IntToStr(Ord(ADetailKind)));
   FDetailControl.PrepareGridPresentation;
   // sstModule overrides this in TBorlandView.  Every other reused detail view
   // starts from the normal UI font so its presentation cannot leak across nodes.

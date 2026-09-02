@@ -30,7 +30,7 @@ object ExplorerPopupMenuForm: TExplorerPopupMenuForm
   Font.Height = -12
   Font.Name = 'Segoe UI'
   Font.Style = []
-  GlassFrame.Enabled = True
+  GlassFrame.Enabled = False
   GlassFrame.Top = 4
   PopupMode = pmExplicit
   Position = poDesigned

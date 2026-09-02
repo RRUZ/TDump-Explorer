@@ -1,3 +1,15 @@
+//**************************************************************************************************
+//
+// Unit TDump.Explorer.Main
+//
+// Main-window input queue, TDUMP execution, and document-tab orchestration
+//
+// https://github.com/RRUZ/TDump-Explorer
+//
+// Copyright (c) 2026 Rodrigo Ruz V.
+// SPDX-License-Identifier: MIT
+//
+//**************************************************************************************************
 unit TDump.Explorer.Main;
 
 interface

@@ -1,3 +1,15 @@
+//**************************************************************************************************
+//
+// Unit TDump.Explorer.RawView
+//
+// Virtualized, filterable RAW TDUMP report presentation
+//
+// https://github.com/RRUZ/TDump-Explorer
+//
+// Copyright (c) 2026 Rodrigo Ruz V.
+// SPDX-License-Identifier: MIT
+//
+//**************************************************************************************************
 unit TDump.Explorer.RawView;
 
 interface

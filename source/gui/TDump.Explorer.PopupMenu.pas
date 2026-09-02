@@ -6,8 +6,8 @@
 //
 // https://github.com/RRUZ/TDump-Explorer
 //
-// The Initial Developer of the Original Code is Rodrigo Ruz  Copyright (C) 2026
-// All Rights Reserved.
+// Copyright (c) 2026 Rodrigo Ruz V.
+// SPDX-License-Identifier: MIT
 //
 //**************************************************************************************************
 unit TDump.Explorer.PopupMenu;
@@ -61,8 +61,12 @@ uses
 
 procedure TExplorerPopupMenuForm.ApplyTheme;
 begin
-  CustomTitleBar.BackgroundColor := TExplorerTheme.ActiveTheme.BackgroundColor;
-  CustomTitleBar.InactiveBackgroundColor := TExplorerTheme.ActiveTheme.BackgroundColor;
+  var LTheme := TExplorerTheme.ActiveTheme;
+  Color := LTheme.BackgroundColor;
+  MenuItemsControl.Color := LTheme.BackgroundColor;
+  MenuItemsControl.ControlList1.Color := LTheme.BackgroundColor;
+  CustomTitleBar.BackgroundColor := LTheme.BackgroundColor;
+  CustomTitleBar.InactiveBackgroundColor := LTheme.BackgroundColor;
 end;
 
 procedure TExplorerPopupMenuForm.CMStyleChanged(var AMessage: TMessage);
@@ -74,6 +78,8 @@ end;
 constructor TExplorerPopupMenuForm.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+
+  GlassFrame.Enabled := False;
 
   // These settings are not published by THighlighterControl, so they cannot
   // be streamed from the DFM.  The visual frame itself and its static layout

@@ -1,12 +1,13 @@
 //**************************************************************************************************
 //
 // Unit TDump.Explorer.Utils
+//
 // unit for TDump Explorer project
+//
 // https://github.com/RRUZ/TDump-Explorer
 //
-// The Initial Developer of the Original Code is Rodrigo Ruz V.
-// Portions created by Rodrigo Ruz V. are Copyright (C) 2026 Rodrigo Ruz V.
-// All Rights Reserved.
+// Copyright (c) 2026 Rodrigo Ruz V.
+// SPDX-License-Identifier: MIT
 //
 //**************************************************************************************************
 unit TDump.Explorer.Utils;

@@ -6,8 +6,8 @@
 //
 // https://github.com/RRUZ/TDump-Explorer
 //
-// The Initial Developer of the Original Code is Rodrigo Ruz  Copyright (C) 2026
-// All Rights Reserved.
+// Copyright (c) 2026 Rodrigo Ruz V.
+// SPDX-License-Identifier: MIT
 //
 //**************************************************************************************************
 unit TDump.Explorer.HighlighterProviders;

@@ -1,10 +1,24 @@
+//**************************************************************************************************
+//
+// Unit TDump.Explorer.HighlighterControl
+//
+// Owner-drawn virtual highlighter control for text and tabular data
+//
+// https://github.com/RRUZ/TDump-Explorer
+//
+// Copyright (c) 2026 Rodrigo Ruz V.
+// SPDX-License-Identifier: MIT
+//
+//**************************************************************************************************
 unit TDump.Explorer.HighlighterControl;
 
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Classes, System.StrUtils,
-  System.Types, System.UITypes, System.Math, System.Generics.Collections, Vcl.Graphics,
+  Winapi.Windows, Winapi.Messages, Winapi.GDIPAPI, Winapi.GDIPOBJ,
+  System.SysUtils, System.Classes, System.StrUtils,
+  System.Types, System.UITypes, System.Math, System.Generics.Collections,
+  System.Generics.Defaults, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.StdCtrls, Vcl.ControlList, Vcl.Clipbrd,
   TDump.Explorer.Highlighter, TDump.Explorer.TinyParser, Vcl.ExtCtrls, TDump.Explorer.UI,
   Vcl.WinXCtrls, Vcl.ComCtrls, Vcl.ImgList;
@@ -21,12 +35,19 @@ type
     function GetLineNumber(AIndex: Integer): Integer;
   end;
 
+  THighlighterColumnLayout = class
+  public
+    SortColumn: Integer;
+    SortAscending: Boolean;
+    ColumnWidths: TArray<Integer>;
+  end;
+
   THighlighterControl = class(TFrame)
     ControlList1: TControlList;
     HeaderControl1: THeaderControl;
   strict private
     const CTextPadding = 8;
-    const CHeaderCaptionMargin = '  ';
+    const CHeaderSortGlyphWidth = 18;
    private
       FHighlighter: TTinyHighlighter;
       FItems: TStringList;
@@ -37,6 +58,7 @@ type
       FColumnDataTypes: array of TTinyHighlightDataType;
       FColumnParserModes: array of Integer;
       FColumnWidthWeights: array of Integer;
+      FUserColumnWidths: array of Integer;
       FMeasureBitmap: TBitmap;
       FAutoSizeColumns: Boolean;
       FUseColumnMode: Boolean;
@@ -60,6 +82,16 @@ type
       FRestoreItemIndexPending: Boolean;
       FImages: TCustomImageList;
       FOnItemClick: TNotifyEvent;
+      FSortIndexes: TList<Integer>;
+      FColumnLayouts: TObjectDictionary<string, THighlighterColumnLayout>;
+      FColumnLayoutKey: string;
+      FViewLayoutId: string;
+      FSortColumn: Integer;
+      FSortAscending: Boolean;
+      FSortEnabled: Boolean;
+      FUpdatingHeader: Boolean;
+      FContextPopupEnabled: Boolean;
+      FContextPopupMenu: TForm;
     procedure AddItem(const AText, AImageName: string; AParserMode: Integer);
     function ItemCount: Integer;
     function ItemText(AItemIndex: Integer): string;
@@ -70,11 +102,24 @@ type
     procedure SetImages(const AValue: TCustomImageList);
     function ColumnCount(const AText: string): Integer;
     function ColumnText(AItemIndex, AColumnIndex: Integer): string;
+    function SourceItemText(ASourceItemIndex: Integer): string;
+    function SourceColumnText(ASourceItemIndex, AColumnIndex: Integer): string;
     function ColumnDataType(AColumnIndex: Integer): TTinyHighlightDataType;
     function ColumnParserMode(AColumnIndex: Integer;
       ADefaultMode: TTinyParserMode): TTinyParserMode;
     function ColumnWidth(AColumnIndex: Integer; AAvailableWidth: Integer): Integer;
+    function HeaderSectionWidth(AColumnIndex: Integer): Integer;
     function DisplayLineNumber(AItemIndex: Integer): Integer;
+    function SourceItemIndex(AItemIndex: Integer): Integer;
+    function HeaderCaption(AColumnIndex: Integer): string;
+    function HeaderLayoutKey: string;
+    function CompareSourceItems(ALeftSourceIndex,
+      ARightSourceIndex: Integer): Integer;
+    function CompareColumnValues(const ALeft, ARight: string;
+      ADataType: TTinyHighlightDataType): Integer;
+    procedure ApplySort;
+    procedure LoadColumnLayout;
+    procedure SaveColumnLayout;
     procedure DrawFilterMatches(ACanvas: TCanvas; const ARect: TRect;
       const AText: string);
     function LineNumberGutterWidth: Integer;
@@ -85,6 +130,16 @@ type
     procedure ControlList1KeyUp(Sender: TObject; var Key: Word;
       Shift: TShiftState);
     procedure ControlList1Click(Sender: TObject);
+    procedure HeaderControlSectionClick(HeaderControl: THeaderControl;
+      Section: THeaderSection);
+    procedure HeaderControlSectionResize(HeaderControl: THeaderControl;
+      Section: THeaderSection);
+    procedure HeaderControlDrawSection(HeaderControl: THeaderControl;
+      Section: THeaderSection; const ARect: TRect; Pressed: Boolean);
+    procedure ControlList1MouseUp(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
+    procedure ContextPopupMenuItemClick(Sender: TObject; AItemIndex: Integer);
+    procedure ShowContextPopupMenu(const APoint: TPoint);
     procedure CopySelectedItemsToClipboard;
     procedure ItemsChanged(Sender: TObject);
     procedure SetAutoSizeColumns(const AValue: Boolean);
@@ -94,6 +149,7 @@ type
     procedure SetThemeKind(const AValue: TExplorerThemeKind);
     procedure SetUseEndEllipsis(const AValue: Boolean);
     procedure SetHighlightColor(const AValue: TColor);
+    procedure SetSortEnabled(const AValue: Boolean);
     procedure UpdateHeaderControl;
     procedure UpdateColumnWidths;
     procedure UpdateControlList;
@@ -115,11 +171,15 @@ type
     procedure BeginUpdate;
     procedure Clear;
     procedure ClearHighlightedItems;
+    procedure ResetSortOrder;
+    procedure AutoAdjustColumnWidths;
+    procedure CopyToClipboard;
     procedure EndUpdate;
     // Resets the shared detail control for a tabular view.  The next update
     // transaction applies the pending layout, avoiding intermediate redraws.
     procedure PrepareGridPresentation;
     procedure SetColumnHeaders(const AColumns: array of string);
+    procedure SetViewLayoutId(const AValue: string);
     procedure SetColumnDataTypes(
       const ADataTypes: array of TTinyHighlightDataType);
     procedure SetColumnParserModes(const AParserModes: array of TTinyParserMode);
@@ -156,12 +216,16 @@ type
     property HighlightColor: TColor read FHighlightColor write SetHighlightColor;
     property MatchColor: TColor read FMatchColor write SetMatchColor;
     property FilterText: string read FFilterText write SetFilterText;
+    property SortEnabled: Boolean read FSortEnabled write SetSortEnabled
+      default True;
+    property ContextPopupEnabled: Boolean read FContextPopupEnabled
+      write FContextPopupEnabled default True;
   end;
 
 implementation
 
 uses
-  Vcl.Themes, Vcl.GraphUtil;
+  Vcl.Themes, Vcl.GraphUtil, TDump.Explorer.PopupMenu;
 
 {$R *.dfm}
 
@@ -174,6 +238,9 @@ begin
   FItemImageNames := TStringList.Create;
   FItemParserModes := TList<Integer>.Create;
   FColumnHeaders := TStringList.Create;
+  FSortIndexes := TList<Integer>.Create;
+  FColumnLayouts := TObjectDictionary<string, THighlighterColumnLayout>.Create([
+    doOwnsValues]);
   FMeasureBitmap := TBitmap.Create;
   FHighlightedItems := TList<Integer>.Create;
   FInactiveItems := TList<Integer>.Create;
@@ -187,21 +254,34 @@ begin
   FParserMode := tpmTDumpValues;
   FThemeKind := thtDark;
   FUseEndEllipsis := True;
+  FSortColumn := -1;
+  FSortAscending := True;
+  FSortEnabled := True;
+  FContextPopupEnabled := True;
 
   ApplyTheme;
 
   HeaderControl1.Align := alTop;
+  // hsButtons adds HDS_BUTTONS, which is required for the native header to
+  // issue the section-click notifications used for sorting.
+  HeaderControl1.Style := hsButtons;
   HeaderControl1.Visible := False;
+  HeaderControl1.NoSizing := False;
+  HeaderControl1.OnSectionClick := HeaderControlSectionClick;
+  HeaderControl1.OnSectionResize := HeaderControlSectionResize;
+  HeaderControl1.OnDrawSection := HeaderControlDrawSection;
   ControlList1.MultiSelect := True;
   ControlList1.OnBeforeDrawItem := ControlList1BeforeDrawItem;
   ControlList1.OnKeyDown := ControlList1KeyDown;
   ControlList1.OnKeyUp := ControlList1KeyUp;
   ControlList1.OnClick := ControlList1Click;
+  ControlList1.OnMouseUp := ControlList1MouseUp;
   UpdateControlList;
 end;
 
 destructor THighlighterControl.Destroy;
 begin
+  FContextPopupMenu.Free;
   FMeasureBitmap.Free;
   FItemImageNames.Free;
   FItemParserModes.Free;
@@ -209,6 +289,8 @@ begin
   FInactiveItems.Free;
   FHighlightedItems.Free;
   FColumnHeaders.Free;
+  FColumnLayouts.Free;
+  FSortIndexes.Free;
   FItems.Free;
   FHighlighter.Free;
   inherited;
@@ -264,12 +346,18 @@ end;
 function THighlighterControl.ColumnText(AItemIndex,
   AColumnIndex: Integer): string;
 begin
+  Result := SourceColumnText(SourceItemIndex(AItemIndex), AColumnIndex);
+end;
+
+function THighlighterControl.SourceColumnText(ASourceItemIndex,
+  AColumnIndex: Integer): string;
+begin
   Result := '';
-  if (AItemIndex < 0) or (AItemIndex >= ItemCount) or
+  if (ASourceItemIndex < 0) or (ASourceItemIndex >= ItemCount) or
     (AColumnIndex < 0) then
     Exit;
 
-  var LText := ItemText(AItemIndex);
+  var LText := SourceItemText(ASourceItemIndex);
   if not FUseColumnMode then
   begin
     if AColumnIndex = 0 then
@@ -308,6 +396,7 @@ end;
 
 function THighlighterControl.DisplayLineNumber(AItemIndex: Integer): Integer;
 begin
+  AItemIndex := SourceItemIndex(AItemIndex);
   if FItemProvider <> nil then
     Exit(FItemProvider.GetLineNumber(AItemIndex));
   if (AItemIndex >= 0) and (AItemIndex < FLineNumbers.Count) and
@@ -359,6 +448,9 @@ end;
 function THighlighterControl.ColumnWidth(AColumnIndex,
   AAvailableWidth: Integer): Integer;
 begin
+  if (AColumnIndex >= 0) and (AColumnIndex < Length(FUserColumnWidths)) and
+    (FUserColumnWidths[AColumnIndex] > 0) then
+    Exit(FUserColumnWidths[AColumnIndex]);
   if FAutoSizeColumns and (AColumnIndex >= 0) and
     (AColumnIndex < Length(FColumnWidths)) then
     Exit(FColumnWidths[AColumnIndex]);
@@ -375,6 +467,21 @@ begin
   Result := AAvailableWidth div FColumnCount;
 end;
 
+function THighlighterControl.HeaderSectionWidth(AColumnIndex: Integer): Integer;
+begin
+  var LAvailableWidth := ControlList1.ClientWidth;
+  if LAvailableWidth <= 0 then
+    LAvailableWidth := HeaderControl1.ClientWidth;
+  Result := ColumnWidth(AColumnIndex, LAvailableWidth);
+  if AColumnIndex <> FColumnHeaders.Count - 1 then
+    Exit;
+
+  var LUsedWidth := 0;
+  for var LColumnIndex := 0 to AColumnIndex - 1 do
+    Inc(LUsedWidth, ColumnWidth(LColumnIndex, LAvailableWidth));
+  Result := Max(Result, LAvailableWidth - LUsedWidth);
+end;
+
 function THighlighterControl.LineNumberGutterWidth: Integer;
 begin
   Result := 0;
@@ -382,6 +489,174 @@ begin
     Exit;
   FMeasureBitmap.Canvas.Font.Assign(Font);
   Result := FMeasureBitmap.Canvas.TextWidth('00000000:') + (CTextPadding * 2);
+end;
+
+function THighlighterControl.SourceItemIndex(AItemIndex: Integer): Integer;
+begin
+  Result := AItemIndex;
+  if (AItemIndex >= 0) and (AItemIndex < FSortIndexes.Count) and
+    (FSortIndexes.Count = ItemCount) then
+    Result := FSortIndexes[AItemIndex];
+end;
+
+function THighlighterControl.HeaderCaption(AColumnIndex: Integer): string;
+begin
+  Result := FColumnHeaders[AColumnIndex];
+end;
+
+function THighlighterControl.HeaderLayoutKey: string;
+begin
+  Result := FViewLayoutId;
+  if Result = '' then
+    Result := 'headers';
+  for var LColumnIndex := 0 to FColumnHeaders.Count - 1 do
+  begin
+    Result := Result + #31;
+    Result := Result + FColumnHeaders[LColumnIndex];
+  end;
+end;
+
+function THighlighterControl.CompareColumnValues(const ALeft, ARight: string;
+  ADataType: TTinyHighlightDataType): Integer;
+  function CompareInt64(ALeftValue, ARightValue: Int64): Integer;
+  begin
+    if ALeftValue < ARightValue then
+      Exit(-1);
+    if ALeftValue > ARightValue then
+      Exit(1);
+    Result := 0;
+  end;
+  function CompareUInt64(ALeftValue, ARightValue: UInt64): Integer;
+  begin
+    if ALeftValue < ARightValue then
+      Exit(-1);
+    if ALeftValue > ARightValue then
+      Exit(1);
+    Result := 0;
+  end;
+  function CompareExtended(ALeftValue, ARightValue: Extended): Integer;
+  begin
+    if ALeftValue < ARightValue then
+      Exit(-1);
+    if ALeftValue > ARightValue then
+      Exit(1);
+    Result := 0;
+  end;
+  function TryParseHex(const AText: string; out AValue: UInt64): Boolean;
+  begin
+    var LValue := Trim(AText);
+    if StartsText('0x', LValue) then
+      Delete(LValue, 1, 2)
+    else if StartsText('$', LValue) then
+      Delete(LValue, 1, 1);
+    if EndsText('h', LValue) then
+      Delete(LValue, Length(LValue), 1);
+    Result := (LValue <> '') and TryStrToUInt64('$' + LValue, AValue);
+  end;
+begin
+  case ADataType of
+    thdtInteger:
+      begin
+        var LLeftInteger: Int64;
+        var LRightInteger: Int64;
+        if TryStrToInt64(Trim(ALeft), LLeftInteger) and
+          TryStrToInt64(Trim(ARight), LRightInteger) then
+          Exit(CompareInt64(LLeftInteger, LRightInteger));
+      end;
+    thdtHexadecimal:
+      begin
+        var LLeftHexadecimal: UInt64;
+        var LRightHexadecimal: UInt64;
+        if TryParseHex(ALeft, LLeftHexadecimal) and
+          TryParseHex(ARight, LRightHexadecimal) then
+          Exit(CompareUInt64(LLeftHexadecimal, LRightHexadecimal));
+      end;
+    thdtFloat:
+      begin
+        var LLeftFloat: Extended;
+        var LRightFloat: Extended;
+        if TryStrToFloat(Trim(ALeft), LLeftFloat) and
+          TryStrToFloat(Trim(ARight), LRightFloat) then
+          Exit(CompareExtended(LLeftFloat, LRightFloat));
+      end;
+    thdtDate, thdtTime, thdtDateTime:
+      begin
+        var LLeftDateTime: TDateTime;
+        var LRightDateTime: TDateTime;
+        if TryStrToDateTime(Trim(ALeft), LLeftDateTime) and
+          TryStrToDateTime(Trim(ARight), LRightDateTime) then
+          Exit(CompareExtended(LLeftDateTime, LRightDateTime));
+      end;
+  end;
+  Result := CompareText(ALeft, ARight);
+end;
+
+function THighlighterControl.CompareSourceItems(ALeftSourceIndex,
+  ARightSourceIndex: Integer): Integer;
+begin
+  Result := CompareColumnValues(SourceColumnText(ALeftSourceIndex,
+    FSortColumn), SourceColumnText(ARightSourceIndex, FSortColumn),
+    ColumnDataType(FSortColumn));
+  if not FSortAscending then
+    Result := -Result;
+  // Keep equal values in their source order so sort transitions are stable.
+  if Result = 0 then
+    Result := ALeftSourceIndex - ARightSourceIndex;
+end;
+
+procedure THighlighterControl.ApplySort;
+begin
+  FSortIndexes.Clear;
+  if not FSortEnabled or (FSortColumn < 0) or
+    (FSortColumn >= FColumnHeaders.Count) then
+    Exit;
+
+  for var LSourceIndex := 0 to ItemCount - 1 do
+    FSortIndexes.Add(LSourceIndex);
+  FSortIndexes.Sort(TComparer<Integer>.Construct(
+    function(const ALeft, ARight: Integer): Integer
+    begin
+      Result := CompareSourceItems(ALeft, ARight);
+    end));
+end;
+
+procedure THighlighterControl.LoadColumnLayout;
+var
+  LLayout: THighlighterColumnLayout;
+begin
+  FColumnLayoutKey := HeaderLayoutKey;
+  FSortColumn := -1;
+  FSortAscending := True;
+  SetLength(FUserColumnWidths, FColumnHeaders.Count);
+  FSortIndexes.Clear;
+  if (FColumnLayoutKey = '') or not FColumnLayouts.TryGetValue(
+    FColumnLayoutKey, LLayout) then
+    Exit;
+
+  if (LLayout.SortColumn >= 0) and
+    (LLayout.SortColumn < FColumnHeaders.Count) then
+  begin
+    FSortColumn := LLayout.SortColumn;
+    FSortAscending := LLayout.SortAscending;
+  end;
+  if Length(LLayout.ColumnWidths) = FColumnHeaders.Count then
+    FUserColumnWidths := Copy(LLayout.ColumnWidths);
+end;
+
+procedure THighlighterControl.SaveColumnLayout;
+var
+  LLayout: THighlighterColumnLayout;
+begin
+  if FColumnLayoutKey = '' then
+    Exit;
+  if not FColumnLayouts.TryGetValue(FColumnLayoutKey, LLayout) then
+  begin
+    LLayout := THighlighterColumnLayout.Create;
+    FColumnLayouts.Add(FColumnLayoutKey, LLayout);
+  end;
+  LLayout.SortColumn := FSortColumn;
+  LLayout.SortAscending := FSortAscending;
+  LLayout.ColumnWidths := Copy(FUserColumnWidths);
 end;
 
 procedure THighlighterControl.AddItem(const AText, AImageName: string;
@@ -411,13 +686,19 @@ end;
 
 function THighlighterControl.ItemText(AItemIndex: Integer): string;
 begin
+  Result := SourceItemText(SourceItemIndex(AItemIndex));
+end;
+
+function THighlighterControl.SourceItemText(ASourceItemIndex: Integer): string;
+begin
   if FItemProvider <> nil then
-    Exit(FItemProvider.GetText(AItemIndex));
-  Result := FItems[AItemIndex];
+    Exit(FItemProvider.GetText(ASourceItemIndex));
+  Result := FItems[ASourceItemIndex];
 end;
 
 function THighlighterControl.ItemParserMode(AItemIndex: Integer): Integer;
 begin
+  AItemIndex := SourceItemIndex(AItemIndex);
   if FItemProvider <> nil then
     Exit(FItemProvider.GetParserMode(AItemIndex));
   if (AItemIndex >= 0) and (AItemIndex < FItemParserModes.Count) then
@@ -449,6 +730,7 @@ end;
 
 procedure THighlighterControl.Clear;
 begin
+  SaveColumnLayout;
   ControlList1.ItemIndex := -1;
   FItemProvider := nil;
   FItems.Clear;
@@ -457,9 +739,14 @@ begin
   FLineNumbers.Clear;
   FInactiveItems.Clear;
   FColumnHeaders.Clear;
+  FSortIndexes.Clear;
+  FColumnLayoutKey := '';
+  FSortColumn := -1;
+  FSortAscending := True;
   SetLength(FColumnDataTypes, 0);
   SetLength(FColumnParserModes, 0);
   SetLength(FColumnWidthWeights, 0);
+  SetLength(FUserColumnWidths, 0);
   UpdateControlList;
 end;
 
@@ -509,6 +796,7 @@ end;
 
 procedure THighlighterControl.SetColumnHeaders(const AColumns: array of string);
 begin
+  SaveColumnLayout;
   FColumnHeaders.Clear;
   for var LColumn in AColumns do
     FColumnHeaders.Add(StringReplace(StringReplace(LColumn, #13, ' ',
@@ -522,6 +810,7 @@ begin
       else thdtAuto;
     FColumnParserModes[LColumnIndex] := -1;
   end;
+  LoadColumnLayout;
   UpdateControlList;
 end;
 
@@ -541,14 +830,20 @@ end;
 
 procedure THighlighterControl.SetText(const AText: string);
 begin
+  SaveColumnLayout;
   FItemProvider := nil;
   var LPreviousItemIndex := ControlList1.ItemIndex;
   ClearHighlightedItems;
   FInactiveItems.Clear;
   FColumnHeaders.Clear;
+  FSortIndexes.Clear;
+  FColumnLayoutKey := '';
+  FSortColumn := -1;
+  FSortAscending := True;
   SetLength(FColumnDataTypes, 0);
   SetLength(FColumnParserModes, 0);
   SetLength(FColumnWidthWeights, 0);
+  SetLength(FUserColumnWidths, 0);
   FItems.BeginUpdate;
   try
     FItems.Text := AText;
@@ -587,6 +882,7 @@ end;
 
 function THighlighterControl.ItemImageName(AItemIndex: Integer): string;
 begin
+  AItemIndex := SourceItemIndex(AItemIndex);
   if FItemProvider <> nil then
     Exit(FItemProvider.GetImageName(AItemIndex));
   Result := '';
@@ -984,6 +1280,201 @@ begin
     FOnItemClick(Self);
 end;
 
+procedure THighlighterControl.HeaderControlSectionClick(
+  HeaderControl: THeaderControl; Section: THeaderSection);
+var
+  LSelectedSourceIndex: Integer;
+begin
+  if not FSortEnabled or (Section = nil) or
+    (Section.Index < 0) or (Section.Index >= FColumnHeaders.Count) then
+    Exit;
+
+  LSelectedSourceIndex := SourceItemIndex(ControlList1.ItemIndex);
+  if FSortColumn = Section.Index then
+    FSortAscending := not FSortAscending
+  else
+  begin
+    FSortColumn := Section.Index;
+    FSortAscending := True;
+  end;
+  SaveColumnLayout;
+  UpdateControlList;
+
+  if LSelectedSourceIndex >= 0 then
+    for var LDisplayIndex := 0 to FSortIndexes.Count - 1 do
+      if FSortIndexes[LDisplayIndex] = LSelectedSourceIndex then
+      begin
+        ControlList1.ItemIndex := LDisplayIndex;
+        Break;
+      end;
+end;
+
+procedure THighlighterControl.HeaderControlSectionResize(
+  HeaderControl: THeaderControl; Section: THeaderSection);
+begin
+  if FUpdatingHeader or (Section = nil) or (Section.Index < 0) or
+    (Section.Index >= FColumnHeaders.Count) then
+    Exit;
+
+  if Length(FUserColumnWidths) <> FColumnHeaders.Count then
+    SetLength(FUserColumnWidths, FColumnHeaders.Count);
+  FUserColumnWidths[Section.Index] := Max(CTextPadding * 4, Section.Width);
+  SaveColumnLayout;
+  ControlList1.Invalidate;
+end;
+
+procedure THighlighterControl.ResetSortOrder;
+begin
+  if (FSortColumn < 0) and (FSortIndexes.Count = 0) then
+    Exit;
+  FSortColumn := -1;
+  FSortAscending := True;
+  FSortIndexes.Clear;
+  SaveColumnLayout;
+  UpdateControlList;
+end;
+
+procedure THighlighterControl.AutoAdjustColumnWidths;
+begin
+  if FColumnHeaders.Count = 0 then
+    Exit;
+  SetLength(FUserColumnWidths, FColumnHeaders.Count);
+  for var LColumnIndex := 0 to High(FUserColumnWidths) do
+    FUserColumnWidths[LColumnIndex] := 0;
+  SaveColumnLayout;
+  UpdateControlList;
+end;
+
+procedure THighlighterControl.CopyToClipboard;
+begin
+  CopySelectedItemsToClipboard;
+end;
+
+procedure THighlighterControl.HeaderControlDrawSection(
+  HeaderControl: THeaderControl; Section: THeaderSection; const ARect: TRect;
+  Pressed: Boolean);
+var
+  LTheme: TExplorerTheme;
+  LTextRect: TRect;
+  LChevronCenterX: Single;
+  LChevronCenterY: Single;
+  LChevronColor: TColor;
+  LGraphics: TGPGraphics;
+  LPen: TGPPen;
+  LRGBColor: TColor;
+  LColor: TGPColor;
+  LTextFormat: TTextFormat;
+  LHeaderText: string;
+  LOriginalBrushStyle: TBrushStyle;
+begin
+  LTheme := TExplorerTheme.ActiveTheme;
+  HeaderControl.Canvas.Brush.Color := LTheme.BackgroundColor;
+  HeaderControl.Canvas.FillRect(ARect);
+
+  HeaderControl.Canvas.Pen.Color := ColorBlendRGB(LTheme.TextColor,
+    LTheme.BackgroundColor, 0.88);
+  HeaderControl.Canvas.MoveTo(ARect.Right - 1, ARect.Top);
+  HeaderControl.Canvas.LineTo(ARect.Right - 1, ARect.Bottom);
+
+  LTextRect := ARect;
+  InflateRect(LTextRect, -CTextPadding, 0);
+  if FSortEnabled and (Section.Index = FSortColumn) then
+    Dec(LTextRect.Right, ScaleValue(CHeaderSortGlyphWidth));
+  HeaderControl.Canvas.Font.Assign(HeaderControl.Font);
+  HeaderControl.Canvas.Font.Color := LTheme.TextColor;
+  LTextFormat := [tfLeft, tfVerticalCenter, tfSingleLine, tfEndEllipsis,
+    tfNoPrefix];
+  LHeaderText := HeaderCaption(Section.Index);
+  LOriginalBrushStyle := HeaderControl.Canvas.Brush.Style;
+  try
+    HeaderControl.Canvas.Brush.Style := bsClear;
+    HeaderControl.Canvas.TextRect(LTextRect, LHeaderText, LTextFormat);
+  finally
+    HeaderControl.Canvas.Brush.Style := LOriginalBrushStyle;
+  end;
+
+  if not FSortEnabled or (Section.Index <> FSortColumn) then
+    Exit;
+
+  LChevronColor := LTheme.SelectionColor;
+  LRGBColor := ColorToRGB(LChevronColor);
+  LColor := MakeColor(255, GetRValue(LRGBColor), GetGValue(LRGBColor),
+    GetBValue(LRGBColor));
+  LChevronCenterX := Min(LTextRect.Right - ScaleValue(4),
+    LTextRect.Left + HeaderControl.Canvas.TextWidth(LHeaderText) +
+      ScaleValue(8));
+  LChevronCenterY := (ARect.Top + ARect.Bottom) / 2.0;
+  LGraphics := TGPGraphics.Create(HeaderControl.Canvas.Handle);
+  LPen := nil;
+  try
+    LGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
+    LGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);
+    LPen := TGPPen.Create(LColor, ScaleValue(2) * 0.8);
+    LPen.SetLineJoin(LineJoinRound);
+    if FSortAscending then
+    begin
+      LGraphics.DrawLine(LPen, LChevronCenterX - ScaleValue(3),
+        LChevronCenterY + ScaleValue(1), LChevronCenterX,
+        LChevronCenterY - ScaleValue(2));
+      LGraphics.DrawLine(LPen, LChevronCenterX, LChevronCenterY - ScaleValue(2),
+        LChevronCenterX + ScaleValue(3), LChevronCenterY + ScaleValue(1));
+    end
+    else
+    begin
+      LGraphics.DrawLine(LPen, LChevronCenterX - ScaleValue(3),
+        LChevronCenterY - ScaleValue(1), LChevronCenterX,
+        LChevronCenterY + ScaleValue(2));
+      LGraphics.DrawLine(LPen, LChevronCenterX, LChevronCenterY + ScaleValue(2),
+        LChevronCenterX + ScaleValue(3), LChevronCenterY - ScaleValue(1));
+    end;
+  finally
+    LPen.Free;
+    LGraphics.Free;
+  end;
+end;
+
+procedure THighlighterControl.ControlList1MouseUp(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  if (Button <> mbRight) or not FContextPopupEnabled then
+    Exit;
+
+  var LPoint: TPoint;
+  GetCursorPos(LPoint);
+  ShowContextPopupMenu(LPoint);
+end;
+
+procedure THighlighterControl.ContextPopupMenuItemClick(Sender: TObject;
+  AItemIndex: Integer);
+begin
+  case AItemIndex of
+    0: ResetSortOrder;
+    1: AutoAdjustColumnWidths;
+    2: CopyToClipboard;
+  end;
+end;
+
+procedure THighlighterControl.ShowContextPopupMenu(const APoint: TPoint);
+var
+  LPopupMenu: TExplorerPopupMenuForm;
+begin
+  if FContextPopupMenu = nil then
+  begin
+    LPopupMenu := TExplorerPopupMenuForm.Create(Self);
+    LPopupMenu.MenuItems.ContextPopupEnabled := False;
+    LPopupMenu.OnItemClick := ContextPopupMenuItemClick;
+    FContextPopupMenu := LPopupMenu;
+  end
+  else
+    LPopupMenu := TExplorerPopupMenuForm(FContextPopupMenu);
+
+  LPopupMenu.MenuItems.Clear;
+  LPopupMenu.MenuItems.Add('Reset sort order');
+  LPopupMenu.MenuItems.Add('Auto adjust column widths');
+  LPopupMenu.MenuItems.Add('Copy to clipboard');
+  LPopupMenu.ShowAt(APoint);
+end;
+
 procedure THighlighterControl.CopySelectedItemsToClipboard;
 begin
   var LText := TStringBuilder.Create;
@@ -1086,6 +1577,29 @@ begin
   ControlList1.Invalidate;
 end;
 
+procedure THighlighterControl.SetSortEnabled(const AValue: Boolean);
+begin
+  if FSortEnabled = AValue then
+    Exit;
+  FSortEnabled := AValue;
+  if not FSortEnabled then
+    FSortIndexes.Clear;
+  UpdateControlList;
+end;
+
+procedure THighlighterControl.SetViewLayoutId(const AValue: string);
+begin
+  if FViewLayoutId = AValue then
+    Exit;
+  SaveColumnLayout;
+  FViewLayoutId := AValue;
+  FColumnLayoutKey := '';
+  FSortColumn := -1;
+  FSortAscending := True;
+  FSortIndexes.Clear;
+  SetLength(FUserColumnWidths, 0);
+end;
+
 procedure THighlighterControl.SetParserMode(const AValue: TTinyParserMode);
 begin
   if FParserMode = AValue then
@@ -1110,8 +1624,8 @@ begin
   FMeasureBitmap.Canvas.Font.Assign(HeaderControl1.Font);
   for var LColumnIndex := 0 to FColumnHeaders.Count - 1 do
     LCaptionWidths[LColumnIndex] := FMeasureBitmap.Canvas.TextWidth(
-      CHeaderCaptionMargin + FColumnHeaders[LColumnIndex]) +
-      (CTextPadding * 2);
+      HeaderCaption(LColumnIndex)) +
+      (CTextPadding * 2) + ScaleValue(CHeaderSortGlyphWidth);
 
   FMeasureBitmap.Canvas.Font.Assign(Font);
   for var LColumnIndex := 0 to FColumnCount - 1 do
@@ -1146,9 +1660,9 @@ begin
   if not LRequiresUpdate then
     for var LColumnIndex := 0 to FColumnHeaders.Count - 1 do
       if (HeaderControl1.Sections[LColumnIndex].Text <>
-        CHeaderCaptionMargin + FColumnHeaders[LColumnIndex]) or
+        HeaderCaption(LColumnIndex)) or
         (HeaderControl1.Sections[LColumnIndex].Width <>
-          ColumnWidth(LColumnIndex, HeaderControl1.ClientWidth)) then
+          HeaderSectionWidth(LColumnIndex)) then
       begin
         LRequiresUpdate := True;
         Break;
@@ -1160,6 +1674,7 @@ begin
     Exit;
   end;
 
+  FUpdatingHeader := True;
   HeaderControl1.Perform(WM_SETREDRAW, 0, 0);
   try
     HeaderControl1.Visible := True;
@@ -1169,17 +1684,18 @@ begin
       for var LColumnIndex := 0 to FColumnHeaders.Count - 1 do
       begin
         var LSection := HeaderControl1.Sections.Add;
-        LSection.Style := hsText;
+        LSection.Style := hsOwnerDraw;
       end;
     end;
     for var LColumnIndex := 0 to FColumnHeaders.Count - 1 do
     begin
       var LSection := HeaderControl1.Sections[LColumnIndex];
-      LSection.Text := CHeaderCaptionMargin + FColumnHeaders[LColumnIndex];
-      LSection.Width := ColumnWidth(LColumnIndex, HeaderControl1.ClientWidth);
+      LSection.Text := HeaderCaption(LColumnIndex);
+      LSection.Width := HeaderSectionWidth(LColumnIndex);
     end;
   finally
     HeaderControl1.Perform(WM_SETREDRAW, 1, 0);
+    FUpdatingHeader := False;
     HeaderControl1.Invalidate;
   end;
 end;
@@ -1208,6 +1724,7 @@ begin
     while FLineNumbers.Count > FItems.Count do
       FLineNumbers.Delete(FLineNumbers.Count - 1);
   end;
+  ApplySort;
   UpdateColumnWidths;
   UpdateHeaderControl;
   ControlList1.ItemCount := ItemCount;

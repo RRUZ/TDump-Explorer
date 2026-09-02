@@ -1,3 +1,15 @@
+//**************************************************************************************************
+//
+// Unit TDump.Explorer.LogControl
+//
+// Bounded activity and profiling log presentation
+//
+// https://github.com/RRUZ/TDump-Explorer
+//
+// Copyright (c) 2026 Rodrigo Ruz V.
+// SPDX-License-Identifier: MIT
+//
+//**************************************************************************************************
 unit TDump.Explorer.LogControl;
 
 interface
