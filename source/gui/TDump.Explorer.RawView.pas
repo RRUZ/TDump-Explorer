@@ -21,7 +21,7 @@ uses
   System.Generics.Collections, System.Threading, System.SyncObjs,
   Vcl.Controls, Vcl.Forms,
   TDump.Explorer.HighlighterControl, TDump.Explorer.Parser, Vcl.ExtCtrls,
-  Vcl.StdCtrls, Vcl.WinXCtrls;
+  Vcl.StdCtrls, Vcl.WinXCtrls, TDump.Explorer.UI;
 
 const
   cWmRawFilterReady = WM_USER + $541;
@@ -35,9 +35,18 @@ type
     pnToolbar: TPanel;
     SearchFilterBox: TSearchBox;
     Label1: TLabel;
-    lblFilterMatches: TLabel;
     cbFollowSelection: TCheckBox;
+    pbSurface: TPaintBox;
+    pnSearch: TPanel;
+    pbSearchBorder: TPaintBox;
+    procedure SurfacePaint(Sender: TObject);
+    procedure SearchBorderPaint(Sender: TObject);
+    procedure SearchFocusChanged(Sender: TObject);
+    procedure SearchBorderMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
+    procedure ToolbarResize(Sender: TObject);
   private
+    FMatchBadge: TExplorerBadgeLabel;
     FHighlighterControl: THighlighterControl;
     FDocument: TDumpDocument;
     FRowProvider: IHighlighterRowProvider;
@@ -83,6 +92,7 @@ type
     procedure Populate(ADocument: TDumpDocument);
     procedure ShowLines(AStartLine, AEndLine: Integer);
   protected
+    procedure Resize; override;
     procedure SetParent(AParent: TWinControl); override;
   published
     property SyncWithSelectedNode: Boolean read FSyncWithSelectedNode
@@ -96,7 +106,7 @@ type
 implementation
 
 uses
-  TDump.Explorer.TinyParser, TDump.Explorer.UI,
+  TDump.Explorer.TinyParser,
   TDump.Explorer.HighlighterProviders, Vcl.Graphics;
 
 {$R *.dfm}
@@ -113,6 +123,15 @@ type
 constructor TRawViewFrame.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  FMatchBadge := TExplorerBadgeLabel.Create(Self);
+  FMatchBadge.Name := 'FilterCountBadge';
+  FMatchBadge.Parent := pnToolbar;
+  FMatchBadge.Left := Label1.BoundsRect.Right + ScaleValue(8);
+  FMatchBadge.AlignWithMargins := True;
+  FMatchBadge.Margins.SetBounds(ScaleValue(8), ScaleValue(6),
+    ScaleValue(8), ScaleValue(6));
+  FMatchBadge.Align := alLeft;
+  FMatchBadge.ShowHint := True;
   FVisibleSourceLineIndexes := TList<Integer>.Create;
   FFilterTimer := TTimer.Create(Self);
   FFilterTimer.Enabled := False;
@@ -121,6 +140,8 @@ begin
   FHighlighterControl := THighlighterControl.Create(nil);
   FHighlighterControl.Parent := Self;
   FHighlighterControl.Align := alClient;
+  FHighlighterControl.AlignWithMargins := True;
+  FHighlighterControl.Margins.SetBounds(0, ScaleValue(4), 0, 0);
   FHighlighterControl.AutoSizeColumns := False;
   FHighlighterControl.UseColumnMode := False;
   FHighlighterControl.ShowLineNumbers := True;
@@ -140,6 +161,7 @@ begin
   SetSyncWithSelectedNode(cbFollowSelection.Checked);
   Clear;
   ApplyTheme;
+  TExplorerFocusScrollBars.Create(FHighlighterControl.ControlList1);
 end;
 
 destructor TRawViewFrame.Destroy;
@@ -357,44 +379,120 @@ end;
 
 procedure TRawViewFrame.ApplyTheme;
 begin
+  if pnSearch = nil then
+    Exit;
   var LTheme := TExplorerTheme.ActiveTheme;
+  Color := LTheme.BackgroundColor;
+  StyleElements := StyleElements - [seClient];
   pnToolbar.ParentBackground := False;
   pnToolbar.StyleElements := pnToolbar.StyleElements - [seClient];
   pnToolbar.Color := LTheme.BackgroundColor;
+  pnSearch.StyleElements := pnSearch.StyleElements - [seClient];
+  pnSearch.Color := LTheme.BackgroundColor;
+  cbFollowSelection.Font.Color := LTheme.InactiveText;
+  SearchFilterBox.StyleName := 'Windows';
+  SearchFilterBox.StyleElements := [];
+  SearchFilterBox.Color := LTheme.BackgroundColor;
+  SearchFilterBox.Font.Name := TExplorerTheme.FontName;
+  SearchFilterBox.Font.Height := -ScaleValue(MulDiv(TExplorerTheme.FontSize, 96, 72));
   SearchFilterBox.Font.Color := LTheme.TextColor;
-  lblFilterMatches.Font.Color := LTheme.InactiveText;
-  FHighlighterControl.Invalidate;
+  Label1.StyleName := 'Windows';
+  Label1.Font.Color := LTheme.TextColor;
+  if FMatchBadge <> nil then
+  begin
+    FMatchBadge.ApplyTheme(LTheme);
+    FMatchBadge.Font.Color := LTheme.InactiveText;
+    ToolbarResize(nil);
+  end;
+  pbSurface.Invalidate;
+  pbSearchBorder.Invalidate;
+  if FHighlighterControl <> nil then
+    FHighlighterControl.Invalidate;
+end;
+
+procedure TRawViewFrame.SurfacePaint(Sender: TObject);
+begin
+  DrawExplorerSurface(pbSurface.Canvas, pbSurface.ClientRect, ScaleFactor,
+    pnToolbar.BoundsRect.Bottom);
+end;
+
+procedure TRawViewFrame.SearchBorderPaint(Sender: TObject);
+begin
+  DrawExplorerSearchBorder(pbSearchBorder.Canvas, pbSearchBorder.ClientRect,
+    ScaleFactor, SearchFilterBox.Focused);
+end;
+
+procedure TRawViewFrame.SearchFocusChanged(Sender: TObject);
+begin
+  pbSearchBorder.Invalidate;
+end;
+
+procedure TRawViewFrame.SearchBorderMouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  if (Button = mbLeft) and SearchFilterBox.CanFocus then
+    SearchFilterBox.SetFocus;
+end;
+
+procedure TRawViewFrame.ToolbarResize(Sender: TObject);
+begin
+  if FMatchBadge = nil then
+    Exit;
+  FMatchBadge.Font.Assign(SearchFilterBox.Font);
+  FMatchBadge.Font.Color := TExplorerTheme.ActiveTheme.InactiveText;
+  // Leave both input controls usable when the host is narrow. Long counts
+  // ellipsize inside the badge; the hint retains the complete count.
+  FMatchBadge.Width := Min(FMatchBadge.NaturalWidth, Max(0,
+    pnToolbar.ClientWidth - Label1.Width - cbFollowSelection.Width -
+    pnSearch.Width - ScaleValue(44)));
+  pbSurface.Invalidate;
+end;
+
+procedure TRawViewFrame.Resize;
+begin
+  inherited;
+  if pbSurface <> nil then
+    pbSurface.SetBounds(0, 0, ClientWidth, ClientHeight);
+  ToolbarResize(nil);
 end;
 
 procedure TRawViewFrame.UpdateFilterMatchCount(AFiltering: Boolean);
 begin
   if (FDocument = nil) or (FDocument.TextSource = nil) then
   begin
-    lblFilterMatches.Caption := '0 matches';
+    FMatchBadge.Caption := '0 matches';
+    FMatchBadge.Hint := FMatchBadge.Caption;
+    ToolbarResize(nil);
     Exit;
   end;
 
   var LTotalLines := FDocument.TextSource.LineCount;
   if Trim(SearchFilterBox.Text) = '' then
-    lblFilterMatches.Caption := Format('%s lines', [FormatFloat('#,##0',
+    FMatchBadge.Caption := Format('%s lines', [FormatFloat('#,##0',
       LTotalLines)])
   else if AFiltering then
-    lblFilterMatches.Caption := 'Filtering...'
+    FMatchBadge.Caption := 'Filtering...'
   else
-    lblFilterMatches.Caption := Format('%s / %s matches', [
+    FMatchBadge.Caption := Format('%s / %s matches', [
       FormatFloat('#,##0', FVisibleSourceLineIndexes.Count),
       FormatFloat('#,##0', LTotalLines)]);
+  FMatchBadge.Hint := FMatchBadge.Caption;
+  ToolbarResize(nil);
 end;
 
 procedure TRawViewFrame.UpdateFontSize;
 begin
   Font.Name := TExplorerTheme.FontName;
   Font.Size := TExplorerTheme.FontSize;
-  Font.Height := MulDiv(Font.Height, CurrentPPI, Font.PixelsPerInch);
+  Font.Height := MulDiv(Font.Height, PixelsPerInch, Font.PixelsPerInch);
 
   FHighlighterControl.Font.Name := TExplorerTheme.FixedWidthFontName;
   FHighlighterControl.Font.Size := TExplorerTheme.FixedWidthFontSize;
-  FHighlighterControl.Font.Height := MulDiv(FHighlighterControl.Font.Height, CurrentPPI, FHighlighterControl.Font.PixelsPerInch);
+  FHighlighterControl.Font.Height := MulDiv(FHighlighterControl.Font.Height, PixelsPerInch, FHighlighterControl.Font.PixelsPerInch);
+
+  cbFollowSelection.Font.Name := TExplorerTheme.FontName;
+  cbFollowSelection.Font.Size := TExplorerTheme.FontSize;
+  cbFollowSelection.Font.Height := MulDiv(cbFollowSelection.Font.Height, PixelsPerInch, cbFollowSelection.Font.PixelsPerInch);
 end;
 
 procedure TRawViewFrame.cbFollowSelectionClick(Sender: TObject);
@@ -464,7 +562,10 @@ procedure TRawViewFrame.SetParent(AParent: TWinControl);
 begin
   inherited;
   if Parent <> nil then
+  begin
     UpdateFontSize;
+    ApplyTheme;
+  end;
 end;
 
 procedure TRawViewFrame.SetSyncWithSelectedNode(const AValue: Boolean);

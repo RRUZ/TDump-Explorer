@@ -18,7 +18,7 @@ uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
   System.Generics.Collections, System.Math, System.StrUtils, System.UITypes,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls,
-  Vcl.ExtCtrls, Vcl.ControlList, Vcl.WinXCtrls, Vcl.Clipbrd;
+  Vcl.ExtCtrls, Vcl.ControlList, Vcl.WinXCtrls, Vcl.Clipbrd, TDump.Explorer.UI;
 
 type
   TLogEntryType = (letInformation, letSuccess, letWarning, letError, letProfile);
@@ -36,7 +36,15 @@ type
     pnToolbar: TPanel;
     SearchFilterBox: TSearchBox;
     Label1: TLabel;
-    lblFilterMatches: TLabel;
+    pbSurface: TPaintBox;
+    pnSearch: TPanel;
+    pbSearchBorder: TPaintBox;
+    procedure SurfacePaint(Sender: TObject);
+    procedure SearchBorderPaint(Sender: TObject);
+    procedure SearchFocusChanged(Sender: TObject);
+    procedure SearchBorderMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
+    procedure ToolbarResize(Sender: TObject);
     procedure ApplyFilter;
     procedure ControlList1BeforeDrawItem(AIndex: Integer; ACanvas: TCanvas;
       ARect: TRect; AState: TOwnerDrawState);
@@ -61,6 +69,9 @@ type
     FEntries: TLogEntryList;
     FVisibleEntryIndexes: TList<Integer>;
     FUsingFilteredIndexes: Boolean;
+    FMatchBadge: TExplorerBadgeLabel;
+  protected
+    procedure Resize; override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -74,7 +85,7 @@ type
 implementation
 
 uses
-  Vcl.Themes, Vcl.GraphUtil, TDump.Explorer.UI;
+  Vcl.Themes, Vcl.GraphUtil;
 
 {$R *.dfm}
 
@@ -87,6 +98,15 @@ begin
   inherited Create(AOwner);
   FEntries := TLogEntryList.Create;
   FVisibleEntryIndexes := TList<Integer>.Create;
+  FMatchBadge := TExplorerBadgeLabel.Create(Self);
+  FMatchBadge.Name := 'FilterCountBadge';
+  FMatchBadge.Parent := pnToolbar;
+  FMatchBadge.Left := Label1.BoundsRect.Right + ScaleValue(8);
+  FMatchBadge.AlignWithMargins := True;
+  FMatchBadge.Margins.SetBounds(ScaleValue(8), ScaleValue(6),
+    ScaleValue(8), ScaleValue(6));
+  FMatchBadge.Align := alLeft;
+  FMatchBadge.ShowHint := True;
   ControlList1.MultiSelect := True;
   ControlList1.OnBeforeDrawItem := ControlList1BeforeDrawItem;
   ControlList1.OnItemDblClick := ControlList1DblClick;
@@ -96,6 +116,7 @@ begin
   pnToolbar.Alignment := taLeftJustify;
   ApplyFilter;
   ApplyTheme;
+  TExplorerFocusScrollBars.Create(ControlList1);
 end;
 
 destructor TLogControl.Destroy;
@@ -135,11 +156,76 @@ end;
 
 procedure TLogControl.ApplyTheme;
 begin
+  if pnSearch = nil then
+    Exit;
   var LTheme := TExplorerTheme.ActiveTheme;
+  Color := LTheme.BackgroundColor;
+  StyleElements := StyleElements - [seClient];
   pnToolbar.StyleElements := pnToolbar.StyleElements - [seClient];
   pnToolbar.Color := LTheme.BackgroundColor;
+  pnSearch.StyleElements := pnSearch.StyleElements - [seClient];
+  pnSearch.Color := LTheme.BackgroundColor;
+  // Keep native text input; the paint box owns the themed outline and glyph.
+  SearchFilterBox.StyleName := 'Windows';
+  SearchFilterBox.StyleElements := [];
+  SearchFilterBox.Color := LTheme.BackgroundColor;
+  SearchFilterBox.Font.Name := TExplorerTheme.FontName;
+  SearchFilterBox.Font.Height := -ScaleValue(MulDiv(TExplorerTheme.FontSize, 96, 72));
   SearchFilterBox.Font.Color := LTheme.TextColor;
-  lblFilterMatches.Font.Color := LTheme.InactiveText;
+  Label1.StyleName := 'Windows';
+  Label1.Font.Color := LTheme.TextColor;
+  ControlList1.Color := LTheme.BackgroundColor;
+  if FMatchBadge <> nil then
+  begin
+    FMatchBadge.ApplyTheme(LTheme);
+    FMatchBadge.Font.Color := LTheme.InactiveText;
+    ToolbarResize(nil);
+  end;
+  pbSurface.Invalidate;
+  pbSearchBorder.Invalidate;
+end;
+
+procedure TLogControl.SurfacePaint(Sender: TObject);
+begin
+  DrawExplorerSurface(pbSurface.Canvas, pbSurface.ClientRect, ScaleFactor,
+    pnToolbar.BoundsRect.Bottom);
+end;
+
+procedure TLogControl.SearchBorderPaint(Sender: TObject);
+begin
+  DrawExplorerSearchBorder(pbSearchBorder.Canvas, pbSearchBorder.ClientRect,
+    ScaleFactor, SearchFilterBox.Focused);
+end;
+
+procedure TLogControl.SearchFocusChanged(Sender: TObject);
+begin
+  pbSearchBorder.Invalidate;
+end;
+
+procedure TLogControl.SearchBorderMouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  if (Button = mbLeft) and SearchFilterBox.CanFocus then
+    SearchFilterBox.SetFocus;
+end;
+
+procedure TLogControl.ToolbarResize(Sender: TObject);
+begin
+  if FMatchBadge = nil then
+    Exit;
+  FMatchBadge.Font.Assign(SearchFilterBox.Font);
+  FMatchBadge.Font.Color := TExplorerTheme.ActiveTheme.InactiveText;
+  FMatchBadge.Width := Min(FMatchBadge.NaturalWidth,
+    Max(0, pnToolbar.ClientWidth - Label1.Width - pnSearch.Width - ScaleValue(36)));
+  pbSurface.Invalidate;
+end;
+
+procedure TLogControl.Resize;
+begin
+  inherited;
+  if pbSurface <> nil then
+    pbSurface.SetBounds(0, 0, ClientWidth, ClientHeight);
+  ToolbarResize(nil);
 end;
 
 procedure TLogControl.Clear;
@@ -413,12 +499,14 @@ end;
 procedure TLogControl.UpdateFilterMatchCount;
 begin
   if Trim(SearchFilterBox.Text) = '' then
-    lblFilterMatches.Caption := Format('%s entries', [FormatFloat('#,##0',
+    FMatchBadge.Caption := Format('%s entries', [FormatFloat('#,##0',
       FEntries.Count)])
   else
-    lblFilterMatches.Caption := Format('%s / %s matches', [
+    FMatchBadge.Caption := Format('%s / %s matches', [
       FormatFloat('#,##0', FVisibleEntryIndexes.Count),
       FormatFloat('#,##0', FEntries.Count)]);
+  FMatchBadge.Hint := FMatchBadge.Caption;
+  ToolbarResize(nil);
 end;
 
 function TLogControl.VisibleEntryIndex(AIndex: Integer): Integer;

@@ -32,59 +32,63 @@ object FrmMain: TFrmMain
   GlassFrame.Enabled = True
   GlassFrame.Top = 40
   Position = poScreenCenter
-  StyleElements = [seFont, seClient]
+  StyleElements = [seFont]
   OnCreate = FormCreate
   OnShow = FormShow
   TextHeight = 15
   object Splitter1: TSplitter
     Left = 0
-    Top = 572
+    Top = 566
     Width = 1072
-    Height = 4
+    Height = 12
     Cursor = crVSplit
     Align = alBottom
-    ExplicitTop = 581
+    ExplicitTop = 570
   end
   inline LogControl1: TLogControl
     AlignWithMargins = True
-    Left = 4
-    Top = 576
-    Width = 1064
+    Left = 6
+    Top = 574
+    Width = 1060
     Height = 127
-    Margins.Left = 4
+    Margins.Left = 6
     Margins.Top = 0
-    Margins.Right = 4
-    Margins.Bottom = 4
+    Margins.Right = 6
+    Margins.Bottom = 6
     Align = alBottom
+    DoubleBuffered = True
+    Padding.Left = 6
+    Padding.Top = 6
+    Padding.Right = 6
+    Padding.Bottom = 6
+    ParentBackground = False
+    ParentDoubleBuffered = False
     TabOrder = 0
-    ExplicitLeft = 4
-    ExplicitTop = 576
-    ExplicitWidth = 1064
+    ExplicitLeft = 6
+    ExplicitTop = 574
+    ExplicitWidth = 1060
     ExplicitHeight = 127
     inherited ControlList1: TControlList
-      Width = 1064
-      Height = 95
-      ExplicitWidth = 1064
-      ExplicitHeight = 95
+      Width = 1048
+      Height = 75
+      ExplicitWidth = 1048
+      ExplicitHeight = 75
     end
     inherited pnToolbar: TPanel
-      Width = 1064
+      Width = 1048
       StyleElements = [seFont, seClient, seBorder]
-      ExplicitWidth = 1064
+      ExplicitWidth = 1048
       inherited Label1: TLabel
-        Height = 32
+        Height = 36
         StyleElements = [seFont, seClient, seBorder]
       end
-      inherited lblFilterMatches: TLabel
-        Left = 827
-        Height = 32
-        ExplicitLeft = 827
-      end
-      inherited SearchFilterBox: TSearchBox
-        Left = 891
-        Height = 24
+      inherited pnSearch: TPanel
+        Left = 856
         StyleElements = [seFont, seClient, seBorder]
-        ExplicitLeft = 891
+        ExplicitLeft = 856
+        inherited SearchFilterBox: TSearchBox
+          StyleElements = [seFont, seClient, seBorder]
+        end
       end
     end
   end
@@ -96,15 +100,21 @@ object FrmMain: TFrmMain
     CustomButtons = <>
   end
   object CardPanel1: TCardPanel
-    Left = 0
-    Top = 39
-    Width = 1072
-    Height = 533
+    AlignWithMargins = True
+    Left = 6
+    Top = 45
+    Width = 1060
+    Height = 521
+    Margins.Left = 6
+    Margins.Top = 6
+    Margins.Right = 6
+    Margins.Bottom = 0
     Align = alClient
     BevelOuter = bvNone
     Caption = 'CardPanel1'
     ParentBackground = False
     TabOrder = 2
+    StyleElements = [seFont, seBorder]
   end
   object ProgressBar1: TProgressBar
     Left = 0

@@ -128,11 +128,9 @@ begin
     begin
       var LItemWidth := LMeasureBitmap.Canvas.TextWidth(
         MenuItemsControl.Items[LIndex]) + ScaleValue(16);
-      if Assigned(MenuItemsControl.Images) and
-        (MenuItemsControl.ItemImageName(LIndex) <> '') and
-        (MenuItemsControl.Images.GetIndexByName(
-          MenuItemsControl.ItemImageName(LIndex)) >= 0) then
-        Inc(LItemWidth, MenuItemsControl.Images.Width + ScaleValue(8));
+      var LIconWidth := MenuItemsControl.ItemIconWidth(LIndex);
+      if LIconWidth > 0 then
+        Inc(LItemWidth, LIconWidth + ScaleValue(8));
       LContentWidth := Max(LContentWidth, LItemWidth);
     end;
 

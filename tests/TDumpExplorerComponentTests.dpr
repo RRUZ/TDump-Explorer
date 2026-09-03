@@ -4,6 +4,7 @@ program TDumpExplorerComponentTests;
 
 uses
   Winapi.Windows,
+  Winapi.Messages,
   System.SysUtils,
   System.StrUtils,
   System.Math,
@@ -13,17 +14,20 @@ uses
   System.Generics.Collections,
   Vcl.Graphics,
   Vcl.Controls,
+  Vcl.StdCtrls,
   Vcl.Forms,
   DUnitX.TestFramework,
   DUnitX.Loggers.Xml.NUnit,
   TDump.Explorer.Tabs in '..\source\common\TDump.Explorer.Tabs.pas',
   TDump.Explorer.UI in '..\source\common\TDump.Explorer.UI.pas',
+  TDump.Explorer.Phosphor.Font in '..\source\common\TDump.Explorer.Phosphor.Font.pas',
   TDump.Explorer.Export in '..\source\common\TDump.Explorer.Export.pas',
   TDump.Explorer.TinyParser in '..\source\common\TDump.Explorer.TinyParser.pas',
   TDump.Explorer.Highlighter in '..\source\common\TDump.Explorer.Highlighter.pas',
   TDump.Explorer.HighlighterControl in '..\source\gui\TDump.Explorer.HighlighterControl.pas',
   TDump.Explorer.LogControl in '..\source\gui\TDump.Explorer.LogControl.pas',
   TDump.Explorer.Settings in '..\source\gui\TDump.Explorer.Settings.pas',
+  TDump.Explorer.Resources in '..\source\gui\TDump.Explorer.Resources.pas',
   TDumpExplorerComponentTestHost in 'TDumpExplorerComponentTestHost.pas';
 
 const
@@ -51,13 +55,26 @@ const
 type
   [TestFixture]
   TExplorerComponentFixture = class
+  private
+    FIconDrawCount: Integer;
+    FIconRect: TRect;
+    FIconColor: TColor;
+    procedure RecordItemIcon(Sender: TObject; AIndex: Integer; ACanvas: TCanvas;
+      const ARect: TRect; AColor: TColor);
   public
     [Test] procedure HighlightThemes;
     [Test] procedure TextFormatDrawing;
     [Test] procedure ViewExportFormats;
     [Test] procedure HighlighterSortingAndLayouts;
     [Test] procedure HighlighterSortGlyphPlacement;
+    [Test] procedure DocumentIconClassification;
+    [Test] procedure HighlighterCustomIcons;
+    [Test] procedure SplitterGripDrawing;
     [Test] procedure LogFilteringNavigation;
+    [Test] procedure BadgeMeasurementBeforeParenting;
+    [Test] procedure RoundedLogLayout;
+    [Test] procedure FocusScrollBarVisibility;
+    [Test] procedure SettingsDialogLayout;
     [Test] procedure SettingsRoundTrip;
   end;
 
@@ -339,6 +356,187 @@ begin
   end;
 end;
 
+procedure TestBadgeMeasurementBeforeParenting;
+begin
+  var LBadge := TExplorerBadgeLabel.Create(nil);
+  try
+    LBadge.Font.Name := TExplorerTheme.FontName;
+    LBadge.Font.Size := TExplorerTheme.FontSize;
+    LBadge.Height := 28;
+    LBadge.Caption := '1 line';
+    var LShortWidth := LBadge.NaturalWidth;
+    LBadge.Caption := '1,000 / 10,000 matches';
+    Require(LBadge.NaturalWidth > LShortWidth,
+      'Badge measurement must work before a frame has a parent window.');
+    var LNormalWidth := LBadge.NaturalWidth;
+    LBadge.Font.Size := 18;
+    Require(LBadge.NaturalWidth > LNormalWidth,
+      'Badge measurement must use the current font, including DPI scaling.');
+    Require((LBadge.Width = LBadge.NaturalWidth) and (LBadge.Height = 28),
+      'Caption/font changes must resize badge width without changing its height.');
+    var LBitmap := TBitmap.Create;
+    try
+      LBitmap.Canvas.Font.Assign(LBadge.Font);
+      Require(LBadge.NaturalWidth = LBitmap.Canvas.TextWidth(LBadge.Caption) +
+        2 * MulDiv(8, LBadge.CurrentPPI, 96),
+        'Badge width must include exactly eight design pixels on each side.');
+    finally
+      LBitmap.Free;
+    end;
+  finally
+    LBadge.Free;
+  end;
+end;
+
+procedure TestRoundedLogLayout;
+begin
+  var LHost := TComponentTestHostForm.Create(nil);
+  try
+    LHost.SetBounds(-32000, -32000, 640, 480);
+    LHost.Show;
+    Application.ProcessMessages;
+    var LLog := LHost.LogControl;
+    var LBadge := TExplorerBadgeLabel(LLog.FindComponent('FilterCountBadge'));
+    Require(LBadge <> nil, 'Log count must use the shared badge label.');
+    Require(LLog.SearchFilterBox.BorderStyle = bsNone,
+      'The custom rounded search border must not retain a native rectangle.');
+    Require(LLog.SearchFilterBox.ButtonWidth = 0,
+      'The native black glyph must not overlap the theme-aware search glyph.');
+    for var LWidth in TArray<Integer>.Create(640, 950, 1200) do
+    begin
+      LHost.ClientWidth := LWidth;
+      LLog.Height := 160;
+      LLog.Add('A searchable entry');
+      Require(LLog.pbSurface.BoundsRect = LLog.ClientRect,
+        'Pane decoration must follow the full frame bounds after resizing.');
+      Require((LLog.ControlList1.Left > 0) and
+        (LLog.ControlList1.BoundsRect.Bottom < LLog.ClientHeight),
+        'Content must leave room for the rounded pane corners.');
+      Require((LBadge.Left >= LLog.Label1.BoundsRect.Right) and
+        (LBadge.BoundsRect.Right < LLog.pnSearch.Left),
+        'Count badge must not overlap the title or search field.');
+    end;
+    LLog.SearchFilterBox.Text := 'searchable';
+    Require(LBadge.Caption = '3 / 3 matches', 'Filtered badge count is incorrect.');
+    LLog.ControlList1.SetFocus;
+    LLog.SearchBorderMouseDown(LLog.pbSearchBorder, mbLeft, [], 2, 2);
+    Require(LLog.SearchFilterBox.Focused, 'Clicking search padding must focus the edit.');
+    LLog.SearchFilterBox.Text := '';
+    Require(LBadge.Caption = '3 entries', 'Clearing a filter must restore the entry count.');
+  finally
+    LHost.Free;
+  end;
+end;
+
+procedure TestFocusScrollBarVisibility;
+begin
+  var LHost := TComponentTestHostForm.Create(nil);
+  try
+    // Off-screen: the real pointer cannot accidentally hover this list.
+    LHost.SetBounds(-32000, -32000, 640, 480);
+    LHost.Show;
+    var LLog := LHost.LogControl;
+    LLog.Height := 160;
+    LLog.SearchFilterBox.SetFocus;
+    for var LIndex := 1 to 100 do
+      LLog.Add('Entry ' + IntToStr(LIndex));
+    Application.ProcessMessages;
+    var LList := LLog.ControlList1;
+    Require((GetWindowLong(LList.Handle, GWL_STYLE) and WS_VSCROLL) = 0,
+      'Unfocused, unhovered log must hide its scrollbar after content updates.');
+    var LScrollPos := GetScrollPos(LList.Handle, SB_VERT);
+    var LClientHeight := LList.ClientHeight;
+    Require(LScrollPos > 0, 'Hiding must not reset the current scroll position.');
+    LList.SetFocus;
+    Application.ProcessMessages;
+    Require((GetWindowLong(LList.Handle, GWL_STYLE) and WS_VSCROLL) <> 0,
+      'Focusing a scrollable log must show its scrollbar.');
+    Require(((GetWindowLong(LList.Handle, GWL_STYLE) and WS_HSCROLL) = 0) and
+      (LList.ClientHeight = LClientHeight),
+      'Hover/focus must not introduce an unused horizontal scrollbar.');
+    Require(GetScrollPos(LList.Handle, SB_VERT) = LScrollPos,
+      'Showing the scrollbar must preserve the scroll position.');
+    LList.Perform(WM_KEYDOWN, VK_HOME, 0);
+    Application.ProcessMessages;
+    Require(LList.ItemIndex = 0, 'Keyboard navigation must remain intact.');
+    LList.Perform(WM_VSCROLL, SB_LINEDOWN, 0);
+    Require(GetScrollPos(LList.Handle, SB_VERT) > 0,
+      'The native scrollbar must still scroll the list.');
+    LScrollPos := GetScrollPos(LList.Handle, SB_VERT);
+    LList.Perform(WM_MOUSEWHEEL, MakeWParam(0, WHEEL_DELTA), 0);
+    Application.ProcessMessages;
+    Require(GetScrollPos(LList.Handle, SB_VERT) < LScrollPos,
+      'Mouse-wheel scrolling must remain intact.');
+    LLog.SearchFilterBox.SetFocus;
+    LLog.Height := 200;
+    LLog.Add('New entry while inactive');
+    Application.ProcessMessages;
+    Require((GetWindowLong(LList.Handle, GWL_STYLE) and WS_VSCROLL) = 0,
+      'Resize and appending rows must not reveal an inactive scrollbar.');
+    LLog.SearchFilterBox.Text := 'New entry while inactive';
+    LList.SetFocus;
+    Application.ProcessMessages;
+    Require((LList.ItemCount = 1) and
+      ((GetWindowLong(LList.Handle, GWL_STYLE) and WS_VSCROLL) = 0),
+      'Focus must not show a scrollbar when the filtered content fits.');
+    LLog.SearchFilterBox.Text := '';
+    Application.ProcessMessages;
+    Require((GetWindowLong(LList.Handle, GWL_STYLE) and WS_VSCROLL) <> 0,
+      'Clearing the filter must restore a needed, focused scrollbar.');
+  finally
+    LHost.Free;
+  end;
+end;
+
+procedure TestSettingsDialogLayout;
+begin
+  TSettings.SetSettingsFolderOverride(cTestResultsDirectory + '\settings-dialog');
+  try
+    var LResources := TDataModule1.Create(nil);
+    try
+      var LPreviousResources := DataModule1;
+      DataModule1 := LResources;
+      try
+        var LForm := TFrmSettings.Create(nil);
+        try
+          LForm.Position := poDesigned;
+          LForm.SetBounds(-32000, -32000, LForm.Width, LForm.Height);
+          LForm.Show;
+          for var LPPI in TArray<Integer>.Create(96, 120, 144) do
+          begin
+            LForm.ScaleForPPI(LPPI);
+            Application.ProcessMessages;
+            Require(LForm.pbCard.BoundsRect = LForm.pnContent.ClientRect,
+              'Settings card must cover the actual scaled content panel.');
+            Require(LForm.pnlAppearance.BoundsRect.Bottom <=
+              LForm.pnContent.ClientHeight - LForm.pnContent.Padding.Bottom,
+              'Theme list must leave room for the complete bottom card border.');
+            for var LCheckBox in TArray<TCheckBox>.Create(
+              LForm.cbRememberWindowPlacement, LForm.cbRestorePreviousSession) do
+            begin
+              Require((LCheckBox.StyleName = '') and
+                not (seFont in LCheckBox.StyleElements) and
+                (LCheckBox.Font.Color = TExplorerTheme.ActiveTheme.TextColor),
+                'Settings checkboxes must use the app style and explicit theme text color.');
+              LCheckBox.Checked := False;
+              LCheckBox.Perform(BM_CLICK, 0, 0);
+              Require(LCheckBox.Checked, 'Themed checkboxes must remain interactive.');
+            end;
+          end;
+        finally
+          LForm.Free;
+        end;
+      finally
+        DataModule1 := LPreviousResources;
+      end;
+    finally
+      LResources.Free;
+    end;
+  finally
+    TSettings.SetSettingsFolderOverride('');
+  end;
+end;
+
 procedure TestSettingsRoundTrip;
 var
   LGuid: TGUID;
@@ -437,9 +635,161 @@ begin
   TestLogFilteringNavigation;
 end;
 
+procedure TExplorerComponentFixture.DocumentIconClassification;
+begin
+  for var LFileName in TArray<string>.Create('report.tdump', 'report.TDUMP',
+    'C:\reports\module.bpl.tdump', 'report.TxT') do
+    Require(ExplorerDocumentIconName(LFileName) = 'file-text',
+      'Report inputs must share the file-text icon in tabs, headers and MRU.');
+  for var LFileName in TArray<string>.Create('app.exe', 'library.dll',
+    'package.bpl', 'unit.dcu', 'module.obj', 'library.so', '') do
+    Require(ExplorerDocumentIconName(LFileName) = 'binary',
+      'Binary inputs and pending documents must share the binary icon.');
+end;
+
+procedure TExplorerComponentFixture.RecordItemIcon(Sender: TObject;
+  AIndex: Integer; ACanvas: TCanvas; const ARect: TRect; AColor: TColor);
+begin
+  Inc(FIconDrawCount);
+  FIconRect := ARect;
+  FIconColor := AColor;
+  DrawExplorerDocumentIcon(ACanvas, 'report.tdump', ARect, AColor);
+end;
+
+procedure TExplorerComponentFixture.HighlighterCustomIcons;
+begin
+  var LHost := TComponentTestHostForm.Create(nil);
+  try
+    LHost.SetBounds(-32000, -32000, 640, 480);
+    LHost.Show;
+    var LControl := LHost.HighlighterControl;
+    LControl.UseColumnMode := False;
+    LControl.ShowLineNumbers := False;
+    LControl.OnDrawItemIcon := RecordItemIcon;
+    LControl.CustomIconSize := 24;
+    LControl.Add('Report', 'file-text');
+    LControl.Add('No icon');
+    var LBitmap := TBitmap.Create;
+    try
+      for var LPPI in TArray<Integer>.Create(96, 120, 144) do
+      begin
+        LHost.ScaleForPPI(LPPI);
+        Application.ProcessMessages;
+        var LRowRect := Rect(0, 0, 500, MulDiv(32, LPPI, 96));
+        LBitmap.SetSize(LRowRect.Width, LRowRect.Height);
+        var LExpectedSize := MulDiv(24, LPPI, 96);
+        Require(LControl.ItemIconWidth(0) = LExpectedSize,
+          'Custom icon measurement must scale the 24-pixel design size once.');
+        Require(LControl.ItemIconWidth(1) = 0,
+          'A row without an icon must not reserve an icon gutter.');
+        LControl.SetInactiveItems([]);
+        FIconDrawCount := 0;
+        LControl.ControlList1.OnBeforeDrawItem(0, LBitmap.Canvas, LRowRect, []);
+        Require(LBitmap.Canvas.Font.Height = LControl.Font.Height,
+          'Row painting must preserve the same scaled font height used for measurement.');
+        Require((FIconDrawCount = 1) and
+          (FIconRect.Width = LExpectedSize) and
+          (FIconRect.Height = LExpectedSize) and
+          (FIconRect.Top = (LRowRect.Height - LExpectedSize) div 2),
+          'Custom icons must be square, DPI-scaled and vertically centered.');
+        Require(FIconColor = TExplorerTheme.ActiveTheme.TextColor,
+          'Normal icons must use the active theme text color.');
+        LControl.SetInactiveItems([0]);
+        LControl.ControlList1.OnBeforeDrawItem(0, LBitmap.Canvas, LRowRect, []);
+        Require(FIconColor = TExplorerTheme.ActiveTheme.InactiveText,
+          'Unavailable files must use the inactive icon color.');
+        LControl.ControlList1.OnBeforeDrawItem(0, LBitmap.Canvas, LRowRect,
+          [odSelected]);
+        Require(FIconColor = TExplorerTheme.ActiveTheme.SelectionColor,
+          'Selection color must apply to icons, including unavailable files.');
+        FIconDrawCount := 0;
+        LControl.ControlList1.OnBeforeDrawItem(1, LBitmap.Canvas, LRowRect, []);
+        Require(FIconDrawCount = 0,
+          'Rows without icons must not invoke the custom renderer.');
+      end;
+      LControl.OnDrawItemIcon := nil;
+      Require(LControl.ItemIconWidth(0) = 0,
+        'Without a renderer or image list, the icon gutter must remain empty.');
+    finally
+      LBitmap.Free;
+    end;
+  finally
+    LHost.Free;
+  end;
+end;
+
 procedure TExplorerComponentFixture.SettingsRoundTrip;
 begin
   TestSettingsRoundTrip;
+end;
+
+procedure TExplorerComponentFixture.SplitterGripDrawing;
+begin
+  var LBitmap := TBitmap.Create;
+  try
+    var LBaseline := TBitmap.Create;
+    try
+      var LTheme := TExplorerTheme.ActiveTheme;
+      for var LPPI in TArray<Integer>.Create(96, 120, 144) do
+        for var LVertical in TArray<Boolean>.Create(False, True) do
+        begin
+          var LScale: Single := LPPI / 96;
+          if LVertical then
+            LBitmap.SetSize(MulDiv(12, LPPI, 96), MulDiv(200, LPPI, 96))
+          else
+            LBitmap.SetSize(MulDiv(200, LPPI, 96), MulDiv(12, LPPI, 96));
+          var LBounds := Rect(0, 0, LBitmap.Width, LBitmap.Height);
+          LBitmap.Canvas.Brush.Color := LTheme.BackgroundColor;
+          LBitmap.Canvas.FillRect(LBounds);
+          LBaseline.Assign(LBitmap);
+          DrawSplitterLine(LBaseline.Canvas, LBounds, LVertical, LTheme.GhostColor);
+          DrawExplorerSplitter(LBitmap.Canvas, LBounds, LVertical, LScale);
+          var LChangedPixels := 0;
+          var LCenter := LBounds.CenterPoint;
+          for var LY := 0 to LBitmap.Height - 1 do
+            for var LX := 0 to LBitmap.Width - 1 do
+              if LBitmap.Canvas.Pixels[LX, LY] <> LBaseline.Canvas.Pixels[LX, LY] then
+              begin
+                Inc(LChangedPixels);
+                var LDistance := if LVertical then Abs(LY - LCenter.Y)
+                  else Abs(LX - LCenter.X);
+                Require(LDistance <= MulDiv(26, LPPI, 96),
+                  'The rounded grip must remain centered within its scaled 48-pixel span.');
+              end;
+          Require(LChangedPixels > 24,
+            'Both splitter orientations must show a grip, not just the old line.');
+          Require(ColorToRGB(LBitmap.Canvas.Pixels[0, 0]) =
+            ColorToRGB(LTheme.BackgroundColor),
+            'The grip must leave room around the splitter edges.');
+        end;
+      DrawExplorerSplitter(LBitmap.Canvas, Rect(0, 0, 0, 0), False, 1);
+      DrawExplorerSplitter(LBitmap.Canvas, Rect(0, 0, 2, 8), True, 1);
+    finally
+      LBaseline.Free;
+    end;
+  finally
+    LBitmap.Free;
+  end;
+end;
+
+procedure TExplorerComponentFixture.BadgeMeasurementBeforeParenting;
+begin
+  TestBadgeMeasurementBeforeParenting;
+end;
+
+procedure TExplorerComponentFixture.RoundedLogLayout;
+begin
+  TestRoundedLogLayout;
+end;
+
+procedure TExplorerComponentFixture.FocusScrollBarVisibility;
+begin
+  TestFocusScrollBarVisibility;
+end;
+
+procedure TExplorerComponentFixture.SettingsDialogLayout;
+begin
+  TestSettingsDialogLayout;
 end;
 
 begin

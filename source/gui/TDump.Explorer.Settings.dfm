@@ -3,7 +3,7 @@ object FrmSettings: TFrmSettings
   Top = 0
   BorderStyle = bsDialog
   Caption = 'Settings'
-  ClientHeight = 448
+  ClientHeight = 464
   ClientWidth = 585
   Color = clWindow
   CustomTitleBar.Control = TitleBarPanel1
@@ -39,7 +39,7 @@ object FrmSettings: TFrmSettings
     Left = 0
     Top = 29
     Width = 585
-    Height = 361
+    Height = 377
     Align = alClient
     BevelOuter = bvNone
     Color = clWindow
@@ -52,15 +52,14 @@ object FrmSettings: TFrmSettings
     StyleElements = [seFont, seBorder]
     DesignSize = (
       585
-      361)
+      377)
     object pbCard: TPaintBox
       Left = 0
       Top = 0
       Width = 585
-      Height = 360
+      Height = 377
       Anchors = [akLeft, akTop, akRight, akBottom]
       OnPaint = CardPaint
-      ExplicitHeight = 322
     end
     object pnlWorkspace: TPanel
       AlignWithMargins = True
@@ -330,7 +329,7 @@ object FrmSettings: TFrmSettings
   end
   object pnFooter: TPanel
     Left = 0
-    Top = 390
+    Top = 406
     Width = 585
     Height = 58
     Align = alBottom

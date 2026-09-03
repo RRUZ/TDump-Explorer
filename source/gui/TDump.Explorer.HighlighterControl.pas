@@ -43,6 +43,9 @@ type
     ColumnWidths: TArray<Integer>;
   end;
 
+  THighlighterDrawItemIconEvent = procedure(Sender: TObject; AIndex: Integer;
+    ACanvas: TCanvas; const ARect: TRect; AColor: TColor) of object;
+
   THighlighterControl = class(TFrame)
     ControlList1: TControlList;
     HeaderControl1: THeaderControl;
@@ -82,6 +85,8 @@ type
       FRestoreItemIndex: Integer;
       FRestoreItemIndexPending: Boolean;
       FImages: TCustomImageList;
+      FCustomIconSize: Integer;
+      FOnDrawItemIcon: THighlighterDrawItemIconEvent;
       FOnItemClick: TNotifyEvent;
       FSortIndexes: TList<Integer>;
       FColumnLayouts: TObjectDictionary<string, THighlighterColumnLayout>;
@@ -103,6 +108,7 @@ type
     function IsItemInactive(AItemIndex: Integer): Boolean;
     procedure SetMatchColor(const AValue: TColor);
     procedure SetImages(const AValue: TCustomImageList);
+    procedure SetCustomIconSize(const AValue: Integer);
     function ColumnCount(const AText: string): Integer;
     function ColumnText(AItemIndex, AColumnIndex: Integer): string;
     function SourceItemText(ASourceItemIndex: Integer): string;
@@ -199,6 +205,7 @@ type
       AParserMode: TTinyParserMode);
     procedure SetItemImageName(AItemIndex: Integer; const AImageName: string);
     function ItemImageName(AItemIndex: Integer): string;
+    function ItemIconWidth(AItemIndex: Integer): Integer;
     procedure SetLineNumber(AItemIndex, ALineNumber: Integer);
     procedure SetFilterText(const AValue: string);
     procedure SetText(const AText: string);
@@ -212,6 +219,11 @@ type
     property Items: TStringList read FItems;
     property Count: Integer read ItemCount;
     property Images: TCustomImageList read FImages write SetImages;
+    // Optional square icon renderer; size is in 96-DPI design pixels.
+    // Without it, existing image-list drawing is unchanged.
+    property CustomIconSize: Integer read FCustomIconSize write SetCustomIconSize;
+    property OnDrawItemIcon: THighlighterDrawItemIconEvent
+      read FOnDrawItemIcon write FOnDrawItemIcon;
     property OnItemClick: TNotifyEvent read FOnItemClick write FOnItemClick;
     property AutoSizeColumns: Boolean read FAutoSizeColumns
       write SetAutoSizeColumns default True;
@@ -317,8 +329,8 @@ begin
     Exit;
 
   FContextPopupImages := TVirtualImageList.Create(Self);
-  FContextPopupImages.Width := ScaleValue(16);
-  FContextPopupImages.Height := ScaleValue(16);
+  FContextPopupImages.Width := ScaleValue(24);
+  FContextPopupImages.Height := ScaleValue(24);
   FContextPopupImages.ImageCollection := DataModule1.ImageCollection1;
   FContextPopupImages.Add('file-text_dark', 'file-text_dark');
   FContextPopupImages.Add('file-text_light', 'file-text_light');
@@ -1179,8 +1191,8 @@ begin
 
   var LTextRect := ARect;
   InflateRect(LTextRect, -CTextPadding, 0);
-  ACanvas.Font.Name := Font.Name;
-  ACanvas.Font.Size := Font.Size;
+  // Match measurement and painting, including the font's scaled pixel height.
+  ACanvas.Font.Assign(Font);
   LBrushStyle := ACanvas.Brush.Style;
   if LSelected then
     ACanvas.Brush.Style := bsClear;
@@ -1206,21 +1218,28 @@ begin
     LTextRect.Left := Min(LTextRect.Right, LTextRect.Left + LGutterWidth);
   end;
 
-  if FImages <> nil then
+  var LIconWidth := ItemIconWidth(AIndex);
+  if LIconWidth > 0 then
   begin
-    var LImageName := ItemImageName(AIndex);
-    if LImageName <> '' then
+    if (FCustomIconSize > 0) and Assigned(FOnDrawItemIcon) then
     begin
-      var LImageIndex := FImages.GetIndexByName(LImageName);
-      if LImageIndex >= 0 then
-      begin
-        var LImageY := LTextRect.Top +
-          Max(0, (LTextRect.Height - FImages.Height) div 2);
-        FImages.Draw(ACanvas, LTextRect.Left, LImageY, LImageIndex, True);
-        LTextRect.Left := Min(LTextRect.Right, LTextRect.Left +
-          FImages.Width + CTextPadding);
-      end;
+      var LIconTop := LTextRect.Top + Max(0, (LTextRect.Height - LIconWidth) div 2);
+      var LIconRect := Rect(LTextRect.Left, LIconTop,
+        LTextRect.Left + LIconWidth, LIconTop + LIconWidth);
+      var LIconColor := TExplorerTheme.ActiveTheme.TextColor;
+      if LSelected then
+        LIconColor := TExplorerTheme.ActiveTheme.SelectionColor
+      else if IsItemInactive(AIndex) then
+        LIconColor := TExplorerTheme.ActiveTheme.InactiveText;
+      FOnDrawItemIcon(Self, AIndex, ACanvas, LIconRect, LIconColor);
+    end
+    else
+    begin
+      var LImageY := LTextRect.Top + Max(0, (LTextRect.Height - FImages.Height) div 2);
+      FImages.Draw(ACanvas, LTextRect.Left, LImageY,
+        FImages.GetIndexByName(ItemImageName(AIndex)), True);
     end;
+    LTextRect.Left := Min(LTextRect.Right, LTextRect.Left + LIconWidth + CTextPadding);
   end;
 
   if IsItemInactive(AIndex) and not LSelected then
@@ -1626,6 +1645,27 @@ begin
   UpdateControlList;
 end;
 
+procedure THighlighterControl.SetCustomIconSize(const AValue: Integer);
+begin
+  var LSize := Max(0, AValue);
+  if FCustomIconSize = LSize then
+    Exit;
+  FCustomIconSize := LSize;
+  UpdateControlList;
+end;
+
+function THighlighterControl.ItemIconWidth(AItemIndex: Integer): Integer;
+begin
+  Result := 0;
+  var LImageName := ItemImageName(AItemIndex);
+  if LImageName = '' then
+    Exit;
+  if (FCustomIconSize > 0) and Assigned(FOnDrawItemIcon) then
+    Result := ScaleValue(FCustomIconSize)
+  else if (FImages <> nil) and (FImages.GetIndexByName(LImageName) >= 0) then
+    Result := FImages.Width;
+end;
+
 procedure THighlighterControl.SetAutoSizeColumns(const AValue: Boolean);
 begin
   if FAutoSizeColumns = AValue then
@@ -1736,9 +1776,8 @@ begin
     begin
       var LItemWidth := FMeasureBitmap.Canvas.TextWidth(
         ColumnText(LItemIndex, LColumnIndex)) + (CTextPadding * 2);
-      if (LColumnIndex = 0) and (FImages <> nil) and
-        (FImages.GetIndexByName(ItemImageName(LItemIndex)) >= 0) then
-        Inc(LItemWidth, FImages.Width + CTextPadding);
+      if (LColumnIndex = 0) and (ItemIconWidth(LItemIndex) > 0) then
+        Inc(LItemWidth, ItemIconWidth(LItemIndex) + CTextPadding);
       LWidth := Max(LWidth, LItemWidth);
     end;
     FColumnWidths[LColumnIndex] := LWidth;

@@ -9,63 +9,106 @@ object DumpDocumentFrame: TDumpDocumentFrame
   TabOrder = 0
   object Splitter1: TSplitter
     Left = 297
-    Top = 52
-    Width = 4
-    Height = 499
-    ExplicitLeft = 0
-    ExplicitTop = 0
-    ExplicitHeight = 476
+    Top = 70
+    Width = 12
+    Height = 477
+    ExplicitHeight = 481
   end
   object Splitter2: TSplitter
     Left = 0
-    Top = 551
+    Top = 547
     Width = 1056
-    Height = 4
+    Height = 12
     Cursor = crVSplit
     Align = alBottom
-    ExplicitTop = 231
-    ExplicitWidth = 386
+    ExplicitTop = 551
   end
-  object Tree: TVirtualStringTree
+  object pnNavigation: TPanel
     Left = 0
-    Top = 52
+    Top = 70
     Width = 297
-    Height = 499
+    Height = 477
     Align = alLeft
-    BorderStyle = bsNone
-    DragOperations = []
-    Header.AutoSizeIndex = 0
-    Header.Height = 15
-    Header.MainColumn = -1
-    Images = VirtualImageList1
-    SelectionBlendFactor = 255
-    StyleElements = [seClient, seBorder]
-    TabOrder = 0
-    Touch.InteractiveGestures = [igPan, igPressAndTap]
-    Touch.InteractiveGestureOptions = [igoPanSingleFingerHorizontal, igoPanSingleFingerVertical, igoPanInertia, igoPanGutter, igoParentPassthrough]
-    Columns = <>
-  end
-  object pnCards: TPanel
-    Left = 301
-    Top = 52
-    Width = 755
-    Height = 499
-    Align = alClient
     BevelOuter = bvNone
-    TabOrder = 1
-    object pnProperties: TPanel
+    Padding.Left = 6
+    Padding.Top = 6
+    Padding.Right = 6
+    Padding.Bottom = 6
+    ParentBackground = False
+    TabOrder = 0
+    OnResize = SurfaceResize
+    DesignSize = (
+      297
+      477)
+    object pbNavigation: TPaintBox
       Left = 0
       Top = 0
-      Width = 755
-      Height = 499
+      Width = 297
+      Height = 477
+      Anchors = [akLeft, akTop, akRight, akBottom]
+      OnPaint = SurfacePaint
+      ExplicitHeight = 481
+    end
+    object Tree: TVirtualStringTree
+      Left = 6
+      Top = 6
+      Width = 285
+      Height = 465
+      Align = alClient
+      BorderStyle = bsNone
+      DragOperations = []
+      Header.AutoSizeIndex = 0
+      Header.Height = 15
+      Header.MainColumn = -1
+      Images = VirtualImageList1
+      SelectionBlendFactor = 255
+      StyleElements = [seClient, seBorder]
+      TabOrder = 0
+      Touch.InteractiveGestures = [igPan, igPressAndTap]
+      Touch.InteractiveGestureOptions = [igoPanSingleFingerHorizontal, igoPanSingleFingerVertical, igoPanInertia, igoPanGutter, igoParentPassthrough]
+      Columns = <>
+    end
+  end
+  object pnCards: TPanel
+    Left = 305
+    Top = 70
+    Width = 751
+    Height = 477
+    Align = alClient
+    BevelOuter = bvNone
+    Padding.Left = 6
+    Padding.Top = 6
+    Padding.Right = 6
+    Padding.Bottom = 6
+    ParentBackground = False
+    TabOrder = 1
+    OnResize = SurfaceResize
+    DesignSize = (
+      751
+      477)
+    object pbDetails: TPaintBox
+      Left = 0
+      Top = 0
+      Width = 751
+      Height = 477
+      Anchors = [akLeft, akTop, akRight, akBottom]
+      OnPaint = SurfacePaint
+      ExplicitWidth = 755
+      ExplicitHeight = 499
+    end
+    object pnProperties: TPanel
+      Left = 6
+      Top = 6
+      Width = 739
+      Height = 465
       Align = alClient
       BevelOuter = bvNone
       TabOrder = 0
       object cpViews: TCardPanel
         Left = 0
         Top = 0
-        Width = 755
-        Height = 499
+        Width = 739
+        Height = 465
         Align = alClient
         BevelOuter = bvNone
         Caption = 'cpViews'
@@ -74,18 +117,39 @@ object DumpDocumentFrame: TDumpDocumentFrame
     end
   end
   object pnTop: TPanel
+    AlignWithMargins = True
     Left = 0
     Top = 0
     Width = 1056
-    Height = 52
+    Height = 64
+    Margins.Left = 0
+    Margins.Top = 0
+    Margins.Right = 0
+    Margins.Bottom = 6
     Align = alTop
     BevelOuter = bvNone
+    Padding.Left = 6
+    Padding.Top = 6
+    Padding.Right = 6
+    Padding.Bottom = 6
     ParentBackground = False
     TabOrder = 3
+    OnResize = SurfaceResize
+    DesignSize = (
+      1056
+      64)
+    object pbHeader: TPaintBox
+      Left = 0
+      Top = 0
+      Width = 1056
+      Height = 64
+      Anchors = [akLeft, akTop, akRight, akBottom]
+      OnPaint = SurfacePaint
+    end
     object PaintBox1: TPaintBox
       AlignWithMargins = True
-      Left = 8
-      Top = 8
+      Left = 14
+      Top = 14
       Width = 36
       Height = 44
       Margins.Left = 8
@@ -95,12 +159,13 @@ object DumpDocumentFrame: TDumpDocumentFrame
       Align = alLeft
       OnPaint = PaintBox1Paint
       ExplicitLeft = 0
+      ExplicitTop = 8
     end
     object pnDocument: TPanel
       AlignWithMargins = True
-      Left = 48
-      Top = 0
-      Width = 584
+      Left = 54
+      Top = 6
+      Width = 542
       Height = 52
       Margins.Left = 4
       Margins.Top = 0
@@ -112,12 +177,10 @@ object DumpDocumentFrame: TDumpDocumentFrame
       ParentBackground = False
       ParentDoubleBuffered = False
       TabOrder = 0
-      ExplicitLeft = 58
-      ExplicitWidth = 574
       object lblDocumentName: TLabel
         Left = 0
         Top = 0
-        Width = 584
+        Width = 542
         Height = 27
         Margins.Left = 0
         Margins.Top = 4
@@ -126,6 +189,7 @@ object DumpDocumentFrame: TDumpDocumentFrame
         Align = alClient
         AutoSize = False
         Caption = 'Document'
+        EllipsisPosition = epEndEllipsis
         Layout = tlBottom
         ExplicitLeft = 8
         ExplicitTop = -3
@@ -134,7 +198,7 @@ object DumpDocumentFrame: TDumpDocumentFrame
       object lblSourcePath: TLabel
         Left = 0
         Top = 27
-        Width = 584
+        Width = 542
         Height = 25
         Align = alBottom
         AutoSize = False
@@ -147,9 +211,9 @@ object DumpDocumentFrame: TDumpDocumentFrame
     end
     object gpHeader: TGridPanel
       AlignWithMargins = True
-      Left = 648
-      Top = 0
-      Width = 400
+      Left = 612
+      Top = 6
+      Width = 430
       Height = 52
       Margins.Left = 8
       Margins.Top = 0
@@ -160,19 +224,19 @@ object DumpDocumentFrame: TDumpDocumentFrame
       ColumnCollection = <
         item
           SizeStyle = ssAbsolute
-          Value = 50.000000000000000000
+          Value = 70.000000000000000000
         end
         item
           SizeStyle = ssAbsolute
-          Value = 100.000000000000000000
+          Value = 110.000000000000000000
         end
         item
           SizeStyle = ssAbsolute
-          Value = 150.000000000000000000
+          Value = 160.000000000000000000
         end
         item
           SizeStyle = ssAbsolute
-          Value = 100.000000000000000000
+          Value = 90.000000000000000000
         end>
       ControlCollection = <
         item
@@ -182,7 +246,7 @@ object DumpDocumentFrame: TDumpDocumentFrame
         end
         item
           Column = 0
-          Control = lblFormatValue
+          Control = pnFormatBadge
           Row = 1
         end
         item
@@ -202,7 +266,7 @@ object DumpDocumentFrame: TDumpDocumentFrame
         end
         item
           Column = 1
-          Control = lblArchitectureValue
+          Control = pnArchitectureBadge
           Row = 1
         end
         item
@@ -227,7 +291,7 @@ object DumpDocumentFrame: TDumpDocumentFrame
       object lblFormatCaption: TLabel
         Left = 0
         Top = 0
-        Width = 50
+        Width = 70
         Height = 26
         Align = alClient
         AutoSize = False
@@ -237,27 +301,25 @@ object DumpDocumentFrame: TDumpDocumentFrame
         ExplicitTop = -3
         ExplicitWidth = 152
       end
-      object lblFormatValue: TLabel
+      object pnFormatBadge: TPanel
         AlignWithMargins = True
         Left = 0
         Top = 28
-        Width = 50
-        Height = 24
+        Width = 70
+        Height = 22
         Margins.Left = 0
         Margins.Top = 2
         Margins.Right = 0
-        Margins.Bottom = 0
+        Margins.Bottom = 2
         Align = alClient
-        AutoSize = False
-        Caption = ' '
-        ExplicitLeft = -3
-        ExplicitTop = 25
-        ExplicitWidth = 152
+        BevelOuter = bvNone
+        ParentBackground = False
+        TabOrder = 0
       end
       object lblArchitectureCaption: TLabel
-        Left = 50
+        Left = 70
         Top = 0
-        Width = 100
+        Width = 110
         Height = 26
         Align = alClient
         AutoSize = False
@@ -269,9 +331,9 @@ object DumpDocumentFrame: TDumpDocumentFrame
         ExplicitHeight = 18
       end
       object lblTimestampCaption: TLabel
-        Left = 150
+        Left = 180
         Top = 0
-        Width = 150
+        Width = 160
         Height = 26
         Align = alClient
         AutoSize = False
@@ -283,9 +345,9 @@ object DumpDocumentFrame: TDumpDocumentFrame
         ExplicitHeight = 32
       end
       object lblSizeCaption: TLabel
-        Left = 300
+        Left = 340
         Top = 0
-        Width = 100
+        Width = 90
         Height = 26
         Align = alClient
         AutoSize = False
@@ -295,29 +357,27 @@ object DumpDocumentFrame: TDumpDocumentFrame
         ExplicitTop = -3
         ExplicitWidth = 152
       end
-      object lblArchitectureValue: TLabel
+      object pnArchitectureBadge: TPanel
         AlignWithMargins = True
-        Left = 50
+        Left = 70
         Top = 28
-        Width = 100
-        Height = 24
+        Width = 86
+        Height = 22
         Margins.Left = 0
         Margins.Top = 2
-        Margins.Right = 0
-        Margins.Bottom = 0
+        Margins.Right = 24
+        Margins.Bottom = 2
         Align = alClient
-        AutoSize = False
-        Caption = ' '
-        ExplicitLeft = 545
-        ExplicitTop = 82
-        ExplicitWidth = 153
-        ExplicitHeight = 20
+        AutoSize = True
+        BevelOuter = bvNone
+        ParentBackground = False
+        TabOrder = 1
       end
       object lblTimestampValue: TLabel
         AlignWithMargins = True
-        Left = 150
+        Left = 180
         Top = 28
-        Width = 150
+        Width = 160
         Height = 24
         Margins.Left = 0
         Margins.Top = 2
@@ -333,9 +393,9 @@ object DumpDocumentFrame: TDumpDocumentFrame
       end
       object lblSizeValue: TLabel
         AlignWithMargins = True
-        Left = 300
+        Left = 340
         Top = 28
-        Width = 100
+        Width = 90
         Height = 24
         Margins.Left = 0
         Margins.Top = 2
@@ -358,6 +418,10 @@ object DumpDocumentFrame: TDumpDocumentFrame
     Height = 100
     Align = alBottom
     DoubleBuffered = True
+    Padding.Left = 6
+    Padding.Top = 6
+    Padding.Right = 6
+    Padding.Bottom = 6
     ParentBackground = False
     ParentDoubleBuffered = False
     TabOrder = 2
@@ -365,44 +429,26 @@ object DumpDocumentFrame: TDumpDocumentFrame
     ExplicitWidth = 1056
     ExplicitHeight = 100
     inherited pnToolbar: TPanel
-      Width = 1056
-      Height = 32
+      Width = 1044
       StyleElements = [seFont, seBorder]
-      ExplicitWidth = 1056
-      ExplicitHeight = 32
+      ExplicitLeft = 6
+      ExplicitTop = 6
+      ExplicitWidth = 1044
       inherited Label1: TLabel
-        AlignWithMargins = True
-        Top = 0
-        Height = 32
-        Margins.Left = 8
-        Margins.Top = 0
-        Margins.Right = 8
-        Margins.Bottom = 0
-        Align = alLeft
-        Layout = tlCenter
+        Height = 36
         StyleElements = [seFont, seClient, seBorder]
-        ExplicitTop = 0
-      end
-      inherited lblFilterMatches: TLabel
-        Left = 666
-        Height = 32
-        ExplicitLeft = 666
-      end
-      inherited SearchFilterBox: TSearchBox
-        Left = 883
-        Top = 2
-        Height = 28
-        Margins.Top = 2
-        Margins.Bottom = 2
-        StyleElements = [seFont, seClient, seBorder]
-        ExplicitLeft = 883
-        ExplicitTop = 2
       end
       inherited cbFollowSelection: TCheckBox
-        Left = 736
-        Height = 32
-        ExplicitLeft = 736
-        ExplicitHeight = 32
+        Left = 709
+        ExplicitLeft = 709
+      end
+      inherited pnSearch: TPanel
+        Left = 852
+        StyleElements = [seFont, seClient, seBorder]
+        ExplicitLeft = 852
+        inherited SearchFilterBox: TSearchBox
+          StyleElements = [seFont, seClient, seBorder]
+        end
       end
     end
   end

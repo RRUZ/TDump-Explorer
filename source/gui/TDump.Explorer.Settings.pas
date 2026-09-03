@@ -608,10 +608,15 @@ begin
   ApplyLabel(lblShowLogPanel, LTheme.TextColor);
   ApplyLabel(lblShowRawPanel, LTheme.TextColor);
   ApplyLabel(lblFollowRawSelection, LTheme.TextColor);
-  cbRememberWindowPlacement.StyleName := 'Windows';
-  cbRememberWindowPlacement.Font.Color := LTheme.TextColor;
-  cbRestorePreviousSession.StyleName := 'Windows';
-  cbRestorePreviousSession.Font.Color := LTheme.TextColor;
+  for var LCheckBox in TArray<TCheckBox>.Create(cbRememberWindowPlacement,
+    cbRestorePreviousSession) do
+  begin
+    // Native Windows checkbox captions ignore Font.Color under visual styles.
+    // Use the app style for the glyph/background and our palette for the text.
+    LCheckBox.StyleName := '';
+    LCheckBox.StyleElements := LCheckBox.StyleElements - [seFont];
+    LCheckBox.Font.Color := LTheme.TextColor;
+  end;
   ApplyLabel(lblInformation, LTheme.InactiveText);
   ApplyLabel(lblHint, LTheme.InactiveText);
 
@@ -920,6 +925,14 @@ procedure TFrmSettings.UpdateSettingsLayout;
 begin
   if not Assigned(FSaveButton) then
     Exit;
+  // Native and styled title bars reserve different client heights. Keep the
+  // complete Appearance panel above the card's bottom inset in either style.
+  var LRequiredHeight := pnlAppearance.BoundsRect.Bottom + pnContent.Padding.Bottom;
+  if pnContent.ClientHeight < LRequiredHeight then
+    ClientHeight := ClientHeight + LRequiredHeight - pnContent.ClientHeight;
+  // Use the actual scaled panel bounds, not stale designer anchor distances.
+  pbCard.SetBounds(0, 0, pnContent.ClientWidth, pnContent.ClientHeight);
+  pbInputBorders.SetBounds(0, 0, pnlGeneral.ClientWidth, pnlGeneral.ClientHeight);
   // Derive the edit width from the scaled panel to avoid cumulative rounding
   // pushing Browse beyond the right edge at fractional display scales.
   edTDumpPath.Width := Max(1, pnlGeneral.ClientWidth - edTDumpPath.Left -
@@ -992,6 +1005,7 @@ procedure TFrmSettings.CMStyleChanged(var AMessage: TMessage);
 begin
   inherited;
   ApplyTheme;
+  UpdateSettingsLayout;
 end;
 
 constructor TFrmSettings.Create(AOwner: TComponent);

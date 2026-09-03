@@ -124,8 +124,7 @@ type
       AKind: TAnalysisKind; AActivateTabWhenComplete: Boolean): TAnalysisRequest;
     procedure CreateTabs;
     procedure CreateEmptyState;
-    function DocumentTabImageName: System.UITypes.TImageName;
-    function RecentFileImageName(const AFileName: string): System.UITypes.TImageName;
+    function DocumentTabImageName(const AFileName: string): System.UITypes.TImageName;
     function IsTextFile(const AFileName: string): Boolean;
     function ProcessDroppedFile(const AFileName: string;
       AActivateTabWhenComplete: Boolean = False): Boolean;
@@ -142,6 +141,8 @@ type
     procedure InitializeExplorerPopupMenuImages;
     procedure PopulateExplorerPopupMenu;
     procedure PopulateRecentFilesPopupMenu;
+    procedure DrawRecentFileIcon(Sender: TObject; AIndex: Integer;
+      ACanvas: TCanvas; const ARect: TRect; AColor: TColor);
     procedure PopupMenuSettingsClick(Sender: TObject);
     procedure RecentFilesPopupMenuItemClick(Sender: TObject;
       AItemIndex: Integer);
@@ -401,12 +402,13 @@ begin
   var LPalette := ExplorerTabPalette(LTheme);
   Color := LTheme.BackgroundColor;
   CardPanel1.Color := LTheme.BackgroundColor;
+  LogControl1.ApplyTheme;
+  Splitter1.Invalidate;
   FTabs.Palette := LPalette;
   FTabs.BackgroundGradientDirection := etgdVertical;
   FTabs.TabGradientDirection := etgdVertical;
-  var LImageName := DocumentTabImageName;
-  for var LIndex := 0 to FTabs.Items.Count - 1 do
-    FTabs.Items[LIndex].ImageName := LImageName;
+  for var LIndex := 0 to Min(FTabs.Items.Count, CardPanel1.CardCount) - 1 do
+    FTabs.Items[LIndex].ImageName := DocumentTabImageName(CardPanel1.Cards[LIndex].Hint);
 
   CustomTitleBar.SystemHeight := False;
   CustomTitleBar.Height := ScaleValue(cTitleBarHeight);
@@ -698,24 +700,10 @@ begin
   ApplyEmptyStateTheme;
 end;
 
-function TFrmMain.DocumentTabImageName: System.UITypes.TImageName;
-begin
-  if ColorIsBright(TExplorerTheme.ActiveTheme.BackgroundColor) then
-    Result := 'binary_light'
-  else
-    Result := 'binary_dark';
-end;
-
-function TFrmMain.RecentFileImageName(
+function TFrmMain.DocumentTabImageName(
   const AFileName: string): System.UITypes.TImageName;
-var
-  LBaseName: string;
 begin
-  LBaseName := 'binary';
-  var LExtension := LowerCase(ExtractFileExt(AFileName));
-  if (LExtension = '.tdump') or (LExtension = '.txt') then
-    LBaseName := 'file-text';
-
+  var LBaseName := ExplorerDocumentIconName(AFileName);
   if IsLightThemeActive then
     Result := LBaseName + '_light'
   else
@@ -814,6 +802,9 @@ begin
     Exit;
 
   FExplorerPopupImages.Clear;
+  FExplorerPopupImages.Width := ScaleValue(24);
+  FExplorerPopupImages.Height := ScaleValue(24);
+
   FExplorerPopupImages.ImageCollection := DataModule1.ImageCollection1;
   FExplorerPopupImages.Add('gear_dark', 'gear_dark');
   FExplorerPopupImages.Add('gear_light', 'gear_light');
@@ -863,7 +854,7 @@ begin
     var LMenuItems := FRecentFilesPopupMenu.MenuItems;
     LMenuItems.BeginUpdate;
     try
-      LMenuItems.ControlList1.ItemHeight := ScaleValue(24);
+      LMenuItems.ControlList1.ItemHeight := Round(32 * LMenuItems.ScaleFactor);
       LMenuItems.Clear;
       FRecentFilesPopupFiles.Clear;
       for var LIndex := 0 to TSettings.Instance.RecentItemCount - 1 do
@@ -875,7 +866,7 @@ begin
         FRecentFilesPopupFiles.Add(LFileName);
         LMenuItems.Add(Format('%s  %s', [
           RecentFileShortcutCaption(LVisibleIndex), LFileName]),
-          RecentFileImageName(LFileName));
+          ExplorerDocumentIconName(LFileName));
         if not FileExists(LFileName) then
           LInactiveItems.Add(LVisibleIndex);
       end;
@@ -891,6 +882,14 @@ begin
   finally
     LInactiveItems.Free;
   end;
+end;
+
+procedure TFrmMain.DrawRecentFileIcon(Sender: TObject; AIndex: Integer;
+  ACanvas: TCanvas; const ARect: TRect; AColor: TColor);
+begin
+  if (AIndex < 0) or (AIndex >= FRecentFilesPopupFiles.Count) then
+    Exit;
+  DrawExplorerDocumentIcon(ACanvas, FRecentFilesPopupFiles[AIndex], ARect, AColor);
 end;
 
 procedure TFrmMain.RecentFilesPopupMenuItemClick(Sender: TObject;
@@ -1073,7 +1072,8 @@ begin
   if FRecentFilesPopupMenu = nil then
   begin
     FRecentFilesPopupMenu := TExplorerPopupMenuForm.Create(Self);
-    FRecentFilesPopupMenu.MenuItems.Images := FTabImages;
+    FRecentFilesPopupMenu.MenuItems.OnDrawItemIcon := DrawRecentFileIcon;
+    FRecentFilesPopupMenu.MenuItems.CustomIconSize := 24;
     FRecentFilesPopupMenu.OnItemClick := RecentFilesPopupMenuItemClick;
     FRecentFilesPopupMenu.OnShortcut := RecentFilesPopupMenuShortcut;
   end;
@@ -1115,10 +1115,8 @@ begin
     Exit;
 
   var LSplitter := TSplitter(Sender);
-  LSplitter.Canvas.Brush.Color := TExplorerTheme.ActiveTheme.BackgroundColor;
-  LSplitter.Canvas.FillRect(LSplitter.ClientRect);
-  DrawSplitterLine(LSplitter.Canvas, LSplitter.ClientRect,
-    LSplitter.Align in [alLeft, alRight], TExplorerTheme.ActiveTheme.GhostColor);
+  DrawExplorerSplitter(LSplitter.Canvas, LSplitter.ClientRect,
+    LSplitter.Align in [alLeft, alRight], ScaleFactor);
 end;
 
 procedure TFrmMain.CheckTDumpAvailability;
@@ -1561,7 +1559,7 @@ begin
    FTabs.LockDrawing;
    try
     for var LCard in FPendingDocumentCards do
-      FTabs.AddTab(LCard.Caption, DocumentTabImageName, True, False);
+      FTabs.AddTab(LCard.Caption, DocumentTabImageName(LCard.Hint), True, False);
    finally
      FTabs.UnlockDrawing;
    end;

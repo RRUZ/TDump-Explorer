@@ -22,7 +22,7 @@ uses
   Vcl.ExtCtrls, VirtualTrees.Types, VirtualTrees.BaseAncestorVCL, VirtualTrees.BaseTree,
   VirtualTrees.AncestorVCL, VirtualTrees, TDump.Explorer.Parser, TDump.Explorer.TinyParser,
   Vcl.WinXPanels, TDump.Explorer.RawView, TDump.Explorer.View.Shared, Vcl.VirtualImage,
-  System.ImageList, Vcl.ImgList, Vcl.VirtualImageList;
+  System.ImageList, Vcl.ImgList, Vcl.VirtualImageList, TDump.Explorer.UI;
 
 type
   TDumpDocumentFrame = class(TFrame)
@@ -37,9 +37,9 @@ type
     lblDocumentName: TLabel;
     lblSourcePath: TLabel;
     lblFormatCaption: TLabel;
-    lblFormatValue: TLabel;
+    pnFormatBadge: TPanel;
     lblArchitectureCaption: TLabel;
-    lblArchitectureValue: TLabel;
+    pnArchitectureBadge: TPanel;
     lblTimestampCaption: TLabel;
     lblTimestampValue: TLabel;
     lblSizeCaption: TLabel;
@@ -48,11 +48,25 @@ type
     gpHeader: TGridPanel;
     VirtualImageList1: TVirtualImageList;
     PaintBox1: TPaintBox;
+    pnNavigation: TPanel;
+    pbNavigation: TPaintBox;
+    pbDetails: TPaintBox;
+    pbHeader: TPaintBox;
     procedure PaintBox1Paint(Sender: TObject);
+    procedure SurfacePaint(Sender: TObject);
+    procedure SurfaceResize(Sender: TObject);
   private
+    FFormatBadge: TExplorerBadgeLabel;
+    FArchitectureBadge: TExplorerBadgeLabel;
     FDocument: TDumpDocument;
     FSummaryCard: TCard;
     FSummaryControl: THighlighterControl;
+    FSummaryScroll: TScrollBox;
+    FSummaryContent: TPanel;
+    FSummaryTitle: TLabel;
+    FSummaryDivider: TPaintBox;
+    FSummaryCounts: array[0..2] of THighlighterControl;
+    FUpdatingSummaryLayout: Boolean;
     FDetailCard: TCard;
     FDetailControl: THighlighterControl;
     FCurrentDetailKind: TTreeDetailKind;
@@ -149,16 +163,22 @@ type
       const Text: string; const CellRect: TRect; var DefaultDraw: Boolean);
     procedure TreeMouseUp(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
-    procedure pnTopResize(Sender: TObject);
     procedure SplitterPaint(Sender: TObject);
     procedure CMStyleChanged(var AMessage: TMessage); message CM_STYLECHANGED;
     procedure ApplyTreeTheme;
     procedure ApplyTheme;
-    function DocumentIconName: string;
     procedure UpdateDocumentIcon;
     procedure UpdateFontSize;
+    procedure CreateSummaryView;
+    procedure SummaryResize(Sender: TObject);
+    procedure SummaryDividerPaint(Sender: TObject);
+    procedure SummaryIconDraw(Sender: TObject; AIndex: Integer;
+      ACanvas: TCanvas; const ARect: TRect; AColor: TColor);
+    procedure UpdateSummaryLayout;
+    procedure ApplySummaryTheme;
   protected
     procedure SetParent(AParent: TWinControl); override;
+    procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -170,7 +190,7 @@ type
 implementation
 
 uses
-  TDump.Explorer.UI, Vcl.GraphUtil, TDump.Explorer.Resources,
+  Vcl.GraphUtil, TDump.Explorer.Resources,
   TDump.Explorer.View.ELF, TDump.Explorer.View.Mach,
   TDump.Explorer.View.OMF, TDump.Explorer.View.PE, TDump.Explorer.Phosphor.Font,
   TDump.Explorer.View.Borland, TDump.Explorer.View.Diagnostics;
@@ -187,6 +207,20 @@ procedure TDumpDocumentFrame.ApplyTheme;
    end;
 
 begin
+  if pnNavigation = nil then
+    Exit;
+  var LTheme := TExplorerTheme.ActiveTheme;
+  Color := LTheme.BackgroundColor;
+  StyleElements := StyleElements - [seClient];
+  for var LPanel in TArray<TPanel>.Create(pnNavigation, pnCards, pnProperties,
+    pnFormatBadge, pnArchitectureBadge) do
+  begin
+    LPanel.StyleElements := LPanel.StyleElements - [seClient];
+    LPanel.ParentBackground := False;
+    LPanel.Color := LTheme.BackgroundColor;
+  end;
+  cpViews.StyleElements := cpViews.StyleElements - [seClient];
+  cpViews.Color := LTheme.BackgroundColor;
   pnTop.StyleElements := pnTop.StyleElements - [seClient];
   pnTop.Color := TExplorerTheme.ActiveTheme.BackgroundColor;
   pnDocument.StyleElements := pnDocument.StyleElements - [seClient];
@@ -196,29 +230,33 @@ begin
 
   SetLabelColor(lblSourcePath, TExplorerTheme.ActiveTheme.InactiveText);
   SetLabelColor(lblFormatCaption, TExplorerTheme.ActiveTheme.InactiveText);
-  SetLabelColor(lblFormatValue, TExplorerTheme.ActiveTheme.StringLiteralColor);
   SetLabelColor(lblArchitectureCaption, TExplorerTheme.ActiveTheme.InactiveText);
-  SetLabelColor(lblArchitectureValue, TExplorerTheme.ActiveTheme.InactiveText);
   SetLabelColor(lblTimestampCaption, TExplorerTheme.ActiveTheme.InactiveText);
   SetLabelColor(lblTimestampValue, TExplorerTheme.ActiveTheme.DateTimeColor);
   SetLabelColor(lblSizeCaption, TExplorerTheme.ActiveTheme.InactiveText);
   SetLabelColor(lblSizeValue, TExplorerTheme.ActiveTheme.NumberColor);
+  SetLabelColor(lblDocumentName, LTheme.TextColor);
+  if FFormatBadge <> nil then
+  begin
+    FFormatBadge.ApplyTheme(LTheme);
+    // Apply badge-specific colors after the shared theme defaults.
+    FFormatBadge.Color := ColorBlendRGB(LTheme.StringLiteralColor, LTheme.BackgroundColor, 0.9);
+    FFormatBadge.BorderColor := LTheme.StringLiteralColor;
+    FFormatBadge.Font.Color := LTheme.StringLiteralColor;
+    FArchitectureBadge.ApplyTheme(LTheme);
+    FArchitectureBadge.Color := ColorBlendRGB(LTheme.InactiveText, LTheme.BackgroundColor, 0.9);
+    FArchitectureBadge.BorderColor := LTheme.InactiveText;
+    FArchitectureBadge.Font.Color := LTheme.InactiveText;
+  end;
+  pbNavigation.Invalidate;
+  pbDetails.Invalidate;
+  pbHeader.Invalidate;
+  Splitter1.Invalidate;
+  Splitter2.Invalidate;
+  ApplySummaryTheme;
 
   UpdateDocumentIcon;
   ApplyTreeTheme;
-end;
-
-function TDumpDocumentFrame.DocumentIconName: string;
-var
-  LExtension: string;
-begin
-  Result := 'binary';
-  if FDocument = nil then
-    Exit;
-
-  LExtension := LowerCase(ExtractFileExt(FDocument.SourceFileName));
-  if (LExtension = '.tdump') or (LExtension = '.txt') then
-    Result := 'file-text';
 end;
 
 procedure TDumpDocumentFrame.UpdateDocumentIcon;
@@ -279,14 +317,22 @@ begin
   Font.Name := TExplorerTheme.FontName;
   Font.Size := TExplorerTheme.FontSize;
 
+  FFormatBadge := TExplorerBadgeLabel.Create(Self);
+  FFormatBadge.Name := 'FormatBadge';
+  FFormatBadge.Parent := pnFormatBadge;
+  FFormatBadge.Align := alLeft;
+  FFormatBadge.ShowHint := True;
+
+  FArchitectureBadge := TExplorerBadgeLabel.Create(Self);
+  FArchitectureBadge.Name := 'ArchitectureBadge';
+  FArchitectureBadge.Parent := pnArchitectureBadge;
+  FArchitectureBadge.Align := alLeft;
+  FArchitectureBadge.ShowHint := True;
+  SurfaceResize(nil);
+
   Splitter1.OnPaint := SplitterPaint;
   Splitter2.OnPaint := SplitterPaint;
-  FSummaryCard := TCard.Create(cpViews);
-  FSummaryCard.Parent := cpViews;
-  FSummaryCard.Caption := 'Summary';
-  FSummaryControl := THighlighterControl.Create(FSummaryCard);
-  FSummaryControl.Parent := FSummaryCard;
-  FSummaryControl.Align := alClient;
+  CreateSummaryView;
   cpViews.ActiveCard := FSummaryCard;
   Tree.NodeDataSize := SizeOf(TTreeItemData);
   Tree.OnGetText := TreeGetText;
@@ -307,7 +353,6 @@ begin
 
   frRawView.OnSyncWithSelectedNodeChanged := RawViewSyncWithSelectedNodeChanged;
   frRawView.OnSourceLineSelected := RawViewSourceLineSelected;
-  pnTop.OnResize := pnTopResize;
   UpdateDocumentHeader;
 end;
 
@@ -364,7 +409,7 @@ end;
 procedure TDumpDocumentFrame.PaintBox1Paint(Sender: TObject);
 var
   LPaintBox: TPaintBox;
-  LIconCode: Word;
+  LSourceFileName: string;
   LIconSize: Integer;
   LIconRect: TRect;
 begin
@@ -380,16 +425,29 @@ begin
     (LPaintBox.ClientHeight - LIconSize) div 2,
     (LPaintBox.ClientWidth + LIconSize) div 2,
     (LPaintBox.ClientHeight + LIconSize) div 2);
-  if DocumentIconName = 'file-text' then
-    LIconCode := cPhFileText
-  else
-    LIconCode := cPhBinary;
-  PhosphorFont.DrawIcon(LPaintBox.Canvas.Handle, LIconCode, LIconRect,
-    TExplorerTheme.ActiveTheme.TextColor, pfwThin);
+  LSourceFileName := '';
+  if FDocument <> nil then
+    LSourceFileName := FDocument.SourceFileName;
+  DrawExplorerDocumentIcon(LPaintBox.Canvas, LSourceFileName, LIconRect,
+    TExplorerTheme.ActiveTheme.TextColor);
 end;
 
-procedure TDumpDocumentFrame.pnTopResize(Sender: TObject);
+procedure TDumpDocumentFrame.SurfacePaint(Sender: TObject);
 begin
+  var LPaintBox := TPaintBox(Sender);
+  DrawExplorerSurface(LPaintBox.Canvas, LPaintBox.ClientRect, ScaleFactor);
+end;
+
+procedure TDumpDocumentFrame.SurfaceResize(Sender: TObject);
+begin
+  // Inline-frame streaming and DPI changes can both change the design-time
+  // anchor distances. Keep the decoration tied to the actual pane bounds.
+  if pbNavigation <> nil then
+    pbNavigation.SetBounds(0, 0, pnNavigation.ClientWidth, pnNavigation.ClientHeight);
+  if pbDetails <> nil then
+    pbDetails.SetBounds(0, 0, pnCards.ClientWidth, pnCards.ClientHeight);
+  if pbHeader <> nil then
+    pbHeader.SetBounds(0, 0, pnTop.ClientWidth, pnTop.ClientHeight);
 end;
 
 procedure TDumpDocumentFrame.SplitterPaint(Sender: TObject);
@@ -398,10 +456,8 @@ begin
     Exit;
 
   var LSplitter := TSplitter(Sender);
-  LSplitter.Canvas.Brush.Color := TExplorerTheme.ActiveTheme.BackgroundColor;
-  LSplitter.Canvas.FillRect(LSplitter.ClientRect);
-  DrawSplitterLine(LSplitter.Canvas, LSplitter.ClientRect,
-    LSplitter.Align in [alLeft, alRight], TExplorerTheme.ActiveTheme.GhostColor);
+  DrawExplorerSplitter(LSplitter.Canvas, LSplitter.ClientRect,
+    LSplitter.Align in [alLeft, alRight], ScaleFactor);
 end;
 
 procedure TDumpDocumentFrame.UpdateDocumentHeader;
@@ -412,8 +468,10 @@ begin
   begin
     lblDocumentName.Caption := '';
     lblSourcePath.Caption := '';
-    lblFormatValue.Caption := '';
-    lblArchitectureValue.Caption := '';
+    FFormatBadge.Caption := '';
+    FFormatBadge.Visible := False;
+    FArchitectureBadge.Caption := '';
+    FArchitectureBadge.Visible := False;
     lblTimestampValue.Caption := '';
     lblSizeValue.Caption := '';
     UpdateDocumentIcon;
@@ -428,8 +486,16 @@ begin
   lblDocumentName.Caption := TBorlandView.PackageCaption(
     lblDocumentName.Caption, FDocument);
   lblSourcePath.Caption := LSourceFileName;
-  lblFormatValue.Caption := HeaderFormatCaption;
-  lblArchitectureValue.Caption := HeaderArchitectureCaption;
+  lblDocumentName.Hint := lblDocumentName.Caption;
+  lblDocumentName.ShowHint := True;
+  lblSourcePath.Hint := LSourceFileName;
+  lblSourcePath.ShowHint := True;
+  FFormatBadge.Caption := HeaderFormatCaption;
+  FFormatBadge.Hint := FFormatBadge.Caption;
+  FFormatBadge.Visible := FFormatBadge.Caption <> '';
+  FArchitectureBadge.Caption := HeaderArchitectureCaption;
+  FArchitectureBadge.Hint := FArchitectureBadge.Caption;
+  FArchitectureBadge.Visible := FArchitectureBadge.Caption <> '';
 
   if FileExists(LSourceFileName) then
   begin
@@ -963,7 +1029,198 @@ end;
 
 procedure TDumpDocumentFrame.ShowSummary(const ASummary: string);
 begin
-  FSummaryControl.SetText(ASummary);
+  var LLines := TStringList.Create;
+  try
+    LLines.Text := ASummary;
+    FSummaryTitle.Caption := '';
+    FSummaryControl.BeginUpdate;
+    try
+      FSummaryControl.Clear;
+      if LLines.Count > 0 then
+        FSummaryTitle.Caption := LLines[0];
+      // Keep the runner's metadata (including actual TDUMP switches) intact.
+      // The blank line separates that metadata from the legacy count list.
+      for var LIndex := 1 to LLines.Count - 1 do
+      begin
+        if LLines[LIndex] = '' then
+          Break;
+        FSummaryControl.Add(LLines[LIndex]);
+      end;
+    finally
+      FSummaryControl.EndUpdate;
+    end;
+  finally
+    LLines.Free;
+  end;
+  FSummaryTitle.Hint := FSummaryTitle.Caption;
+  for var LCounts in FSummaryCounts do
+    LCounts.Clear;
+  if FDocument <> nil then
+  begin
+    FSummaryCounts[0].Add('Headers: ' + IntToStr(FDocument.Headers.Count), IntToStr(cPhFileText));
+    FSummaryCounts[0].Add('Sections: ' + IntToStr(FDocument.Sections.Count), IntToStr(cPhStack));
+    FSummaryCounts[0].Add('Import modules: ' + IntToStr(FDocument.Imports.Count), IntToStr(cPhSignIn));
+    FSummaryCounts[1].Add('Exports: ' + IntToStr(FDocument.ExportList.Count), IntToStr(cPhArrowSquareOut));
+    FSummaryCounts[1].Add('Resources: ' + IntToStr(FDocument.Resources.Count), IntToStr(cPhTable));
+    FSummaryCounts[2].Add('Diagnostics: ' + IntToStr(FDocument.Diagnostics.Count), IntToStr(cPhPulse));
+  end;
+  UpdateSummaryLayout;
+  for var LCounts in FSummaryCounts do
+  begin
+    LCounts.ControlList1.ClearSelection;
+    LCounts.ControlList1.ItemIndex := -1;
+  end;
+end;
+
+procedure TDumpDocumentFrame.CreateSummaryView;
+
+  function CreateList(const AName: string): THighlighterControl;
+  begin
+    Result := THighlighterControl.Create(FSummaryContent);
+    Result.Name := AName;
+    Result.Parent := FSummaryContent;
+    Result.ParentFont := True;
+    Result.UseColumnMode := False;
+    Result.AutoSizeColumns := False;
+    Result.SortEnabled := False;
+  end;
+
+begin
+  FSummaryCard := TCard.Create(cpViews);
+  FSummaryCard.Parent := cpViews;
+  FSummaryCard.Caption := 'Summary';
+  FSummaryScroll := TScrollBox.Create(FSummaryCard);
+  FSummaryScroll.Name := 'SummaryScroll';
+  FSummaryScroll.Parent := FSummaryCard;
+  FSummaryScroll.Align := alClient;
+  FSummaryScroll.BorderStyle := bsNone;
+  FSummaryScroll.HorzScrollBar.Visible := False;
+  FSummaryScroll.VertScrollBar.Tracking := True;
+  FSummaryScroll.ParentFont := True;
+  FSummaryContent := TPanel.Create(FSummaryScroll);
+  FSummaryContent.Name := 'SummaryContent';
+  FSummaryContent.Caption := '';
+  FSummaryContent.Parent := FSummaryScroll;
+  FSummaryContent.Align := alTop;
+  FSummaryContent.BevelOuter := bvNone;
+  FSummaryContent.ParentBackground := False;
+  FSummaryContent.ParentFont := True;
+  FSummaryTitle := TLabel.Create(FSummaryContent);
+  FSummaryTitle.Name := 'SummaryTitle';
+  FSummaryTitle.Parent := FSummaryContent;
+  FSummaryTitle.AutoSize := False;
+  FSummaryTitle.Layout := tlCenter;
+  FSummaryTitle.EllipsisPosition := epEndEllipsis;
+  FSummaryTitle.ShowHint := True;
+  FSummaryControl := CreateList('SummaryMetadata');
+  FSummaryDivider := TPaintBox.Create(FSummaryContent);
+  FSummaryDivider.OnPaint := SummaryDividerPaint;
+  FSummaryDivider.Parent := FSummaryContent;
+  for var LIndex := 0 to High(FSummaryCounts) do
+  begin
+    FSummaryCounts[LIndex] := CreateList('SummaryCounts' + IntToStr(LIndex));
+    FSummaryCounts[LIndex].OnDrawItemIcon := SummaryIconDraw;
+    FSummaryCounts[LIndex].CustomIconSize := 20;
+  end;
+  FSummaryContent.OnResize := SummaryResize;
+  FSummaryScroll.OnResize := SummaryResize;
+end;
+
+procedure TDumpDocumentFrame.ApplySummaryTheme;
+begin
+  if FSummaryScroll = nil then
+    Exit;
+  var LTheme := TExplorerTheme.ActiveTheme;
+  FSummaryScroll.StyleElements := FSummaryScroll.StyleElements - [seClient];
+  FSummaryScroll.Color := LTheme.BackgroundColor;
+  FSummaryContent.StyleElements := FSummaryContent.StyleElements - [seClient];
+  FSummaryContent.Color := LTheme.BackgroundColor;
+  FSummaryTitle.StyleElements := FSummaryTitle.StyleElements - [seFont];
+  FSummaryTitle.Font.Assign(Font);
+  FSummaryTitle.Font.Style := [fsBold];
+  FSummaryTitle.Font.Color := LTheme.TextColor;
+  FSummaryControl.ControlList1.Color := LTheme.BackgroundColor;
+  for var LCounts in FSummaryCounts do
+    LCounts.ControlList1.Color := LTheme.BackgroundColor;
+  FSummaryDivider.Invalidate;
+  UpdateSummaryLayout;
+end;
+
+procedure TDumpDocumentFrame.SummaryIconDraw(Sender: TObject; AIndex: Integer;
+  ACanvas: TCanvas; const ARect: TRect; AColor: TColor);
+begin
+  var LIconCode := StrToIntDef(THighlighterControl(Sender).ItemImageName(AIndex), 0);
+  if LIconCode <> 0 then
+    PhosphorFont.DrawIcon(ACanvas.Handle, LIconCode, ARect, AColor, pfwLight);
+end;
+
+procedure TDumpDocumentFrame.SummaryDividerPaint(Sender: TObject);
+begin
+  var LTheme := TExplorerTheme.ActiveTheme;
+  FSummaryDivider.Canvas.Brush.Color := ColorBlendRGB(LTheme.TextColor,
+    LTheme.BackgroundColor, 0.87);
+  FSummaryDivider.Canvas.FillRect(FSummaryDivider.ClientRect);
+end;
+
+procedure TDumpDocumentFrame.SummaryResize(Sender: TObject);
+begin
+  UpdateSummaryLayout;
+end;
+
+procedure TDumpDocumentFrame.UpdateSummaryLayout;
+var
+  LWidth: Integer;
+begin
+  if (FSummaryContent = nil) or (FSummaryCounts[2] = nil) or
+    FUpdatingSummaryLayout then
+    Exit;
+  FUpdatingSummaryLayout := True;
+  try
+    var LInset := ScaleValue(8);
+    LWidth := Max(1, FSummaryContent.ClientWidth);
+    FSummaryTitle.SetBounds(LInset, ScaleValue(2),
+      Max(1, LWidth - 2 * LInset), ScaleValue(24));
+    FSummaryControl.ControlList1.ItemHeight := ScaleValue(24);
+    FSummaryControl.SetBounds(0, FSummaryTitle.BoundsRect.Bottom,
+      LWidth, FSummaryControl.Count * FSummaryControl.ControlList1.ItemHeight);
+    var LDividerTop := FSummaryControl.BoundsRect.Bottom + LInset;
+    FSummaryDivider.SetBounds(LInset, LDividerTop,
+      Max(1, LWidth - 2 * LInset), Max(1, ScaleValue(1)));
+    var LTop := FSummaryDivider.BoundsRect.Bottom + LInset;
+    var LColumns := EnsureRange(LWidth div ScaleValue(190), 1, 3);
+    var LColumnWidth := LWidth div LColumns;
+    var LRowHeight := 0;
+    for var LIndex := 0 to High(FSummaryCounts) do
+    begin
+      if (LIndex > 0) and (LIndex mod LColumns = 0) then
+      begin
+        Inc(LTop, LRowHeight);
+        LRowHeight := 0;
+      end;
+      var LCounts := FSummaryCounts[LIndex];
+      LCounts.ControlList1.ItemHeight := ScaleValue(28);
+      var LHeight := LCounts.Count * LCounts.ControlList1.ItemHeight;
+      LCounts.SetBounds((LIndex mod LColumns) * LColumnWidth, LTop,
+        LColumnWidth, LHeight);
+      LRowHeight := Max(LRowHeight, LHeight);
+    end;
+    // Fill unused space too: a styled scroll box can cache a different
+    // background brush. The content panel owns the whole visible surface.
+    FSummaryContent.Height := Max(LTop + LRowHeight + LInset,
+      FSummaryScroll.ClientHeight);
+  finally
+    FUpdatingSummaryLayout := False;
+  end;
+  // Showing the outer scrollbar can reduce the aligned content width while
+  // layout is guarded. Reflow once more at that actual client width.
+  if LWidth <> FSummaryContent.ClientWidth then
+    UpdateSummaryLayout;
+end;
+
+procedure TDumpDocumentFrame.ChangeScale(M, D: Integer; isDpiChange: Boolean);
+begin
+  inherited;
+  UpdateSummaryLayout;
 end;
 
 function TDumpDocumentFrame.DetailControlForNode(
@@ -1011,9 +1268,9 @@ begin
   Font.Height := MulDiv(Font.Height, CurrentPPI, Font.PixelsPerInch);
   FixFontForHighDPI(Tree);
   FixFontForHighDPI(lblFormatCaption);
-  FixFontForHighDPI(lblFormatValue);
+  FixFontForHighDPI(FFormatBadge);
   FixFontForHighDPI(lblArchitectureCaption);
-  FixFontForHighDPI(lblArchitectureValue);
+  FixFontForHighDPI(FArchitectureBadge);
   FixFontForHighDPI(lblTimestampCaption);
   FixFontForHighDPI(lblTimestampValue);
 
@@ -1027,7 +1284,10 @@ procedure TDumpDocumentFrame.SetParent(AParent: TWinControl);
 begin
   inherited;
   if Parent <> nil then
+  begin
     UpdateFontSize;
+    ApplySummaryTheme;
+  end;
 end;
 
 procedure TDumpDocumentFrame.RestoreDetailItemIndex(ANode: PVirtualNode);

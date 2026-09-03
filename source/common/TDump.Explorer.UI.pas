@@ -16,13 +16,30 @@ interface
 
 uses
   Winapi.Messages, Vcl.Graphics, System.Types, System.UITypes, System.Classes,
-  Vcl.Controls, Vcl.ExtCtrls, Vcl.Forms, Vcl.ImgList, Vcl.StdCtrls,
+  Vcl.Controls, Vcl.ExtCtrls, Vcl.Forms, Vcl.ImgList, Vcl.StdCtrls, Vcl.ControlList,
   TDump.Explorer.Tabs;
 
 type
   TExplorerThemeKind = (thtLight, thtDark);
   TExplorerChevronDirection = (ecdUp, ecdDown);
   TSimpleUIButtonImagePosition = (buipLeft, buipRight, buipTop, buipBottom);
+
+  // Opt-in vertical scrollbar policy for the single-column Log and RAW lists.
+  // Owned by the target control; does not replace its input/event handlers.
+  TExplorerFocusScrollBars = class(TComponent)
+  private
+    FControl: TControlList;
+    FPreviousWindowProc: TWndMethod;
+    FUpdatePending: Boolean;
+    FUpdating: Boolean;
+    function IsActive: Boolean;
+    procedure QueueUpdate;
+    procedure UpdateScrollBars;
+    procedure WindowProc(var AMessage: TMessage);
+  public
+    constructor Create(AControl: TControlList); reintroduce;
+    destructor Destroy; override;
+  end;
 
   TExplorerTheme = record
     const FixedWidthFontName : string = 'Consolas';
@@ -52,7 +69,7 @@ type
     class function ActiveTheme: TExplorerTheme; static;
   end;
 
-  // Non-interactive, fixed-size label with DPI-aware rounded badge painting.
+  // Non-interactive badge: content-sized width, layout-owned height.
   TExplorerBadgeLabel = class(TCustomLabel)
   private
     FBorderColor: TColor;
@@ -60,10 +77,14 @@ type
     procedure SetBorderColor(const AValue: TColor);
     procedure SetCornerRadius(const AValue: Integer);
   protected
+    procedure AdjustBounds; override;
+    procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override;
     procedure Paint; override;
   public
     constructor Create(AOwner: TComponent); override;
+    // Restores the default palette; assign badge-specific colors afterward.
     procedure ApplyTheme(const ATheme: TExplorerTheme);
+    function NaturalWidth: Integer;
   published
     property Align;
     property Anchors;
@@ -77,7 +98,7 @@ type
     property ShowHint;
     property Visible;
     property BorderColor: TColor read FBorderColor write SetBorderColor;
-    property CornerRadius: Integer read FCornerRadius write SetCornerRadius default 5;
+    property CornerRadius: Integer read FCornerRadius write SetCornerRadius default 4;
   end;
 
   TSimpleUIButtonPalette = record
@@ -268,6 +289,12 @@ procedure DrawDashedRoundedRectangle(const ACanvas: TCanvas;
   const ARect: TRect; ABorderColor: TColor; ARadius: Integer);
 procedure DrawSelectionBar(const Canvas: TCanvas; const ARect: TRect; FillColor, BorderColor: TColor);
 procedure DrawSplitterLine(const ACanvas: TCanvas; const ARect: TRect; AIsVertical: Boolean; AColor: TColor);
+procedure DrawExplorerSplitter(const ACanvas: TCanvas; const ARect: TRect;
+  AIsVertical: Boolean; AScale: Single);
+procedure DrawExplorerSurface(const ACanvas: TCanvas; const ARect: TRect;
+  AScale: Single; ADividerY: Integer = -1);
+procedure DrawExplorerSearchBorder(const ACanvas: TCanvas; const ARect: TRect;
+  AScale: Single; AFocused: Boolean);
 procedure DrawExplorerChevron(const ACanvas: TCanvas; const ACenter: TPoint;
   AColor: TColor; ADirection: TExplorerChevronDirection;
   ADeviceScale: Single = 1.0);
@@ -280,18 +307,204 @@ function IsWindows11: Boolean;
 function IsLightThemeActive: Boolean;
 function IsWindowsLightTheme: Boolean;
 function FormatByteSize(AByteCount: Int64): string;
+function ExplorerDocumentIconName(const AFileName: string): string;
+procedure DrawExplorerDocumentIcon(ACanvas: TCanvas; const AFileName: string;
+  const ARect: TRect; AColor: TColor);
 
 implementation
 
 uses
   Winapi.Windows, System.Win.Registry, Vcl.GraphUtil, Winapi.GDIPAPI, Winapi.GDIPOBJ,
-  System.Math, System.SysUtils, Vcl.Themes;
+  System.Math, System.SysUtils, Vcl.Themes, TDump.Explorer.Phosphor.Font;
 
 const
   cBorderBlend = 0.82;
   cInactiveTopBlend = 0.97;
   cHoverTopBlend = 0.82;
   cCloseHoverBlend = 0.72;
+  cWmUpdateFocusScrollBars = WM_APP + $145;
+  cBadgeHorizontalPadding = 8;
+
+procedure DrawExplorerSplitter(const ACanvas: TCanvas; const ARect: TRect;
+  AIsVertical: Boolean; AScale: Single);
+var
+  LGripRect: TRect;
+  LDotRect: TRect;
+begin
+  if (ARect.Width <= 0) or (ARect.Height <= 0) or (AScale <= 0) then
+    Exit;
+  var LTheme := TExplorerTheme.ActiveTheme;
+  ACanvas.Brush.Color := LTheme.BackgroundColor;
+  ACanvas.FillRect(ARect);
+  DrawSplitterLine(ACanvas, ARect, AIsVertical, LTheme.GhostColor);
+  var LCenter := ARect.CenterPoint;
+  var LThickness := Min(Round(8 * AScale),
+    if AIsVertical then ARect.Width - 2 else ARect.Height - 2);
+  var LLength := Min(Round(48 * AScale),
+    if AIsVertical then ARect.Height - 2 else ARect.Width - 2);
+  if (LThickness < 4) or (LLength < Round(24 * AScale)) then
+    Exit;
+  if AIsVertical then
+    LGripRect := Rect(LCenter.X - LThickness div 2, LCenter.Y - LLength div 2,
+      LCenter.X - LThickness div 2 + LThickness, LCenter.Y - LLength div 2 + LLength)
+  else
+    LGripRect := Rect(LCenter.X - LLength div 2, LCenter.Y - LThickness div 2,
+      LCenter.X - LLength div 2 + LLength, LCenter.Y - LThickness div 2 + LThickness);
+  var LHaloRect := LGripRect;
+  InflateRect(LHaloRect, Max(1, Round(AScale)), Max(1, Round(AScale)));
+  var LHaloColor := ColorBlendRGB(LTheme.SelectionColor, LTheme.BackgroundColor, 0.94);
+  DrawAntialiasedRoundedRectangle(ACanvas, LHaloRect, LHaloColor, LHaloColor,
+    6 * AScale, AScale);
+  DrawAntialiasedRoundedRectangle(ACanvas, LGripRect,
+    ColorBlendRGB(LTheme.SelectionColor, LTheme.BackgroundColor, 0.95),
+    ColorBlendRGB(LTheme.SelectionColor, LTheme.BackgroundColor, 0.65),
+    4 * AScale, AScale);
+  var LDotSize := Max(2, Round(2 * AScale));
+  for var LIndex := 0 to 3 do
+  begin
+    var LOffset := Round((LIndex - 1.5) * 5 * AScale);
+    if AIsVertical then
+      LDotRect := Rect(LCenter.X - LDotSize div 2,
+        LCenter.Y + LOffset - LDotSize div 2, 0, 0)
+    else
+      LDotRect := Rect(LCenter.X + LOffset - LDotSize div 2,
+        LCenter.Y - LDotSize div 2, 0, 0);
+    LDotRect.Right := LDotRect.Left + LDotSize;
+    LDotRect.Bottom := LDotRect.Top + LDotSize;
+    DrawAntialiasedRoundedRectangle(ACanvas, LDotRect, LTheme.SelectionColor,
+      LTheme.SelectionColor, LDotSize / 2, AScale / 2);
+  end;
+end;
+
+function ExplorerDocumentIconName(const AFileName: string): string;
+begin
+  var LExtension := ExtractFileExt(AFileName);
+  if SameText(LExtension, '.tdump') or SameText(LExtension, '.txt') then
+    Result := 'file-text'
+  else
+    Result := 'binary';
+end;
+
+procedure DrawExplorerDocumentIcon(ACanvas: TCanvas; const AFileName: string;
+  const ARect: TRect; AColor: TColor);
+begin
+  var LIconCode := cPhBinary;
+  if ExplorerDocumentIconName(AFileName) = 'file-text' then
+    LIconCode := cPhFileText;
+  PhosphorFont.DrawIcon(ACanvas.Handle, LIconCode, ARect, AColor, pfwLight);
+end;
+
+{ TExplorerFocusScrollBars }
+
+constructor TExplorerFocusScrollBars.Create(AControl: TControlList);
+begin
+  inherited Create(AControl);
+  FControl := AControl;
+  FPreviousWindowProc := FControl.WindowProc;
+  FControl.WindowProc := WindowProc;
+  QueueUpdate;
+end;
+
+destructor TExplorerFocusScrollBars.Destroy;
+begin
+  if FControl <> nil then
+    FControl.WindowProc := FPreviousWindowProc;
+  inherited;
+end;
+
+function TExplorerFocusScrollBars.IsActive: Boolean;
+var
+  LCursor: TPoint;
+  LWindowRect: TRect;
+begin
+  var LHandle := FControl.Handle;
+  var LFocus := Winapi.Windows.GetFocus;
+  Result := (LFocus = LHandle) or IsChild(LHandle, LFocus) or
+    (GetCapture = LHandle);
+  if Result then
+    Exit;
+  // Include the non-client scrollbar, but not another window covering us.
+  Result := GetCursorPos(LCursor) and GetWindowRect(LHandle, LWindowRect) and
+    PtInRect(LWindowRect, LCursor) and
+    (GetAncestor(WindowFromPoint(LCursor), GA_ROOT) =
+     GetAncestor(LHandle, GA_ROOT));
+end;
+
+procedure TExplorerFocusScrollBars.QueueUpdate;
+begin
+  if FUpdating or FUpdatePending or not FControl.HandleAllocated or
+    (csDestroying in FControl.ComponentState) then
+    Exit;
+  // Let TControlList finish updating its scroll range before applying the
+  // visibility policy. Posted work runs before the next idle WM_PAINT.
+  FUpdatePending := PostMessage(FControl.Handle, cWmUpdateFocusScrollBars, 0, 0);
+end;
+
+procedure TExplorerFocusScrollBars.UpdateScrollBars;
+var
+  LScrollInfo: TScrollInfo;
+begin
+  if FUpdating or not FControl.HandleAllocated or
+    (csDestroying in FControl.ComponentState) then
+    Exit;
+  FUpdating := True;
+  try
+    LScrollInfo := Default(TScrollInfo);
+    LScrollInfo.cbSize := SizeOf(LScrollInfo);
+    LScrollInfo.fMask := SIF_RANGE or SIF_PAGE;
+    var LShow := IsActive and
+      GetScrollInfo(FControl.Handle, SB_VERT, LScrollInfo) and
+      (LScrollInfo.nMax > LScrollInfo.nMin) and
+      (Int64(LScrollInfo.nMax) - LScrollInfo.nMin + 1 > LScrollInfo.nPage);
+    // Single-column TControlList owns only a vertical scroll range. The
+    // unused horizontal range can contain Windows defaults (0..100).
+    if ((GetWindowLong(FControl.Handle, GWL_STYLE) and WS_VSCROLL) <> 0) <> LShow then
+    begin
+      ShowScrollBar(FControl.Handle, SB_VERT, LShow);
+      FControl.Invalidate;
+    end;
+  finally
+    FUpdating := False;
+  end;
+end;
+
+procedure TExplorerFocusScrollBars.WindowProc(var AMessage: TMessage);
+var
+  LTrack: TTrackMouseEvent;
+begin
+  if AMessage.Msg = cWmUpdateFocusScrollBars then
+  begin
+    FUpdatePending := False;
+    UpdateScrollBars;
+    AMessage.Result := 0;
+    Exit;
+  end;
+  // ShowScrollBar changes the non-client gutter and sends WM_SIZE. Do not
+  // let that synthetic resize make TControlList immediately show it again.
+  // Real control resizes still run the original layout/scroll-range code.
+  if FUpdating and (AMessage.Msg = WM_SIZE) then
+  begin
+    AMessage.Result := 0;
+    Exit;
+  end;
+  if AMessage.Msg = WM_NCDESTROY then
+    FUpdatePending := False;
+  FPreviousWindowProc(AMessage);
+  if (AMessage.Msg = WM_NCMOUSEMOVE) and FControl.HandleAllocated then
+  begin
+    LTrack := Default(TTrackMouseEvent);
+    LTrack.cbSize := SizeOf(LTrack);
+    LTrack.dwFlags := TME_LEAVE or TME_NONCLIENT;
+    LTrack.hwndTrack := FControl.Handle;
+    TrackMouseEvent(LTrack);
+  end;
+  case AMessage.Msg of
+    CM_MOUSEENTER, CM_MOUSELEAVE, WM_MOUSEMOVE, WM_NCMOUSEMOVE,
+    WM_NCMOUSELEAVE, WM_SETFOCUS, WM_KILLFOCUS, WM_CAPTURECHANGED,
+    WM_SIZE, WM_NCPAINT, CM_SHOWINGCHANGED, CM_STYLECHANGED:
+      QueueUpdate;
+  end;
+end;
 
 { TExplorerBadgeLabel }
 
@@ -301,9 +514,23 @@ begin
   AutoSize := False;
   Transparent := True;
   ShowAccelChar := False;
-  FCornerRadius := 5;
-  SetBounds(0, 0, 72, 28);
+  FCornerRadius := 4;
+  SetBounds(0, 0, NaturalWidth, 28);
   ApplyTheme(TExplorerTheme.ActiveTheme);
+end;
+
+procedure TExplorerBadgeLabel.AdjustBounds;
+begin
+  // TCustomLabel calls this after caption/font changes. Keep the assigned
+  // height and avoid its parent-window canvas during inline-frame loading.
+  if not (csReading in ComponentState) then
+    Width := NaturalWidth;
+end;
+
+procedure TExplorerBadgeLabel.ChangeScale(M, D: Integer; isDpiChange: Boolean);
+begin
+  inherited;
+  AdjustBounds;
 end;
 
 procedure TExplorerBadgeLabel.ApplyTheme(const ATheme: TExplorerTheme);
@@ -312,6 +539,20 @@ begin
   Font.Color := ATheme.TextColor;
   BorderColor := ColorBlendRGB(ATheme.TextColor, ATheme.BackgroundColor, 0.87);
   Invalidate;
+end;
+
+function TExplorerBadgeLabel.NaturalWidth: Integer;
+begin
+  // Inline frames may calculate their layout before they have a parent window.
+  // An off-screen canvas avoids forcing a window handle during DFM loading.
+  var LMeasureBitmap := Vcl.Graphics.TBitmap.Create;
+  try
+    LMeasureBitmap.Canvas.Font.Assign(Font);
+    Result := LMeasureBitmap.Canvas.TextWidth(Caption) +
+      2 * ScaleValue(cBadgeHorizontalPadding);
+  finally
+    LMeasureBitmap.Free;
+  end;
 end;
 
 procedure TExplorerBadgeLabel.SetBorderColor(const AValue: TColor);
@@ -340,7 +581,7 @@ begin
     Canvas.Font.Color := StyleServices.GetSystemColor(clGrayText);
   Canvas.Brush.Style := bsClear;
   var LTextRect := ClientRect;
-  InflateRect(LTextRect, -ScaleValue(8), 0);
+  InflateRect(LTextRect, -ScaleValue(cBadgeHorizontalPadding), 0);
   Winapi.Windows.DrawText(Canvas.Handle, PChar(Caption), Length(Caption),
     LTextRect, DrawTextBiDiModeFlags(DT_SINGLELINE or DT_CENTER or
       DT_VCENTER or DT_NOPREFIX or DT_END_ELLIPSIS));
@@ -1230,6 +1471,38 @@ begin
     Canvas.Brush.Color := BorderColor;
     Canvas.FrameRect(ARect);
   end;
+end;
+
+procedure DrawExplorerSurface(const ACanvas: TCanvas; const ARect: TRect;
+  AScale: Single; ADividerY: Integer);
+begin
+  var LTheme := TExplorerTheme.ActiveTheme;
+  var LBorder := ColorBlendRGB(LTheme.TextColor, LTheme.BackgroundColor, 0.87);
+  DrawAntialiasedRoundedRectangle(ACanvas, ARect, LTheme.BackgroundColor,
+    LBorder, 8 * AScale, AScale);
+  if (ADividerY > ARect.Top) and (ADividerY < ARect.Bottom) then
+  begin
+    ACanvas.Pen.Color := LBorder;
+    ACanvas.Pen.Width := Max(1, Round(AScale));
+    ACanvas.MoveTo(ARect.Left + Round(8 * AScale), ADividerY);
+    ACanvas.LineTo(ARect.Right - Round(8 * AScale), ADividerY);
+  end;
+end;
+
+procedure DrawExplorerSearchBorder(const ACanvas: TCanvas; const ARect: TRect;
+  AScale: Single; AFocused: Boolean);
+begin
+  var LTheme := TExplorerTheme.ActiveTheme;
+  var LBorder := if AFocused then LTheme.SelectionColor else
+    ColorBlendRGB(LTheme.TextColor, LTheme.BackgroundColor, 0.78);
+  DrawAntialiasedRoundedRectangle(ACanvas, ARect, LTheme.BackgroundColor,
+    LBorder, 5 * AScale, AScale);
+  var LIconSize := Round(16 * AScale);
+  var LIconLeft := ARect.Right - Round(24 * AScale);
+  var LIconTop := ARect.Top + (ARect.Height - LIconSize) div 2;
+  PhosphorFont.DrawIcon(ACanvas.Handle, cPhMagnifyingGlass,
+    Rect(LIconLeft, LIconTop, LIconLeft + LIconSize, LIconTop + LIconSize),
+    LTheme.InactiveText, pfwRegular);
 end;
 
 procedure DrawSplitterLine(const ACanvas: TCanvas; const ARect: TRect;  AIsVertical: Boolean; AColor: TColor);

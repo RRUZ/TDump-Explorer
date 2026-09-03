@@ -201,7 +201,7 @@ begin
   FLicenseBadge.Caption := cLicenseCaption;
   FLicenseBadge.ParentFont := True;
   FLicenseBadge.SetBounds(ScaleValue(cDetailControlLeft), ScaleValue(243),
-    ScaleValue(92), ScaleValue(22));
+    FLicenseBadge.NaturalWidth, ScaleValue(22));
 end;
 
 procedure TFrmAbout.ConfigureClientDragging;
