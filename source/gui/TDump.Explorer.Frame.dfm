@@ -11,12 +11,12 @@ object DumpDocumentFrame: TDumpDocumentFrame
     Left = 297
     Top = 70
     Width = 12
-    Height = 477
+    Height = 473
     ExplicitHeight = 481
   end
   object Splitter2: TSplitter
     Left = 0
-    Top = 547
+    Top = 543
     Width = 1056
     Height = 12
     Cursor = crVSplit
@@ -27,7 +27,7 @@ object DumpDocumentFrame: TDumpDocumentFrame
     Left = 0
     Top = 70
     Width = 297
-    Height = 477
+    Height = 473
     Align = alLeft
     BevelOuter = bvNone
     Padding.Left = 6
@@ -39,12 +39,12 @@ object DumpDocumentFrame: TDumpDocumentFrame
     OnResize = SurfaceResize
     DesignSize = (
       297
-      477)
+      473)
     object pbNavigation: TPaintBox
       Left = 0
       Top = 0
       Width = 297
-      Height = 477
+      Height = 473
       Anchors = [akLeft, akTop, akRight, akBottom]
       OnPaint = SurfacePaint
       ExplicitHeight = 481
@@ -53,7 +53,7 @@ object DumpDocumentFrame: TDumpDocumentFrame
       Left = 6
       Top = 6
       Width = 285
-      Height = 465
+      Height = 461
       Align = alClient
       BorderStyle = bsNone
       DragOperations = []
@@ -70,10 +70,10 @@ object DumpDocumentFrame: TDumpDocumentFrame
     end
   end
   object pnCards: TPanel
-    Left = 305
+    Left = 309
     Top = 70
-    Width = 751
-    Height = 477
+    Width = 747
+    Height = 473
     Align = alClient
     BevelOuter = bvNone
     Padding.Left = 6
@@ -84,13 +84,13 @@ object DumpDocumentFrame: TDumpDocumentFrame
     TabOrder = 1
     OnResize = SurfaceResize
     DesignSize = (
-      751
-      477)
+      747
+      473)
     object pbDetails: TPaintBox
       Left = 0
       Top = 0
-      Width = 751
-      Height = 477
+      Width = 747
+      Height = 473
       Anchors = [akLeft, akTop, akRight, akBottom]
       OnPaint = SurfacePaint
       ExplicitWidth = 755
@@ -99,16 +99,16 @@ object DumpDocumentFrame: TDumpDocumentFrame
     object pnProperties: TPanel
       Left = 6
       Top = 6
-      Width = 739
-      Height = 465
+      Width = 735
+      Height = 461
       Align = alClient
       BevelOuter = bvNone
       TabOrder = 0
       object cpViews: TCardPanel
         Left = 0
         Top = 0
-        Width = 739
-        Height = 465
+        Width = 735
+        Height = 461
         Align = alClient
         BevelOuter = bvNone
         Caption = 'cpViews'
@@ -228,11 +228,11 @@ object DumpDocumentFrame: TDumpDocumentFrame
         end
         item
           SizeStyle = ssAbsolute
-          Value = 110.000000000000000000
+          Value = 140.000000000000000000
         end
         item
           SizeStyle = ssAbsolute
-          Value = 160.000000000000000000
+          Value = 140.000000000000000000
         end
         item
           SizeStyle = ssAbsolute
@@ -319,7 +319,7 @@ object DumpDocumentFrame: TDumpDocumentFrame
       object lblArchitectureCaption: TLabel
         Left = 70
         Top = 0
-        Width = 110
+        Width = 140
         Height = 26
         Align = alClient
         AutoSize = False
@@ -331,9 +331,9 @@ object DumpDocumentFrame: TDumpDocumentFrame
         ExplicitHeight = 18
       end
       object lblTimestampCaption: TLabel
-        Left = 180
+        Left = 210
         Top = 0
-        Width = 160
+        Width = 140
         Height = 26
         Align = alClient
         AutoSize = False
@@ -345,7 +345,7 @@ object DumpDocumentFrame: TDumpDocumentFrame
         ExplicitHeight = 32
       end
       object lblSizeCaption: TLabel
-        Left = 340
+        Left = 350
         Top = 0
         Width = 90
         Height = 26
@@ -361,7 +361,7 @@ object DumpDocumentFrame: TDumpDocumentFrame
         AlignWithMargins = True
         Left = 70
         Top = 28
-        Width = 86
+        Width = 116
         Height = 22
         Margins.Left = 0
         Margins.Top = 2
@@ -372,12 +372,13 @@ object DumpDocumentFrame: TDumpDocumentFrame
         BevelOuter = bvNone
         ParentBackground = False
         TabOrder = 1
+        ExplicitWidth = 86
       end
       object lblTimestampValue: TLabel
         AlignWithMargins = True
-        Left = 180
+        Left = 210
         Top = 28
-        Width = 160
+        Width = 140
         Height = 24
         Margins.Left = 0
         Margins.Top = 2
@@ -393,7 +394,7 @@ object DumpDocumentFrame: TDumpDocumentFrame
       end
       object lblSizeValue: TLabel
         AlignWithMargins = True
-        Left = 340
+        Left = 350
         Top = 28
         Width = 90
         Height = 24

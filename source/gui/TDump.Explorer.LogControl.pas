@@ -71,6 +71,7 @@ type
     FUsingFilteredIndexes: Boolean;
     FMatchBadge: TExplorerBadgeLabel;
   protected
+    procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override;
     procedure Resize; override;
   public
     constructor Create(AOwner: TComponent); override;
@@ -169,10 +170,10 @@ begin
   SearchFilterBox.StyleName := 'Windows';
   SearchFilterBox.StyleElements := [];
   SearchFilterBox.Color := LTheme.BackgroundColor;
-  SearchFilterBox.Font.Name := TExplorerTheme.FontName;
-  SearchFilterBox.Font.Height := -ScaleValue(MulDiv(TExplorerTheme.FontSize, 96, 72));
+  SetExplorerFont(SearchFilterBox, TExplorerTheme.FontName, TExplorerTheme.FontSize);
   SearchFilterBox.Font.Color := LTheme.TextColor;
   Label1.StyleName := 'Windows';
+  SetExplorerFontHeight(Label1, -13);
   Label1.Font.Color := LTheme.TextColor;
   ControlList1.Color := LTheme.BackgroundColor;
   if FMatchBadge <> nil then
@@ -225,6 +226,15 @@ begin
   inherited;
   if pbSurface <> nil then
     pbSurface.SetBounds(0, 0, ClientWidth, ClientHeight);
+  ToolbarResize(nil);
+end;
+
+procedure TLogControl.ChangeScale(M, D: Integer; isDpiChange: Boolean);
+begin
+  inherited;
+  if Label1 <> nil then
+    SetExplorerFontHeight(Label1, -13);
+  // Recopy/measure only after the search font has its final pixel height.
   ToolbarResize(nil);
 end;
 
@@ -289,19 +299,18 @@ begin
   LTimestampText := FormatDateTime('hh:nn:ss.zzz', LEntry.Timestamp);
   LStatusText := EntryTypeText(LEntry.EntryType);
   LTimestampRect := ARect;
-  LTimestampRect.Left := LTimestampRect.Left + cTextPadding;
-  LTimestampRect.Right := LTimestampRect.Left + cTimestampColumnWidth;
+  LTimestampRect.Left := LTimestampRect.Left + ScaleValue(cTextPadding);
+  LTimestampRect.Right := LTimestampRect.Left + ScaleValue(cTimestampColumnWidth);
   LStatusRect := ARect;
   LStatusRect.Left := LTimestampRect.Right;
-  LStatusRect.Right := LStatusRect.Left + cStatusColumnWidth;
+  LStatusRect.Right := LStatusRect.Left + ScaleValue(cStatusColumnWidth);
   LMessageRect := ARect;
   LMessageRect.Left := LStatusRect.Right;
-  LMessageRect.Right := LMessageRect.Right - cTextPadding;
+  LMessageRect.Right := LMessageRect.Right - ScaleValue(cTextPadding);
   if LMessageRect.Right < LMessageRect.Left then
     LMessageRect.Right := LMessageRect.Left;
 
-  ACanvas.Font.Name := TExplorerTheme.FontName;
-  ACanvas.Font.Size := TExplorerTheme.FontSize;
+  ACanvas.Font.Assign(ControlList1.Font);
   if LSelected then
     ACanvas.Font.Color := TExplorerTheme.ActiveTheme.SelectionColor
   else

@@ -34,11 +34,10 @@ object FrmMain: TFrmMain
   Position = poScreenCenter
   StyleElements = [seFont]
   OnCreate = FormCreate
-  OnShow = FormShow
   TextHeight = 15
   object Splitter1: TSplitter
     Left = 0
-    Top = 566
+    Top = 562
     Width = 1072
     Height = 12
     Cursor = crVSplit
@@ -104,7 +103,7 @@ object FrmMain: TFrmMain
     Left = 6
     Top = 45
     Width = 1060
-    Height = 521
+    Height = 517
     Margins.Left = 6
     Margins.Top = 6
     Margins.Right = 6

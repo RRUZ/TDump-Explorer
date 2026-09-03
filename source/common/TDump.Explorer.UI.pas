@@ -41,6 +41,47 @@ type
     destructor Destroy; override;
   end;
 
+  // Shared presentation and drag feedback; TSplitter still owns size
+  // calculation and commits only on release. Owned by the splitter.
+  TExplorerSplitterStyle = class(TComponent)
+  private
+    FSplitter: TSplitter;
+    FHot: Boolean;
+    FPreviousWindowProc: TWndMethod;
+    FPreviousPaint: TNotifyEvent;
+    FPreviousResizeStyle: TResizeStyle;
+    FPreviousCanResize: TCanResizeEvent;
+    FPreviousMoved: TNotifyEvent;
+    FDragParent: TWinControl;
+    FDragForm: TCustomForm;
+    FDragTarget: TControl;
+    FDragFocus: TWinControl;
+    FPreviousParentWindowProc: TWndMethod;
+    FPreviousFormWindowProc: TWndMethod;
+    FGuide: TCustomForm;
+    FPreviewSize: Integer;
+    FDragging: Boolean;
+    FReleasing: Boolean;
+    FSnapSuppressed: Boolean;
+    procedure BeginDrag;
+    procedure CanResize(Sender: TObject; var NewSize: Integer; var Accept: Boolean);
+    procedure Moved(Sender: TObject);
+    procedure UpdateGuide;
+    procedure EndDrag;
+    procedure CancelDrag;
+    procedure ParentWindowProc(var AMessage: TMessage);
+    procedure FormWindowProc(var AMessage: TMessage);
+    procedure Paint(Sender: TObject);
+    procedure WindowProc(var AMessage: TMessage);
+  protected
+    procedure Notification(AComponent: TComponent; Operation: TOperation); override;
+  public
+    constructor Create(ASplitter: TSplitter); reintroduce;
+    destructor Destroy; override;
+    property Hot: Boolean read FHot;
+    property Dragging: Boolean read FDragging;
+  end;
+
   TExplorerTheme = record
     const FixedWidthFontName : string = 'Consolas';
     const FixedWidthFontSize = 9;
@@ -281,6 +322,11 @@ type
     property BorderColor: TColor read FBorderColor write SetBorderColor;
   end;
 
+// Set a runtime font at the control's layout DPI, never by multiplying its
+// already-scaled height. Preserves the caller's color and emphasis.
+procedure SetExplorerFont(AControl: TControl; const AFontName: string;
+  APointSize: Integer);
+procedure SetExplorerFontHeight(AControl: TControl; ADesignHeight: Integer);
 procedure DrawRoundedBar(const Canvas: TCanvas; const ARect: TRect; FillColor, BorderColor: TColor; const Radius: Single = 2.0);
 procedure DrawAntialiasedRoundedRectangle(const ACanvas: TCanvas;
   const ARect: TRect; AFillColor, ABorderColor: TColor; ARadius,
@@ -289,8 +335,10 @@ procedure DrawDashedRoundedRectangle(const ACanvas: TCanvas;
   const ARect: TRect; ABorderColor: TColor; ARadius: Integer);
 procedure DrawSelectionBar(const Canvas: TCanvas; const ARect: TRect; FillColor, BorderColor: TColor);
 procedure DrawSplitterLine(const ACanvas: TCanvas; const ARect: TRect; AIsVertical: Boolean; AColor: TColor);
+procedure DrawFadedSplitterLine(const ACanvas: TCanvas; const ARect: TRect;
+  AIsVertical: Boolean; AColor: TColor; AScale: Single);
 procedure DrawExplorerSplitter(const ACanvas: TCanvas; const ARect: TRect;
-  AIsVertical: Boolean; AScale: Single);
+  AIsVertical: Boolean; AScale: Single; AHot: Boolean = False);
 procedure DrawExplorerSurface(const ACanvas: TCanvas; const ARect: TRect;
   AScale: Single; ADividerY: Integer = -1);
 procedure DrawExplorerSearchBorder(const ACanvas: TCanvas; const ARect: TRect;
@@ -325,8 +373,26 @@ const
   cWmUpdateFocusScrollBars = WM_APP + $145;
   cBadgeHorizontalPadding = 8;
 
+type
+  TExplorerFontControl = class(TControl);
+
+procedure SetExplorerFont(AControl: TControl; const AFontName: string;
+  APointSize: Integer);
+begin
+  TExplorerFontControl(AControl).Font.Name := AFontName;
+  SetExplorerFontHeight(AControl, -MulDiv(APointSize, 96, 72));
+end;
+
+procedure SetExplorerFontHeight(AControl: TControl; ADesignHeight: Integer);
+begin
+  // CurrentPPI may report the native monitor during an in-progress scale.
+  // ScaleFactor represents the control's actual layout, including ScaleForPPI.
+  var LPPI := Round(96 * AControl.ScaleFactor);
+  TExplorerFontControl(AControl).Font.ChangeScale(ADesignHeight, LPPI, 96, True);
+end;
+
 procedure DrawExplorerSplitter(const ACanvas: TCanvas; const ARect: TRect;
-  AIsVertical: Boolean; AScale: Single);
+  AIsVertical: Boolean; AScale: Single; AHot: Boolean);
 var
   LGripRect: TRect;
   LDotRect: TRect;
@@ -334,9 +400,16 @@ begin
   if (ARect.Width <= 0) or (ARect.Height <= 0) or (AScale <= 0) then
     Exit;
   var LTheme := TExplorerTheme.ActiveTheme;
+  var LBackgroundRGB := ColorToRGB(LTheme.BackgroundColor);
+  var LGray := (GetRValue(LBackgroundRGB) + GetGValue(LBackgroundRGB) +
+    GetBValue(LBackgroundRGB)) div 3;
+  var LGripBackground: TColor := if AHot then LTheme.BackgroundColor else
+    TColor(RGB(LGray, LGray, LGray));
+  var LAccent: TColor := if AHot then LTheme.SelectionColor else clGray;
   ACanvas.Brush.Color := LTheme.BackgroundColor;
   ACanvas.FillRect(ARect);
-  DrawSplitterLine(ACanvas, ARect, AIsVertical, LTheme.GhostColor);
+  DrawFadedSplitterLine(ACanvas, ARect, AIsVertical,
+    if AHot then LTheme.SelectionColor else LTheme.GhostColor, AScale);
   var LCenter := ARect.CenterPoint;
   var LThickness := Min(Round(8 * AScale),
     if AIsVertical then ARect.Width - 2 else ARect.Height - 2);
@@ -352,12 +425,14 @@ begin
       LCenter.X - LLength div 2 + LLength, LCenter.Y - LThickness div 2 + LThickness);
   var LHaloRect := LGripRect;
   InflateRect(LHaloRect, Max(1, Round(AScale)), Max(1, Round(AScale)));
-  var LHaloColor := ColorBlendRGB(LTheme.SelectionColor, LTheme.BackgroundColor, 0.94);
+  // Preserve the user's stronger accent halo only while hovered.
+  var LHaloColor := ColorBlendRGB(LAccent, LGripBackground,
+    if AHot then 0.5 else 0.85);
   DrawAntialiasedRoundedRectangle(ACanvas, LHaloRect, LHaloColor, LHaloColor,
     6 * AScale, AScale);
   DrawAntialiasedRoundedRectangle(ACanvas, LGripRect,
-    ColorBlendRGB(LTheme.SelectionColor, LTheme.BackgroundColor, 0.95),
-    ColorBlendRGB(LTheme.SelectionColor, LTheme.BackgroundColor, 0.65),
+    ColorBlendRGB(LAccent, LGripBackground, 0.95),
+    ColorBlendRGB(LAccent, LGripBackground, 0.65),
     4 * AScale, AScale);
   var LDotSize := Max(2, Round(2 * AScale));
   for var LIndex := 0 to 3 do
@@ -371,9 +446,319 @@ begin
         LCenter.Y - LDotSize div 2, 0, 0);
     LDotRect.Right := LDotRect.Left + LDotSize;
     LDotRect.Bottom := LDotRect.Top + LDotSize;
-    DrawAntialiasedRoundedRectangle(ACanvas, LDotRect, LTheme.SelectionColor,
-      LTheme.SelectionColor, LDotSize / 2, AScale / 2);
+    DrawAntialiasedRoundedRectangle(ACanvas, LDotRect, LAccent,
+      LAccent, LDotSize / 2, AScale / 2);
   end;
+end;
+
+type
+  TExplorerSplitterAccess = class(TSplitter);
+
+  // An owned, click-through popup above the child windows. No activation,
+  // taskbar button or XOR drawing; its tiny surface is composited by Windows.
+  TExplorerSplitterGuide = class(TCustomForm)
+  private
+    FHost: TCustomForm;
+  protected
+    procedure CreateParams(var Params: TCreateParams); override;
+  public
+    constructor Create(AOwner: TComponent; AHost: TCustomForm); reintroduce;
+    procedure ShowGuide(const ABounds: TRect);
+  end;
+
+constructor TExplorerSplitterGuide.Create(AOwner: TComponent; AHost: TCustomForm);
+begin
+  FHost := AHost;
+  inherited CreateNew(AOwner);
+  BorderStyle := bsNone;
+  AutoScroll := False;
+  Scaled := False;
+  StyleName := 'Windows';
+  StyleElements := [];
+  Color := TExplorerTheme.ActiveTheme.SelectionColor;
+  AlphaBlend := True;
+  AlphaBlendValue := 190;
+end;
+
+procedure TExplorerSplitterGuide.CreateParams(var Params: TCreateParams);
+begin
+  inherited;
+  Params.Style := WS_POPUP;
+  Params.ExStyle := Params.ExStyle or WS_EX_TOOLWINDOW or WS_EX_NOACTIVATE or
+    WS_EX_TRANSPARENT;
+  Params.WindowClass.Style := Params.WindowClass.Style and not CS_DROPSHADOW;
+  Params.WndParent := FHost.Handle;
+end;
+
+procedure TExplorerSplitterGuide.ShowGuide(const ABounds: TRect);
+begin
+  // Finish native per-monitor initialization before assigning physical bounds.
+  // Otherwise the first handle creation can rescale the initial guide again.
+  var LNewHandle := not HandleAllocated;
+  HandleNeeded;
+  var LSizeChanged := (Width <> ABounds.Width) or (Height <> ABounds.Height);
+  SetBounds(ABounds.Left, ABounds.Top, ABounds.Width, ABounds.Height);
+  if LNewHandle or LSizeChanged then
+  begin
+    var LRadius := Min(Width, Height);
+    var LRegion := CreateRoundRectRgn(0, 0, Width + 1, Height + 1, LRadius, LRadius);
+    if LRegion <> 0 then
+    begin
+      // SetWindowRgn takes ownership only on success.
+      try
+        if SetWindowRgn(Handle, LRegion, False) <> 0 then
+          LRegion := 0;
+      finally
+        if LRegion <> 0 then
+          DeleteObject(LRegion);
+      end;
+    end;
+  end;
+  SetWindowPos(Handle, HWND_TOP, 0, 0, 0, 0,
+    SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE or SWP_SHOWWINDOW);
+end;
+
+constructor TExplorerSplitterStyle.Create(ASplitter: TSplitter);
+begin
+  inherited Create(ASplitter);
+  FSplitter := ASplitter;
+  FPreviousWindowProc := FSplitter.WindowProc;
+  FPreviousPaint := FSplitter.OnPaint;
+  FPreviousResizeStyle := FSplitter.ResizeStyle;
+  FPreviousCanResize := FSplitter.OnCanResize;
+  FPreviousMoved := FSplitter.OnMoved;
+  // rsNone retains native bounds checking and release-to-resize, but omits
+  // VCL's private XOR renderer. No private-field or VMT patches are needed.
+  FSplitter.ResizeStyle := rsNone;
+  FSplitter.WindowProc := WindowProc;
+  FSplitter.OnPaint := Paint;
+  FSplitter.OnCanResize := CanResize;
+  FSplitter.OnMoved := Moved;
+end;
+
+destructor TExplorerSplitterStyle.Destroy;
+begin
+  CancelDrag;
+  FSplitter.WindowProc := FPreviousWindowProc;
+  FSplitter.OnPaint := FPreviousPaint;
+  FSplitter.ResizeStyle := FPreviousResizeStyle;
+  FSplitter.OnCanResize := FPreviousCanResize;
+  FSplitter.OnMoved := FPreviousMoved;
+  inherited;
+end;
+
+procedure TExplorerSplitterStyle.BeginDrag;
+begin
+  FDragTarget := FSplitter.Control;
+  FDragParent := FSplitter.Parent;
+  FDragForm := GetParentForm(FSplitter);
+  if (FDragTarget = nil) or (FDragParent = nil) or (FDragForm = nil) then
+    Exit;
+  FDragFocus := FDragForm.ActiveControl;
+  FPreviewSize := if FSplitter.Align in [alLeft, alRight] then
+    FDragTarget.Width else FDragTarget.Height;
+  FPreviousParentWindowProc := FDragParent.WindowProc;
+  FDragParent.WindowProc := ParentWindowProc;
+  if FDragForm <> FDragParent then
+  begin
+    FPreviousFormWindowProc := FDragForm.WindowProc;
+    FDragForm.WindowProc := FormWindowProc;
+  end;
+  FDragTarget.FreeNotification(Self);
+  FDragParent.FreeNotification(Self);
+  FDragForm.FreeNotification(Self);
+  if FDragFocus <> nil then
+    FDragFocus.FreeNotification(Self);
+  FDragging := True;
+  try
+    FGuide := TExplorerSplitterGuide.Create(Self, FDragForm);
+    UpdateGuide;
+  except
+    CancelDrag;
+    raise;
+  end;
+end;
+
+procedure TExplorerSplitterStyle.CanResize(Sender: TObject;
+  var NewSize: Integer; var Accept: Boolean);
+begin
+  if Assigned(FPreviousCanResize) then
+    FPreviousCanResize(Sender, NewSize, Accept);
+  if not FDragging or not Accept then
+    Exit;
+  // DoCanResize applies AutoSnap after this event. Reflect that result and
+  // the target's own Constraints so the guide matches the committed edge.
+  FPreviewSize := NewSize;
+  if FSplitter.AutoSnap and (NewSize <= FSplitter.MinSize) then
+    FPreviewSize := 0;
+  var LMinimum := if FSplitter.Align in [alLeft, alRight] then
+    FDragTarget.Constraints.MinWidth else FDragTarget.Constraints.MinHeight;
+  var LMaximum := if FSplitter.Align in [alLeft, alRight] then
+    FDragTarget.Constraints.MaxWidth else FDragTarget.Constraints.MaxHeight;
+  FPreviewSize := Max(FPreviewSize, LMinimum);
+  if LMaximum > 0 then
+    FPreviewSize := Min(FPreviewSize, LMaximum);
+  // Pass the constrained size back to VCL too: right/bottom alignment uses
+  // it to position the target before assigning its constrained dimensions.
+  NewSize := FPreviewSize;
+  if FSplitter.AutoSnap and (NewSize > 0) and (NewSize <= FSplitter.MinSize) then
+  begin
+    // A nonzero target minimum can disallow snapping to zero. We already
+    // applied snap/constraints once; prevent DoCanResize snapping again.
+    FSnapSuppressed := True;
+    FSplitter.AutoSnap := False;
+  end;
+end;
+
+procedure TExplorerSplitterStyle.UpdateGuide;
+begin
+  if not FDragging or (FGuide = nil) then
+    Exit;
+  var LScale := FSplitter.ScaleFactor;
+  var LThickness := Max(2, Round(3 * LScale));
+  var LInset := Max(1, Round(2 * LScale));
+  var LBounds := FSplitter.BoundsRect;
+  if FSplitter.Align in [alLeft, alRight] then
+  begin
+    var LDelta := FPreviewSize - FDragTarget.Width;
+    if FSplitter.Align = alRight then
+      LDelta := -LDelta;
+    LBounds.Left := LBounds.CenterPoint.X + LDelta - LThickness div 2;
+    LBounds.Right := LBounds.Left + LThickness;
+    InflateRect(LBounds, 0, -LInset);
+  end
+  else
+  begin
+    var LDelta := FPreviewSize - FDragTarget.Height;
+    if FSplitter.Align = alBottom then
+      LDelta := -LDelta;
+    LBounds.Top := LBounds.CenterPoint.Y + LDelta - LThickness div 2;
+    LBounds.Bottom := LBounds.Top + LThickness;
+    InflateRect(LBounds, -LInset, 0);
+  end;
+  if (LBounds.Width <= 0) or (LBounds.Height <= 0) then
+    Exit;
+  var LOrigin := FDragParent.ClientToScreen(Point(0, 0));
+  OffsetRect(LBounds, LOrigin.X, LOrigin.Y);
+  TExplorerSplitterGuide(FGuide).ShowGuide(LBounds);
+end;
+
+procedure TExplorerSplitterStyle.EndDrag;
+begin
+  if not FDragging then
+    Exit;
+  FDragging := False;
+  FDragParent.WindowProc := FPreviousParentWindowProc;
+  if FDragForm <> FDragParent then
+    FDragForm.WindowProc := FPreviousFormWindowProc;
+  FDragTarget.RemoveFreeNotification(Self);
+  FDragParent.RemoveFreeNotification(Self);
+  FDragForm.RemoveFreeNotification(Self);
+  if FDragFocus <> nil then
+    FDragFocus.RemoveFreeNotification(Self);
+  FDragTarget := nil;
+  FDragParent := nil;
+  FDragForm := nil;
+  FDragFocus := nil;
+  FreeAndNil(FGuide);
+  if GetCaptureControl = FSplitter then
+    SetCaptureControl(nil);
+  FSplitter.Invalidate;
+end;
+
+procedure TExplorerSplitterStyle.CancelDrag;
+begin
+  if not FDragging then
+    Exit;
+  try
+    TExplorerSplitterAccess(FSplitter).StopSizing;
+  finally
+    EndDrag;
+  end;
+end;
+
+procedure TExplorerSplitterStyle.Moved(Sender: TObject);
+begin
+  // StopSizing also raises OnMoved on Escape, unlike OnAfterResize.
+  if FSplitter.Control = nil then
+    EndDrag;
+  if Assigned(FPreviousMoved) then
+    FPreviousMoved(Sender);
+end;
+
+procedure TExplorerSplitterStyle.Notification(AComponent: TComponent;
+  Operation: TOperation);
+begin
+  if (Operation = opRemove) and FDragging and
+    ((AComponent = FDragTarget) or (AComponent = FDragParent) or
+     (AComponent = FDragForm) or (AComponent = FDragFocus)) then
+    CancelDrag;
+  inherited;
+end;
+
+procedure TExplorerSplitterStyle.ParentWindowProc(var AMessage: TMessage);
+begin
+  // Keep a local callback: cancellation restores the parent's WindowProc.
+  var LPrevious := FPreviousParentWindowProc;
+  if not FReleasing and ((AMessage.Msg = WM_CAPTURECHANGED) or
+    (AMessage.Msg = WM_CANCELMODE) or (AMessage.Msg = WM_SIZE) or
+    (AMessage.Msg = WM_DESTROY) or (AMessage.Msg = WM_MOVE) or
+    ((AMessage.Msg = WM_ACTIVATE) and (LoWord(AMessage.WParam) = WA_INACTIVE)) or
+    (((AMessage.Msg = WM_KEYDOWN) or (AMessage.Msg = CM_DIALOGKEY)) and
+      (AMessage.WParam = VK_ESCAPE))) then
+    CancelDrag;
+  LPrevious(AMessage);
+end;
+
+procedure TExplorerSplitterStyle.FormWindowProc(var AMessage: TMessage);
+begin
+  var LPrevious := FPreviousFormWindowProc;
+  if not FReleasing and ((AMessage.Msg = WM_CANCELMODE) or
+    (AMessage.Msg = WM_MOVE) or (AMessage.Msg = WM_SIZE) or
+    ((AMessage.Msg = WM_ACTIVATE) and (LoWord(AMessage.WParam) = WA_INACTIVE)) or
+    (((AMessage.Msg = WM_KEYDOWN) or (AMessage.Msg = CM_DIALOGKEY)) and
+      (AMessage.WParam = VK_ESCAPE))) then
+    CancelDrag;
+  LPrevious(AMessage);
+end;
+
+procedure TExplorerSplitterStyle.Paint(Sender: TObject);
+begin
+  DrawExplorerSplitter(FSplitter.Canvas, FSplitter.ClientRect,
+    FSplitter.Align in [alLeft, alRight], FSplitter.ScaleFactor, FHot);
+end;
+
+procedure TExplorerSplitterStyle.WindowProc(var AMessage: TMessage);
+begin
+  case AMessage.Msg of
+    CM_MOUSEENTER: FHot := True;
+    CM_MOUSELEAVE: FHot := False;
+    WM_CANCELMODE: CancelDrag;
+  end;
+  var LWasReleasing := FReleasing;
+  if AMessage.Msg = WM_LBUTTONUP then
+    FReleasing := True;
+  try
+    try
+      FPreviousWindowProc(AMessage);
+      if (AMessage.Msg = WM_LBUTTONDOWN) and (FSplitter.Control <> nil) then
+        BeginDrag;
+      if FDragging and (AMessage.Msg = WM_MOUSEMOVE) then
+        UpdateGuide;
+    except
+      CancelDrag;
+      raise;
+    end;
+  finally
+    if FSnapSuppressed then
+    begin
+      FSnapSuppressed := False;
+      FSplitter.AutoSnap := True;
+    end;
+    FReleasing := LWasReleasing;
+  end;
+  if (AMessage.Msg = CM_MOUSEENTER) or (AMessage.Msg = CM_MOUSELEAVE) then
+    FSplitter.Invalidate;
 end;
 
 function ExplorerDocumentIconName(const AFileName: string): string;
@@ -1531,6 +1916,69 @@ begin
       end;
     finally
       LPen.Free;
+    end;
+  finally
+    LGraphics.Free;
+  end;
+end;
+
+procedure DrawFadedSplitterLine(const ACanvas: TCanvas; const ARect: TRect;
+  AIsVertical: Boolean; AColor: TColor; AScale: Single);
+const
+  cFadeWidth = 64;
+  cFadeMidAlpha = 48;
+var
+  LColors: array[0..5] of TGPColor;
+  LPositions: array[0..5] of Single;
+begin
+  if (ARect.Width <= 0) or (ARect.Height <= 0) or (AScale <= 0) then
+    Exit;
+  var LSpan := if AIsVertical then ARect.Height else ARect.Width;
+  // The same transparent / low-alpha / solid stops as the tab baseline.
+  // Limit the fade on short splitters so interpolation stops stay distinct.
+  var LFade: Single := Min(cFadeWidth * AScale / LSpan, 1 / 3);
+  LPositions[0] := 0;
+  LPositions[1] := LFade / 2;
+  LPositions[2] := LFade;
+  LPositions[3] := 1 - LFade;
+  LPositions[4] := 1 - LFade / 2;
+  LPositions[5] := 1;
+  var LRGB := ColorToRGB(AColor);
+  LColors[0] := MakeColor(0, GetRValue(LRGB), GetGValue(LRGB), GetBValue(LRGB));
+  LColors[1] := MakeColor(cFadeMidAlpha, GetRValue(LRGB), GetGValue(LRGB), GetBValue(LRGB));
+  LColors[2] := ColorToGPColor(AColor);
+  LColors[3] := LColors[2];
+  LColors[4] := LColors[1];
+  LColors[5] := LColors[0];
+  var LGraphics := TGPGraphics.Create(ACanvas.Handle);
+  try
+    LGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
+    LGraphics.SetPixelOffsetMode(PixelOffsetModeHalf);
+    var LGradient := TGPLinearGradientBrush.Create(
+      MakeRect(ARect.Left, ARect.Top, ARect.Width, ARect.Height),
+      LColors[0], LColors[5],
+      if AIsVertical then LinearGradientModeVertical else LinearGradientModeHorizontal);
+    try
+      LGradient.SetInterpolationColors(@LColors[0], @LPositions[0], Length(LColors));
+      var LPen := TGPPen.Create(LGradient, AScale);
+      try
+        LPen.SetStartCap(LineCapFlat);
+        LPen.SetEndCap(LineCapFlat);
+        if AIsVertical then
+        begin
+          var LCenter := (ARect.Left + ARect.Right) / 2.0;
+          LGraphics.DrawLine(LPen, LCenter, ARect.Top, LCenter, ARect.Bottom);
+        end
+        else
+        begin
+          var LCenter := (ARect.Top + ARect.Bottom) / 2.0;
+          LGraphics.DrawLine(LPen, ARect.Left, LCenter, ARect.Right, LCenter);
+        end;
+      finally
+        LPen.Free;
+      end;
+    finally
+      LGradient.Free;
     end;
   finally
     LGraphics.Free;

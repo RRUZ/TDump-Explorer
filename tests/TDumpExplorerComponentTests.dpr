@@ -14,6 +14,7 @@ uses
   System.Generics.Collections,
   Vcl.Graphics,
   Vcl.Controls,
+  Vcl.ExtCtrls,
   Vcl.StdCtrls,
   Vcl.Forms,
   DUnitX.TestFramework,
@@ -27,6 +28,7 @@ uses
   TDump.Explorer.HighlighterControl in '..\source\gui\TDump.Explorer.HighlighterControl.pas',
   TDump.Explorer.LogControl in '..\source\gui\TDump.Explorer.LogControl.pas',
   TDump.Explorer.Settings in '..\source\gui\TDump.Explorer.Settings.pas',
+  TDump.Explorer.About in '..\source\gui\TDump.Explorer.About.pas',
   TDump.Explorer.Resources in '..\source\gui\TDump.Explorer.Resources.pas',
   TDumpExplorerComponentTestHost in 'TDumpExplorerComponentTestHost.pas';
 
@@ -59,6 +61,11 @@ type
     FIconDrawCount: Integer;
     FIconRect: TRect;
     FIconColor: TColor;
+    FRejectResize: Boolean;
+    FResizeCalls: Integer;
+    FMovedCalls: Integer;
+    procedure CheckResizeEvent(Sender: TObject; var NewSize: Integer; var Accept: Boolean);
+    procedure CheckMovedEvent(Sender: TObject);
     procedure RecordItemIcon(Sender: TObject; AIndex: Integer; ACanvas: TCanvas;
       const ARect: TRect; AColor: TColor);
   public
@@ -69,7 +76,13 @@ type
     [Test] procedure HighlighterSortGlyphPlacement;
     [Test] procedure DocumentIconClassification;
     [Test] procedure HighlighterCustomIcons;
+    [Test] procedure HighlighterFontDpi;
+    [Test] procedure LogFontDpi;
+    [Test] procedure DialogFontDpi;
     [Test] procedure SplitterGripDrawing;
+    [Test] procedure SplitterHoverPolicy;
+    [Test] procedure SplitterLineGradient;
+    [Test] procedure SplitterDragGuide;
     [Test] procedure LogFilteringNavigation;
     [Test] procedure BadgeMeasurementBeforeParenting;
     [Test] procedure RoundedLogLayout;
@@ -718,6 +731,164 @@ begin
   end;
 end;
 
+procedure TExplorerComponentFixture.HighlighterFontDpi;
+begin
+  var LHost := TComponentTestHostForm.Create(nil);
+  try
+    LHost.SetBounds(-32000, -32000, 1200, 600);
+    LHost.Show;
+    var LControl := LHost.HighlighterControl;
+    LControl.SetColumnHeaders(['Long header caption', 'Value']);
+    LControl.AddColumns(['Sample text', '1']);
+    var LBitmap := TBitmap.Create;
+    try
+      for var LPPI in TArray<Integer>.Create(96, 120, 144, 192, 144, 120, 96) do
+      begin
+        LHost.ScaleForPPI(LPPI);
+        Application.ProcessMessages;
+        for var LFontName in TArray<string>.Create('Consolas', 'Segoe UI') do
+        begin
+          SetExplorerFont(LControl, LFontName, 9);
+          SetExplorerFont(LControl, LFontName, 9);
+          Require((LControl.Font.Height = -MulDiv(12, LPPI, 96)) and
+            (LControl.Font.PixelsPerInch = LPPI),
+            'Runtime font setup must be DPI-correct and idempotent.');
+          LBitmap.Canvas.Font.Assign(LControl.HeaderControl1.Font);
+          Require(LControl.HeaderControl1.Sections[0].Width >=
+            LBitmap.Canvas.TextWidth('Long header caption') + 16 + MulDiv(18, LPPI, 96),
+            'Column measurements must refresh after font and DPI changes.');
+          LBitmap.SetSize(500, LControl.ControlList1.ItemHeight);
+          LBitmap.Canvas.Font.PixelsPerInch := 96;
+          LBitmap.Canvas.Font.Height := -12;
+          LControl.ControlList1.OnBeforeDrawItem(0, LBitmap.Canvas,
+            Rect(0, 0, LBitmap.Width, LBitmap.Height), []);
+          Require(LBitmap.Canvas.Font.Height = LControl.Font.Height,
+            'Highlighter painting must use the scaled control font.');
+          Require(LBitmap.Canvas.TextHeight('Ag') <= LControl.ControlList1.ItemHeight,
+            'Highlighter rows must contain the scaled text.');
+        end;
+      end;
+      LControl.SetViewLayoutId('dpi-widths');
+      LControl.HeaderControl1.Sections[0].Width := 240;
+      LControl.HeaderControl1.OnSectionResize(LControl.HeaderControl1,
+        LControl.HeaderControl1.Sections[0]);
+      LHost.ScaleForPPI(192);
+      Require(LControl.HeaderControl1.Sections[0].Width = 480,
+        'User-sized columns must scale with the font.');
+      LControl.SetViewLayoutId('other-view');
+      LControl.SetViewLayoutId('dpi-widths');
+      Require(LControl.HeaderControl1.Sections[0].Width = 480,
+        'Cached column layouts must retain the new DPI.');
+    finally
+      LBitmap.Free;
+    end;
+  finally
+    LHost.Free;
+  end;
+end;
+
+procedure TExplorerComponentFixture.LogFontDpi;
+begin
+  var LHost := TComponentTestHostForm.Create(nil);
+  try
+    LHost.SetBounds(-32000, -32000, 1200, 600);
+    LHost.Show;
+    var LLog := LHost.LogControl;
+    LLog.Add('DPI font regression', letSuccess);
+    var LBadge := TExplorerBadgeLabel(LLog.FindComponent('FilterCountBadge'));
+    var LBitmap := TBitmap.Create;
+    try
+      for var LPPI in TArray<Integer>.Create(96, 120, 144, 192, 144, 120, 96) do
+      begin
+        LHost.ScaleForPPI(LPPI);
+        Application.ProcessMessages;
+        LLog.ApplyTheme;
+        Require(LLog.SearchFilterBox.Font.Height = -MulDiv(12, LPPI, 96),
+          'Search font must follow layout DPI after theme refresh.');
+        Require((LBadge.Font.Height = LLog.SearchFilterBox.Font.Height) and
+          (LLog.Label1.Font.Height = -MulDiv(13, LPPI, 96)),
+          'Log badge and title must not accumulate DPI rounding.');
+        LBitmap.SetSize(1000, LLog.ControlList1.ItemHeight);
+        LBitmap.Canvas.Font.PixelsPerInch := 96;
+        LBitmap.Canvas.Font.Height := -12;
+        LLog.ControlList1BeforeDrawItem(0, LBitmap.Canvas,
+          Rect(0, 0, LBitmap.Width, LBitmap.Height), [odSelected]);
+        Require(LBitmap.Canvas.Font.Height = LLog.ControlList1.Font.Height,
+          'Log painting must copy the scaled font, not set canvas point size.');
+        Require(LBitmap.Canvas.TextHeight('Ag') <= LLog.ControlList1.ItemHeight,
+          'Log rows must contain the scaled text.');
+        Require(LBitmap.Canvas.TextWidth('23:59:59.999') < MulDiv(92, LPPI, 96),
+          'Timestamp column must have room for its scaled font.');
+        Require(LBitmap.Canvas.Font.Color = TExplorerTheme.ActiveTheme.SelectionColor,
+          'DPI fixes must preserve selected text colors.');
+      end;
+    finally
+      LBitmap.Free;
+    end;
+  finally
+    LHost.Free;
+  end;
+end;
+
+procedure TExplorerComponentFixture.DialogFontDpi;
+begin
+  TSettings.SetSettingsFolderOverride(cTestResultsDirectory + '\font-dialog');
+  try
+    var LResources := TDataModule1.Create(nil);
+    try
+      var LPreviousResources := DataModule1;
+      DataModule1 := LResources;
+      try
+        var LSettings := TFrmSettings.Create(nil);
+        try
+          var LAbout := TFrmAbout.Create(nil);
+          try
+            LSettings.Position := poDesigned;
+            LAbout.Position := poDesigned;
+            LSettings.SetBounds(-32000, -32000, LSettings.Width, LSettings.Height);
+            LAbout.SetBounds(-32000, -32000, LAbout.Width, LAbout.Height);
+            LSettings.Show;
+            LAbout.Show;
+            for var LPPI in TArray<Integer>.Create(96, 120, 144, 192, 144, 120, 96) do
+            begin
+              LSettings.ScaleForPPI(LPPI);
+              LAbout.ScaleForPPI(LPPI);
+              Application.ProcessMessages;
+              Require(LAbout.TitleBarPanel1.Height > 0,
+                'About title-bar painting must retain a nonempty client strip.');
+              Require((LSettings.Font.Height = -MulDiv(12, LPPI, 96)) and
+                (LAbout.Font.Height = LSettings.Font.Height),
+                'Dialog body fonts must scale once.');
+              Require((LSettings.lblGeneral.Font.Height = -MulDiv(13, LPPI, 96)) and
+                (LAbout.lblProduct.Font.Height = -MulDiv(22, LPPI, 96)) and
+                (LAbout.lblVersion.Font.Height = -MulDiv(15, LPPI, 96)),
+                'Heading fonts must return to their original design heights.');
+              Require((LSettings.edTDumpPath.Font.Height = LSettings.Font.Height) and
+                (LSettings.cbRememberWindowPlacement.Font.Height = LSettings.Font.Height),
+                'Settings inputs and checkboxes must match the body font.');
+              var LClose := TSimpleUIButton(LAbout.FindComponent('btnClose'));
+              var LSave := TSimpleUIButton(LSettings.FindComponent('btnSave'));
+              Require((LClose.Font.Height = LAbout.Font.Height) and
+                (LSave.Font.Height = LSettings.Font.Height),
+                'Runtime buttons must inherit the scaled dialog font.');
+            end;
+          finally
+            LAbout.Free;
+          end;
+        finally
+          LSettings.Free;
+        end;
+      finally
+        DataModule1 := LPreviousResources;
+      end;
+    finally
+      LResources.Free;
+    end;
+  finally
+    TSettings.SetSettingsFolderOverride('');
+  end;
+end;
+
 procedure TExplorerComponentFixture.SettingsRoundTrip;
 begin
   TestSettingsRoundTrip;
@@ -742,7 +913,8 @@ begin
           LBitmap.Canvas.Brush.Color := LTheme.BackgroundColor;
           LBitmap.Canvas.FillRect(LBounds);
           LBaseline.Assign(LBitmap);
-          DrawSplitterLine(LBaseline.Canvas, LBounds, LVertical, LTheme.GhostColor);
+          DrawFadedSplitterLine(LBaseline.Canvas, LBounds, LVertical,
+            LTheme.GhostColor, LScale);
           DrawExplorerSplitter(LBitmap.Canvas, LBounds, LVertical, LScale);
           var LChangedPixels := 0;
           var LCenter := LBounds.CenterPoint;
@@ -775,6 +947,300 @@ end;
 procedure TExplorerComponentFixture.BadgeMeasurementBeforeParenting;
 begin
   TestBadgeMeasurementBeforeParenting;
+end;
+
+procedure TExplorerComponentFixture.SplitterHoverPolicy;
+begin
+  var LSplitter := TSplitter.Create(nil);
+  try
+    var LStyle := TExplorerSplitterStyle.Create(LSplitter);
+    Require(LSplitter.ResizeStyle = rsNone,
+      'Splitter must disable XOR while retaining native release-to-resize.');
+    Require(not LStyle.Hot, 'Splitter must start in the neutral state.');
+    LSplitter.Perform(CM_MOUSEENTER, 0, 0);
+    Require(LStyle.Hot, 'Mouse enter must activate the accent palette.');
+    LSplitter.Perform(CM_MOUSELEAVE, 0, 0);
+    Require(not LStyle.Hot, 'Mouse leave must restore the neutral palette.');
+    var LBitmap := TBitmap.Create;
+    try
+      LBitmap.SetSize(120, 12);
+      var LBounds := Rect(0, 0, LBitmap.Width, LBitmap.Height);
+      DrawExplorerSplitter(LBitmap.Canvas, LBounds, False, 1, False);
+      // Sample a dot's interior, where the idle palette is explicitly gray.
+      var LIdle := ColorToRGB(LBitmap.Canvas.Pixels[57, 5]);
+      Require((GetRValue(LIdle) = GetGValue(LIdle)) and
+        (GetGValue(LIdle) = GetBValue(LIdle)),
+        'Idle splitter dots must be grayscale.');
+      DrawExplorerSplitter(LBitmap.Canvas, LBounds, False, 1, True);
+      Require(ColorToRGB(LBitmap.Canvas.Pixels[57, 5]) <> LIdle,
+        'Hover must visibly change the grip to the active theme accent.');
+    finally
+      LBitmap.Free;
+    end;
+  finally
+    LSplitter.Free;
+  end;
+end;
+
+procedure TExplorerComponentFixture.SplitterLineGradient;
+
+  function Contrast(AColor, ABackground: TColor): Integer;
+  begin
+    var LColor := ColorToRGB(AColor);
+    var LBackground := ColorToRGB(ABackground);
+    Result := Abs(Integer(GetRValue(LColor)) - Integer(GetRValue(LBackground))) +
+      Abs(Integer(GetGValue(LColor)) - Integer(GetGValue(LBackground))) +
+      Abs(Integer(GetBValue(LColor)) - Integer(GetBValue(LBackground)));
+  end;
+
+  function LinePixel(ABitmap: TBitmap; const ABounds: TRect;
+    AVertical: Boolean; AOffset: Integer): TColor;
+  begin
+    var LPoint := ABounds.CenterPoint;
+    if AVertical then
+      LPoint.Y := ABounds.Top + AOffset
+    else
+      LPoint.X := ABounds.Left + AOffset;
+    Result := ABitmap.Canvas.Pixels[LPoint.X, LPoint.Y];
+  end;
+
+begin
+  var LBitmap := TBitmap.Create;
+  try
+    var LReference := TBitmap.Create;
+    try
+      var LTheme := TExplorerTheme.ActiveTheme;
+      for var LPPI in TArray<Integer>.Create(96, 120, 144) do
+        for var LVertical in TArray<Boolean>.Create(False, True) do
+          for var LHot in TArray<Boolean>.Create(False, True) do
+          begin
+            var LScale: Single := LPPI / 96;
+            var LSpan := MulDiv(400, LPPI, 96);
+            var LThickness := MulDiv(12, LPPI, 96);
+            var LBounds := Rect(7, 11, 7 + LSpan, 11 + LThickness);
+            if LVertical then
+              LBounds := Rect(7, 11, 7 + LThickness, 11 + LSpan);
+            LBitmap.SetSize(LBounds.Right + 7, LBounds.Bottom + 11);
+            LBitmap.Canvas.Brush.Color := LTheme.BackgroundColor;
+            LBitmap.Canvas.FillRect(Rect(0, 0, LBitmap.Width, LBitmap.Height));
+            LReference.Assign(LBitmap);
+            DrawExplorerSplitter(LBitmap.Canvas, LBounds, LVertical, LScale, LHot);
+            var LColor := if LHot then LTheme.SelectionColor else LTheme.GhostColor;
+            DrawFadedSplitterLine(LReference.Canvas, LBounds, LVertical, LColor, LScale);
+            var LOpaqueOffset := MulDiv(80, LPPI, 96);
+            Require(LinePixel(LBitmap, LBounds, LVertical, LOpaqueOffset) =
+              LinePixel(LReference, LBounds, LVertical, LOpaqueOffset),
+              'The whole hovered splitter line must use SelectionColor.');
+            var LOpaqueContrast := Contrast(LinePixel(LBitmap, LBounds,
+              LVertical, LOpaqueOffset), LTheme.BackgroundColor);
+            Require(LOpaqueContrast > 10, 'The middle splitter line must remain visible.');
+            for var LFromEnd in TArray<Boolean>.Create(False, True) do
+            begin
+              var LEdge := 0;
+              var LFadeMid := MulDiv(32, LPPI, 96);
+              if LFromEnd then
+              begin
+                LEdge := LSpan - 1;
+                LFadeMid := LSpan - 1 - LFadeMid;
+              end;
+              var LEdgeContrast := Contrast(LinePixel(LBitmap, LBounds,
+                LVertical, LEdge), LTheme.BackgroundColor);
+              var LMidContrast := Contrast(LinePixel(LBitmap, LBounds,
+                LVertical, LFadeMid), LTheme.BackgroundColor);
+              Require((LEdgeContrast < LMidContrast) and
+                (LMidContrast < LOpaqueContrast div 2),
+                'Each line end must blend through the tab baseline low-alpha stop.');
+            end;
+          end;
+    finally
+      LReference.Free;
+    end;
+  finally
+    LBitmap.Free;
+  end;
+end;
+
+procedure TExplorerComponentFixture.CheckResizeEvent(Sender: TObject;
+  var NewSize: Integer; var Accept: Boolean);
+begin
+  Inc(FResizeCalls);
+  Accept := not FRejectResize;
+end;
+
+procedure TExplorerComponentFixture.CheckMovedEvent(Sender: TObject);
+begin
+  Inc(FMovedCalls);
+end;
+
+procedure TExplorerComponentFixture.SplitterDragGuide;
+var
+  LStage: string;
+
+  function Guide(AStyle: TExplorerSplitterStyle): TCustomForm;
+  begin
+    Result := nil;
+    for var LIndex := 0 to AStyle.ComponentCount - 1 do
+      if AStyle.Components[LIndex] is TCustomForm then
+        Exit(TCustomForm(AStyle.Components[LIndex]));
+    Require(False, 'Guide missing during ' + LStage);
+  end;
+
+  procedure DragMessage(ASplitter: TSplitter; AMessage: Cardinal; ADelta: Integer);
+  begin
+    var LPoint := ASplitter.ClientRect.CenterPoint;
+    case ASplitter.Align of
+      alLeft: Inc(LPoint.X, ADelta);
+      alRight: Dec(LPoint.X, ADelta);
+      alTop: Inc(LPoint.Y, ADelta);
+      alBottom: Dec(LPoint.Y, ADelta);
+    end;
+    ASplitter.Perform(AMessage, if AMessage = WM_LBUTTONUP then 0 else MK_LBUTTON,
+      MakeLParam(LPoint.X, LPoint.Y));
+  end;
+
+begin
+  for var LPPI in TArray<Integer>.Create(96, 120, 144) do
+    for var LAlign in TArray<TAlign>.Create(alLeft, alRight, alTop, alBottom) do
+    begin
+      var LHost := TForm.CreateNew(nil);
+      try
+        LStage := Format('start, DPI %d, alignment %d', [LPPI, Ord(LAlign)]);
+        LHost.SetBounds(100, 100, 640, 500);
+        var LPane := TPanel.Create(LHost);
+        LPane.Parent := LHost;
+        LPane.SetBounds(0, 0, 120, 120);
+        LPane.Align := LAlign;
+        var LSplitter := TSplitter.Create(LHost);
+        LSplitter.Parent := LHost;
+        LSplitter.Align := LAlign;
+        LSplitter.SetBounds(0, 0, 12, 12);
+        case LAlign of
+          alLeft: LSplitter.Left := LPane.BoundsRect.Right;
+          alRight: LSplitter.Left := LPane.Left - LSplitter.Width;
+          alTop: LSplitter.Top := LPane.BoundsRect.Bottom;
+          alBottom: LSplitter.Top := LPane.Top - LSplitter.Height;
+        end;
+        var LEdit := TEdit.Create(LHost);
+        LEdit.Parent := LPane;
+        LEdit.SetBounds(8, 8, 100, 24);
+        LSplitter.OnCanResize := CheckResizeEvent;
+        LSplitter.OnMoved := CheckMovedEvent;
+        var LStyle := TExplorerSplitterStyle.Create(LSplitter);
+        LHost.Show;
+        LHost.ScaleForPPI(LPPI);
+        LEdit.SetFocus;
+        FRejectResize := False;
+        FResizeCalls := 0;
+        FMovedCalls := 0;
+        var LVertical := LAlign in [alLeft, alRight];
+        var LBounds := LPane.BoundsRect;
+        var LFocus := GetFocus;
+        DragMessage(LSplitter, WM_LBUTTONDOWN, 0);
+        Require(LStyle.Dragging and (LSplitter.Control = LPane),
+          'Guide must start on the native adjacent pane for each alignment.');
+        DragMessage(LSplitter, WM_MOUSEMOVE, 20);
+        Require(LPane.BoundsRect = LBounds, 'Preview must not resize before release.');
+        Require(GetFocus = LFocus, 'The guide must not take keyboard focus.');
+        var LGuide := Guide(LStyle);
+        Require((LGuide <> nil) and IsWindowVisible(LGuide.Handle), 'Guide must be visible.');
+        var LGuideHandle := LGuide.Handle;
+        Require((if LVertical then LGuide.Width else LGuide.Height) =
+          Max(2, Round(3 * LSplitter.ScaleFactor)), 'Guide width must scale once from 3 design pixels.');
+        DragMessage(LSplitter, WM_LBUTTONUP, 20);
+        Require((if LVertical then LPane.Width = LBounds.Width + 20 else
+          LPane.Height = LBounds.Height + 20), 'Release must commit the accepted size.');
+        Require(not LStyle.Dragging and not IsWindow(LGuideHandle),
+          'Release must destroy the guide.');
+        Require((FResizeCalls > 0) and (FMovedCalls > 0), 'Original callbacks must still run.');
+        LBounds := LPane.BoundsRect;
+        // Native focused-control Escape invokes StopSizing and the shared cleanup.
+        DragMessage(LSplitter, WM_LBUTTONDOWN, 0);
+        DragMessage(LSplitter, WM_MOUSEMOVE, 15);
+        LEdit.Perform(WM_KEYDOWN, VK_ESCAPE, 0);
+        Require(not LStyle.Dragging and (LSplitter.Control = nil) and
+          (LPane.BoundsRect = LBounds) and (GetCaptureControl <> LSplitter),
+          'Escape must cancel without resizing or retaining capture.');
+        // Capture may transfer to another control; do not release its capture.
+        DragMessage(LSplitter, WM_LBUTTONDOWN, 0);
+        DragMessage(LSplitter, WM_MOUSEMOVE, 15);
+        SetCapture(LEdit.Handle);
+        Require(not LStyle.Dragging and (LSplitter.Control = nil) and
+          (LPane.BoundsRect = LBounds) and (GetCapture = LEdit.Handle),
+          'Capture loss must cancel and preserve the new capture owner.');
+        ReleaseCapture;
+        DragMessage(LSplitter, WM_LBUTTONDOWN, 0);
+        DragMessage(LSplitter, WM_MOUSEMOVE, 15);
+        LHost.Perform(WM_CANCELMODE, 0, 0);
+        Require(not LStyle.Dragging and (LPane.BoundsRect = LBounds),
+          'Cancel mode must not accidentally commit a resize.');
+        FRejectResize := True;
+        LStage := Format('veto, DPI %d, alignment %d', [LPPI, Ord(LAlign)]);
+        DragMessage(LSplitter, WM_LBUTTONDOWN, 0);
+        var LOriginalGuide := Guide(LStyle).BoundsRect;
+        DragMessage(LSplitter, WM_MOUSEMOVE, 40);
+        Require(Guide(LStyle).BoundsRect = LOriginalGuide, 'A vetoed size must not move the guide.');
+        DragMessage(LSplitter, WM_LBUTTONUP, 40);
+        Require(LPane.BoundsRect = LBounds, 'OnCanResize veto must be respected.');
+        FRejectResize := False;
+        var LMaximum := (if LVertical then LPane.Width else LPane.Height) + 30;
+        LStage := Format('constraints, DPI %d, alignment %d', [LPPI, Ord(LAlign)]);
+        if LVertical then LPane.Constraints.MaxWidth := LMaximum
+        else LPane.Constraints.MaxHeight := LMaximum;
+        DragMessage(LSplitter, WM_LBUTTONDOWN, 0);
+        DragMessage(LSplitter, WM_MOUSEMOVE, 200);
+        var LExpectedPoint := LSplitter.ClientToScreen(LSplitter.ClientRect.CenterPoint);
+        case LAlign of
+          alLeft: Inc(LExpectedPoint.X, 30);
+          alRight: Dec(LExpectedPoint.X, 30);
+          alTop: Inc(LExpectedPoint.Y, 30);
+          alBottom: Dec(LExpectedPoint.Y, 30);
+        end;
+        var LGuidePoint := Guide(LStyle).BoundsRect.CenterPoint;
+        Require((if LVertical then LGuidePoint.X = LExpectedPoint.X else
+          LGuidePoint.Y = LExpectedPoint.Y), 'Guide must honor target size constraints.');
+        DragMessage(LSplitter, WM_LBUTTONUP, 200);
+        Require((if LVertical then LPane.Width else LPane.Height) = LMaximum,
+          'Committed size must match the constrained guide.');
+        LStage := Format('minimum/snap, DPI %d, alignment %d', [LPPI, Ord(LAlign)]);
+        if LVertical then LPane.Constraints.MinWidth := 20
+        else LPane.Constraints.MinHeight := 20;
+        DragMessage(LSplitter, WM_LBUTTONDOWN, 0);
+        DragMessage(LSplitter, WM_MOUSEMOVE, -1000);
+        LGuidePoint := Guide(LStyle).BoundsRect.CenterPoint;
+        Require(LSplitter.AutoSnap, 'Temporary snap suppression must be restored after movement.');
+        DragMessage(LSplitter, WM_LBUTTONUP, -1000);
+        LExpectedPoint := LSplitter.ClientToScreen(LSplitter.ClientRect.CenterPoint);
+        Require(((if LVertical then LPane.Width else LPane.Height) = 20) and
+          (if LVertical then LGuidePoint.X = LExpectedPoint.X else
+            LGuidePoint.Y = LExpectedPoint.Y),
+          'A nonzero target minimum must match both guide and committed edge.');
+        if LVertical then LPane.Constraints.MinWidth := 0
+        else LPane.Constraints.MinHeight := 0;
+        DragMessage(LSplitter, WM_LBUTTONDOWN, 0);
+        DragMessage(LSplitter, WM_MOUSEMOVE, -1000);
+        DragMessage(LSplitter, WM_LBUTTONUP, -1000);
+        Require((if LVertical then LPane.Width else LPane.Height) = 0,
+          'AutoSnap must still collapse a pane when its constraints allow zero.');
+        // Re-expand only to exercise teardown, not another resize commit.
+        if LVertical then LPane.Width := 120 else LPane.Height := 120;
+        // Teardown during a drag must restore the borrowed splitter state.
+        LStage := Format('teardown, DPI %d, alignment %d', [LPPI, Ord(LAlign)]);
+        DragMessage(LSplitter, WM_LBUTTONDOWN, 0);
+        LGuideHandle := Guide(LStyle).Handle;
+        LStyle.Free;
+        Require((LSplitter.ResizeStyle = rsPattern) and (LSplitter.Control = nil) and
+          not IsWindow(LGuideHandle), 'Helper destruction must restore state and remove its guide.');
+        LStage := Format('target destruction, DPI %d, alignment %d', [LPPI, Ord(LAlign)]);
+        LStyle := TExplorerSplitterStyle.Create(LSplitter);
+        DragMessage(LSplitter, WM_LBUTTONDOWN, 0);
+        LGuideHandle := Guide(LStyle).Handle;
+        LPane.Free;
+        Require(not LStyle.Dragging and (LSplitter.Control = nil) and
+          not IsWindow(LGuideHandle), 'Destroying the target must cancel and clean up its guide.');
+      finally
+        LHost.Free;
+      end;
+    end;
 end;
 
 procedure TExplorerComponentFixture.RoundedLogLayout;

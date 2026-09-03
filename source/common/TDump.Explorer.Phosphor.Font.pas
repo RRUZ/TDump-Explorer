@@ -78,6 +78,10 @@ const
   cPhArrowSquareOut = $E5DE;
   cPhTable = $E476;
   cPhPulse = $E000;
+  cPhGear = $E270;
+  cPhInfo = $E2CE;
+  cPhMoon = $E330;
+  cPhSun = $E472;
   cPhMagnifyingGlass = $E30C;
   cPhTerminal = $E47E;
 

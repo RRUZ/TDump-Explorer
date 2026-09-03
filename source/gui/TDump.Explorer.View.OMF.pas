@@ -133,11 +133,9 @@ begin
     Exit;
   end;
 
-  AControl.Font.Name := TExplorerTheme.FontName;
-  AControl.Font.Size := TExplorerTheme.FontSize;
+  SetExplorerFont(AControl, TExplorerTheme.FontName, TExplorerTheme.FontSize);
   AControl.HeaderControl1.ParentFont := False;
-  AControl.HeaderControl1.Font.Name := TExplorerTheme.FontName;
-  AControl.HeaderControl1.Font.Size := TExplorerTheme.FontSize;
+  SetExplorerFont(AControl.HeaderControl1, TExplorerTheme.FontName, TExplorerTheme.FontSize);
   AControl.AutoSizeColumns := True;
   AControl.UseColumnMode := True;
   AControl.ShowLineNumbers := False;
@@ -161,11 +159,9 @@ class procedure TOMFView.PopulateFixUp32(AControl: THighlighterControl;
   ARecord: TDumpObjectRecord);
 begin
   if (AControl = nil) or (ARecord = nil) then Exit;
-  AControl.Font.Name := TExplorerTheme.FontName;
-  AControl.Font.Size := TExplorerTheme.FontSize;
+  SetExplorerFont(AControl, TExplorerTheme.FontName, TExplorerTheme.FontSize);
   AControl.HeaderControl1.ParentFont := False;
-  AControl.HeaderControl1.Font.Name := TExplorerTheme.FontName;
-  AControl.HeaderControl1.Font.Size := TExplorerTheme.FontSize;
+  SetExplorerFont(AControl.HeaderControl1, TExplorerTheme.FontName, TExplorerTheme.FontSize);
   AControl.ParserMode := tpmOMFRecord;
   AControl.BeginUpdate;
   try
@@ -190,11 +186,9 @@ class procedure TOMFView.PopulateLEData(AControl: THighlighterControl;
   ARecord: TDumpObjectRecord);
 begin
   if (AControl = nil) or (ARecord = nil) then Exit;
-  AControl.Font.Name := TExplorerTheme.FixedWidthFontName;
-  AControl.Font.Size := TExplorerTheme.FixedWidthFontSize;
+  SetExplorerFont(AControl, TExplorerTheme.FixedWidthFontName, TExplorerTheme.FixedWidthFontSize);
   AControl.HeaderControl1.ParentFont := False;
-  AControl.HeaderControl1.Font.Name := TExplorerTheme.FontName;
-  AControl.HeaderControl1.Font.Size := TExplorerTheme.FontSize;
+  SetExplorerFont(AControl.HeaderControl1, TExplorerTheme.FontName, TExplorerTheme.FontSize);
   AControl.ParserMode := tpmTDumpValues;
   AControl.BeginUpdate;
   try

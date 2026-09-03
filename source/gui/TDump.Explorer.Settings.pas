@@ -181,14 +181,14 @@ const
   cSettingsTabHoverTopBlend = 0.82;
   cSettingsTabCloseHoverBlend = 0.72;
   cThemeOptionCount = Ord(High(TThemeOption)) - Ord(Low(TThemeOption)) + 1;
-  cThemeOptionIconSize = 32;
-  cThemeOptionCardMargin = 3;
+  cThemeOptionIconSize = 28;
+  cThemeOptionCardMargin = 4;
   cThemeOptionIconTextGap = 4;
   // All geometry is authored at 96 DPI, like the About dialog.
   cSettingsCardBorderBlend = 0.87;
   cSettingsInputBorderBlend = 0.78;
   cSettingsInputPaddingX = 8;
-  cSettingsInputPaddingY = 5;
+  cSettingsInputPaddingY = 4;
 
   cThemeOptionSystem = Ord(toSystem);
   cThemeOptionDark = Ord(toDark);
@@ -587,6 +587,11 @@ procedure TFrmSettings.ApplyTheme;
 begin
   if not Assigned(pnContent) then
     Exit;
+  // Anchor emphasized fonts to their DFM heights to avoid cumulative
+  // rounding when moving repeatedly between fractional DPI scales.
+  for var LHeading in TArray<TLabel>.Create(lblGeneral, lblAppearance, lblWorkspace) do
+    SetExplorerFontHeight(LHeading, -13);
+  SetExplorerFontHeight(lblInformation, -18);
   var LTheme := TExplorerTheme.ActiveTheme;
   // Icon suffixes describe the surface they are intended for.  On a light
   // form use the visible light-UI glyphs, and vice versa.
@@ -847,8 +852,11 @@ begin
     LFillColor := ColorBlendRGB(LTheme.SelectionColor, LTheme.BackgroundColor, 0.95);
     LBorderColor := ColorBlendRGB(LTheme.SelectionColor, LTheme.BackgroundColor, 0.5);
   end;
-  DrawAntialiasedRoundedRectangle(ACanvas, LCardRect, LFillColor,
-    LBorderColor, ScaleValue(2), 1);
+
+  var LRect := ARect;
+  InflateRect(LRect, -ScaleValue(cThemeOptionCardMargin), 0);
+  DrawAntialiasedRoundedRectangle(ACanvas, LRect, LFillColor, LBorderColor, ScaleValue(2), 1);
+
   ACanvas.Font.Assign(ControlList1.Font);
   ACanvas.Font.Name := TExplorerTheme.FontName;
   //ACanvas.Font.Style := [fsBold];
@@ -1026,6 +1034,9 @@ procedure TFrmSettings.FormShow(Sender: TObject);
 begin
   UpdateSettingsLayout;
   ApplyTheme;
+  edTDumpPath.SetFocus;
+  edTDumpPath.SelStart := Length(edTDumpPath.Text);
+  edTDumpPath.SelLength := 0;
 end;
 
 procedure TFrmSettings.ChangeScale(M, D: Integer; isDpiChange: Boolean);

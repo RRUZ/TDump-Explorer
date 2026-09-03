@@ -645,7 +645,7 @@ procedure TExplorerTabStrip.EnsureTabWidthCache;
 const
   cTabFixedContentWidth = 72;
 begin
-  if FTabWidthCacheValid and (FTabWidthCachePPI = CurrentPPI) and
+  if FTabWidthCacheValid and (FTabWidthCachePPI = ScaleValue(96)) and
     (FTabWidthCache.Count = FItems.Count) then
     Exit;
 
@@ -666,7 +666,7 @@ begin
     Inc(LPosition, LTabWidth - ScaleValue(FTabOverlap));
     FTabPositionCache.Add(LPosition);
   end;
-  FTabWidthCachePPI := CurrentPPI;
+  FTabWidthCachePPI := ScaleValue(96);
   FTabWidthCacheValid := True;
 end;
 

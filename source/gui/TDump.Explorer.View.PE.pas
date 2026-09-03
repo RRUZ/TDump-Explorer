@@ -157,8 +157,7 @@ begin
     AControl.UseColumnMode := True;
     AControl.ShowLineNumbers := False;
     AControl.AutoSizeColumns := True;
-    AControl.Font.Name := TExplorerTheme.FontName;
-    AControl.Font.Size := TExplorerTheme.FontSize;
+    SetExplorerFont(AControl, TExplorerTheme.FontName, TExplorerTheme.FontSize);
     AControl.SetColumnDataTypes([
       thdtSymbol, thdtHexadecimal, thdtSymbol, thdtHexadecimal,
       thdtSymbol, thdtHexadecimal, thdtSymbol, thdtHexadecimal]);
@@ -238,8 +237,7 @@ begin
     AControl.UseColumnMode := True;
     AControl.ShowLineNumbers := False;
     AControl.AutoSizeColumns := False;
-    AControl.Font.Name := TExplorerTheme.FontName;
-    AControl.Font.Size := TExplorerTheme.FontSize;
+    SetExplorerFont(AControl, TExplorerTheme.FontName, TExplorerTheme.FontSize);
     AControl.SetColumnHeaders(['Module', 'Imports']);
     AControl.SetColumnDataTypes([thdtSymbol, thdtInteger]);
     AControl.SetColumnParserModes([tpmTDumpValues, tpmTDumpValues]);
@@ -320,8 +318,7 @@ begin
     AControl.UseColumnMode := True;
     AControl.ShowLineNumbers := False;
     AControl.AutoSizeColumns := False;
-    AControl.Font.Name := TExplorerTheme.FontName;
-    AControl.Font.Size := TExplorerTheme.FontSize;
+    SetExplorerFont(AControl, TExplorerTheme.FontName, TExplorerTheme.FontSize);
     AControl.SetColumnHeaders(['Module', 'Imports']);
     AControl.SetColumnDataTypes([thdtSymbol, thdtInteger]);
     AControl.SetColumnParserModes([tpmTDumpValues, tpmTDumpValues]);

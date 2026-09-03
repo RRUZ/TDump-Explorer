@@ -92,6 +92,7 @@ type
     procedure Populate(ADocument: TDumpDocument);
     procedure ShowLines(AStartLine, AEndLine: Integer);
   protected
+    procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override;
     procedure Resize; override;
     procedure SetParent(AParent: TWinControl); override;
   published
@@ -147,10 +148,7 @@ begin
   FHighlighterControl.ShowLineNumbers := True;
   FHighlighterControl.UseEndEllipsis := False;
   FHighlighterControl.ParserMode := tpmTDumpValues;
-  {
-  FHighlighterControl.Font.Name := TExplorerTheme.FixedWidthFontName;
-  FHighlighterControl.Font.Size := TExplorerTheme.FixedWidthFontSize;
-  }
+  UpdateFontSize;
   FHighlighterControl.ControlList1.MultiSelect := True;
   FHighlighterControl.OnItemClick := HighlighterControlItemClick;
   FHighlighterControl.ControlList1.OnItemDblClick := HighlighterControlItemDblClick;
@@ -393,10 +391,10 @@ begin
   SearchFilterBox.StyleName := 'Windows';
   SearchFilterBox.StyleElements := [];
   SearchFilterBox.Color := LTheme.BackgroundColor;
-  SearchFilterBox.Font.Name := TExplorerTheme.FontName;
-  SearchFilterBox.Font.Height := -ScaleValue(MulDiv(TExplorerTheme.FontSize, 96, 72));
+  SetExplorerFont(SearchFilterBox, TExplorerTheme.FontName, TExplorerTheme.FontSize);
   SearchFilterBox.Font.Color := LTheme.TextColor;
   Label1.StyleName := 'Windows';
+  SetExplorerFontHeight(Label1, -13);
   Label1.Font.Color := LTheme.TextColor;
   if FMatchBadge <> nil then
   begin
@@ -482,17 +480,19 @@ end;
 
 procedure TRawViewFrame.UpdateFontSize;
 begin
-  Font.Name := TExplorerTheme.FontName;
-  Font.Size := TExplorerTheme.FontSize;
-  Font.Height := MulDiv(Font.Height, PixelsPerInch, Font.PixelsPerInch);
+  SetExplorerFont(Self, TExplorerTheme.FontName, TExplorerTheme.FontSize);
+  SetExplorerFont(FHighlighterControl, TExplorerTheme.FixedWidthFontName,
+    TExplorerTheme.FixedWidthFontSize);
+  SetExplorerFont(cbFollowSelection, TExplorerTheme.FontName, TExplorerTheme.FontSize);
+end;
 
-  FHighlighterControl.Font.Name := TExplorerTheme.FixedWidthFontName;
-  FHighlighterControl.Font.Size := TExplorerTheme.FixedWidthFontSize;
-  FHighlighterControl.Font.Height := MulDiv(FHighlighterControl.Font.Height, PixelsPerInch, FHighlighterControl.Font.PixelsPerInch);
-
-  cbFollowSelection.Font.Name := TExplorerTheme.FontName;
-  cbFollowSelection.Font.Size := TExplorerTheme.FontSize;
-  cbFollowSelection.Font.Height := MulDiv(cbFollowSelection.Font.Height, PixelsPerInch, cbFollowSelection.Font.PixelsPerInch);
+procedure TRawViewFrame.ChangeScale(M, D: Integer; isDpiChange: Boolean);
+begin
+  inherited;
+  if Label1 <> nil then
+    SetExplorerFontHeight(Label1, -13);
+  // Resize can run before the child fonts finish scaling.
+  ToolbarResize(nil);
 end;
 
 procedure TRawViewFrame.cbFollowSelectionClick(Sender: TObject);

@@ -163,7 +163,6 @@ type
       const Text: string; const CellRect: TRect; var DefaultDraw: Boolean);
     procedure TreeMouseUp(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
-    procedure SplitterPaint(Sender: TObject);
     procedure CMStyleChanged(var AMessage: TMessage); message CM_STYLECHANGED;
     procedure ApplyTreeTheme;
     procedure ApplyTheme;
@@ -171,6 +170,7 @@ type
     procedure UpdateFontSize;
     procedure CreateSummaryView;
     procedure SummaryResize(Sender: TObject);
+    procedure SummaryCardChanged(Sender: TObject; PrevCard, NextCard: TCard);
     procedure SummaryDividerPaint(Sender: TObject);
     procedure SummaryIconDraw(Sender: TObject; AIndex: Integer;
       ACanvas: TCanvas; const ARect: TRect; AColor: TColor);
@@ -314,8 +314,7 @@ begin
   inherited Create(AOwner);
 
   FTreeHighlighter := TTinyHighlighter.Create;
-  Font.Name := TExplorerTheme.FontName;
-  Font.Size := TExplorerTheme.FontSize;
+  SetExplorerFont(Self, TExplorerTheme.FontName, TExplorerTheme.FontSize);
 
   FFormatBadge := TExplorerBadgeLabel.Create(Self);
   FFormatBadge.Name := 'FormatBadge';
@@ -330,9 +329,10 @@ begin
   FArchitectureBadge.ShowHint := True;
   SurfaceResize(nil);
 
-  Splitter1.OnPaint := SplitterPaint;
-  Splitter2.OnPaint := SplitterPaint;
+  TExplorerSplitterStyle.Create(Splitter1);
+  TExplorerSplitterStyle.Create(Splitter2);
   CreateSummaryView;
+  cpViews.OnCardChange := SummaryCardChanged;
   cpViews.ActiveCard := FSummaryCard;
   Tree.NodeDataSize := SizeOf(TTreeItemData);
   Tree.OnGetText := TreeGetText;
@@ -450,16 +450,6 @@ begin
     pbHeader.SetBounds(0, 0, pnTop.ClientWidth, pnTop.ClientHeight);
 end;
 
-procedure TDumpDocumentFrame.SplitterPaint(Sender: TObject);
-begin
-  if not (Sender is TSplitter) then
-    Exit;
-
-  var LSplitter := TSplitter(Sender);
-  DrawExplorerSplitter(LSplitter.Canvas, LSplitter.ClientRect,
-    LSplitter.Align in [alLeft, alRight], ScaleFactor);
-end;
-
 procedure TDumpDocumentFrame.UpdateDocumentHeader;
 var
   LSourceFileName: string;
@@ -540,8 +530,8 @@ begin
   // starts from the normal UI font so its presentation cannot leak across nodes.
   if ADetailKind <> tdkBorlandSubsection then
   begin
-    FDetailControl.Font.Name := TExplorerTheme.FontName;
-    FDetailControl.Font.Size := TExplorerTheme.FontSize;
+    SetExplorerFont(FDetailControl, TExplorerTheme.FontName,
+      TExplorerTheme.FontSize);
   end;
   Result := FDetailControl;
 end;
@@ -1167,6 +1157,12 @@ begin
   UpdateSummaryLayout;
 end;
 
+procedure TDumpDocumentFrame.SummaryCardChanged(Sender: TObject;
+  PrevCard, NextCard: TCard);
+begin
+  UpdateSummaryLayout;
+end;
+
 procedure TDumpDocumentFrame.UpdateSummaryLayout;
 var
   LWidth: Integer;
@@ -1204,10 +1200,16 @@ begin
         LColumnWidth, LHeight);
       LRowHeight := Max(LRowHeight, LHeight);
     end;
-    // Fill unused space too: a styled scroll box can cache a different
-    // background brush. The content panel owns the whole visible surface.
-    FSummaryContent.Height := Max(LTop + LRowHeight + LInset,
-      FSummaryScroll.ClientHeight);
+    // Keep the count footer at its natural height. Extra pane height belongs
+    // above the divider; metadata row heights and short-window scrolling stay
+    // unchanged. The rounded outer card fills the same area as navigation.
+    var LNaturalHeight := LTop + LRowHeight + LInset;
+    var LExtraHeight := Max(0, FSummaryScroll.ClientHeight - LNaturalHeight);
+    FSummaryControl.Height := FSummaryControl.Height + LExtraHeight;
+    FSummaryDivider.Top := FSummaryDivider.Top + LExtraHeight;
+    for var LCounts in FSummaryCounts do
+      LCounts.Top := LCounts.Top + LExtraHeight;
+    FSummaryContent.Height := LNaturalHeight + LExtraHeight;
   finally
     FUpdatingSummaryLayout := False;
   end;
@@ -1250,22 +1252,15 @@ begin
       LControl.ControlList1.ItemIndex;
 end;
 
-type
-  TControlClass =  class(TControl);
-
 procedure TDumpDocumentFrame.UpdateFontSize;
 
  procedure FixFontForHighDPI(AControl: TControl);
  begin
-   TControlClass(AControl).Font.Name := TExplorerTheme.FontName;
-   TControlClass(AControl).Font.Size := TExplorerTheme.FontSize;
-   TControlClass(AControl).Font.Height := MulDiv(TControlClass(AControl).Font.Height, CurrentPPI, TControlClass(AControl).Font.PixelsPerInch);
+   SetExplorerFont(AControl, TExplorerTheme.FontName, TExplorerTheme.FontSize);
  end;
 
 begin
-  Font.Name := TExplorerTheme.FontName;
-  Font.Size := TExplorerTheme.FontSize;
-  Font.Height := MulDiv(Font.Height, CurrentPPI, Font.PixelsPerInch);
+  SetExplorerFont(Self, TExplorerTheme.FontName, TExplorerTheme.FontSize);
   FixFontForHighDPI(Tree);
   FixFontForHighDPI(lblFormatCaption);
   FixFontForHighDPI(FFormatBadge);

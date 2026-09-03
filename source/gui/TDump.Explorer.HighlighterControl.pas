@@ -170,8 +170,11 @@ type
     procedure UpdateColumnWidths;
     procedure UpdateControlList;
     procedure CMStyleChanged(var AMessage: TMessage); message CM_STYLECHANGED;
+    procedure CMFontChanged(var AMessage: TMessage); message CM_FONTCHANGED;
+    procedure UpdateFontMetrics;
     procedure ApplyTheme;
   protected
+    procedure ChangeScale(M, D: Integer; isDpiChange: Boolean); override;
     procedure Notification(AComponent: TComponent;
       Operation: TOperation); override;
     procedure Resize; override;
@@ -1624,6 +1627,42 @@ procedure THighlighterControl.ItemsChanged(Sender: TObject);
 begin
   FItemProvider := nil;
   UpdateControlList;
+end;
+
+procedure THighlighterControl.UpdateFontMetrics;
+begin
+  if (FMeasureBitmap = nil) or (Parent = nil) or
+    (ComponentState * [csLoading, csDestroying] <> []) then
+    Exit;
+  if FUpdateDepth > 0 then
+  begin
+    FUpdatePending := True;
+    Exit;
+  end;
+  UpdateColumnWidths;
+  UpdateHeaderControl;
+  ControlList1.Invalidate;
+end;
+
+procedure THighlighterControl.CMFontChanged(var AMessage: TMessage);
+begin
+  inherited;
+  UpdateFontMetrics;
+end;
+
+procedure THighlighterControl.ChangeScale(M, D: Integer; isDpiChange: Boolean);
+begin
+  inherited;
+  if isDpiChange and (M <> D) then
+  begin
+    for var LIndex := 0 to High(FUserColumnWidths) do
+      FUserColumnWidths[LIndex] := MulDiv(FUserColumnWidths[LIndex], M, D);
+    if FColumnLayouts <> nil then
+      for var LLayout in FColumnLayouts.Values do
+        for var LIndex := 0 to High(LLayout.ColumnWidths) do
+          LLayout.ColumnWidths[LIndex] := MulDiv(LLayout.ColumnWidths[LIndex], M, D);
+  end;
+  UpdateFontMetrics;
 end;
 
 procedure THighlighterControl.Resize;

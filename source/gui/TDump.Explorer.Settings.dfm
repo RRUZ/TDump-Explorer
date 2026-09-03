@@ -78,7 +78,6 @@ object FrmSettings: TFrmSettings
       TabOrder = 2
       Visible = False
       StyleElements = [seFont, seBorder]
-      ExplicitTop = 306
       object lblWorkspace: TLabel
         Left = 0
         Top = 18
@@ -165,7 +164,6 @@ object FrmSettings: TFrmSettings
       ParentBackground = False
       TabOrder = 1
       StyleElements = [seFont, seBorder]
-      ExplicitTop = 180
       object lblAppearance: TLabel
         Left = 0
         Top = 0
@@ -304,7 +302,7 @@ object FrmSettings: TFrmSettings
       end
       object cbRememberWindowPlacement: TCheckBox
         Left = 0
-        Top = 152
+        Top = 150
         Width = 245
         Height = 17
         Caption = 'Remember window size and position'
@@ -312,7 +310,7 @@ object FrmSettings: TFrmSettings
       end
       object cbRestorePreviousSession: TCheckBox
         Left = 0
-        Top = 175
+        Top = 180
         Width = 245
         Height = 17
         Caption = 'Restore tabs from previous session'

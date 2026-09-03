@@ -115,6 +115,9 @@ begin
   inherited Create(AOwner);
   // Keep the card's opaque fill behind the labels regardless of DFM order.
   pbCard.SendToBack;
+  // The minimal title bar can round down to an empty client strip on a DPI
+  // change. VCL's buffered title-bar painter requires a nonempty rectangle.
+  TitleBarPanel1.Constraints.MinHeight := 1;
   Font.Name := TExplorerTheme.FontName;
   CreateLicenseBadge;
   CreateButtons;
@@ -277,6 +280,11 @@ procedure TFrmAbout.ApplyTheme;
 begin
   if not Assigned(pnContent) then
     Exit;
+  // These are the original 96-DPI DFM font heights, not the last scaled
+  // heights (whose integer rounding can accumulate across monitor moves).
+  SetExplorerFontHeight(lblProduct, -22);
+  for var LValue in TArray<TLabel>.Create(lblVersion, lblBuild, lblArchitecture) do
+    SetExplorerFontHeight(LValue, -15);
   var LTheme := TExplorerTheme.ActiveTheme;
   Color := LTheme.BackgroundColor;
   pnContent.Color := Color;

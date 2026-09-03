@@ -54,7 +54,6 @@ type
     CardPanel1: TCardPanel;
     ProgressBar1: TProgressBar;
     ApplicationEvents1: TApplicationEvents;
-    procedure FormShow(Sender: TObject);
     procedure ApplicationEvents1Idle(Sender: TObject; var Done: Boolean);
     procedure FormCreate(Sender: TObject);
   private
@@ -77,7 +76,6 @@ type
     FTabs: TExplorerTabStrip;
     FTabImages: TVirtualImageList;
     FExplorerPopupMenu: TExplorerPopupMenuForm;
-    FExplorerPopupImages: TVirtualImageList;
     FRecentFilesPopupMenu: TExplorerPopupMenuForm;
     FRecentFilesPopupFiles: TStringList;
     FDocumentStagingPanel: TCardPanel;
@@ -89,11 +87,13 @@ type
     FCurrentFileProgress: Integer;
     FRestoreAlphaBlend: Boolean;
     FRestoringPreviousSession: Boolean;
+    FWindowPlacementRestored: Boolean;
     procedure SyncActiveTheme;
     procedure ToggleActiveTheme;
     procedure ApplyTheme;
     procedure ApplyExplorerPopupMenuTheme;
     procedure ApplyEmptyStateTheme;
+    procedure UpdateEmptyStateFonts;
     procedure AddAnalysisProgressItem;
     procedure AddRecentFile(const AFileName: string);
     procedure AddOpenDocumentFilesToRecentItems;
@@ -133,12 +133,12 @@ type
     procedure ResetAnalysisProgress;
     procedure SetAnalysisProgress(ACompletedLines, ATotalLines: Integer);
     procedure FinalizePendingDocumentTabs;
-    procedure SplitterPaint(Sender: TObject);
     procedure StartNextAnalysis;
     procedure PopupMenuAboutClick(Sender: TObject);
     procedure PopupMenuChangeThemeClick(Sender: TObject);
     procedure ExplorerPopupMenuItemClick(Sender: TObject; AItemIndex: Integer);
-    procedure InitializeExplorerPopupMenuImages;
+    procedure DrawExplorerMenuIcon(Sender: TObject; AIndex: Integer;
+      ACanvas: TCanvas; const ARect: TRect; AColor: TColor);
     procedure PopulateExplorerPopupMenu;
     procedure PopulateRecentFilesPopupMenu;
     procedure DrawRecentFileIcon(Sender: TObject; AIndex: Integer;
@@ -168,6 +168,7 @@ type
     procedure TabsClosing(Sender: TObject; AIndex: Integer;
       var ACanClose: Boolean);
     procedure CMStyleChanged(var AMessage: TMessage); message CM_STYLECHANGED;
+    procedure CMShowingChanged(var AMessage: TMessage); message CM_SHOWINGCHANGED;
     procedure WMAnalysisCompleted(var AMessage: TMessage);
       message cWMAnalysisCompleted;
     procedure WMAnalysisProgress(var AMessage: TMessage);
@@ -175,12 +176,14 @@ type
     procedure WMSettingsChanged(var AMessage: TMessage);  message cWmTDumpSettingsChanged;
     procedure WMDropFiles(var AMessage: TWMDropFiles); message WM_DROPFILES;
   protected
+    procedure DoAfterMonitorDpiChanged(OldDPI, NewDPI: Integer); override;
     procedure CreateParams(var Params: TCreateParams); override;
     procedure CreateWnd; override;
     procedure DestroyWnd; override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    procedure ScaleForPPI(NewPPI: Integer); override;
     procedure InitializeTabImages;
     procedure OpenInputFile(const AFileName: string;
       AActivateTabWhenComplete: Boolean);
@@ -482,6 +485,31 @@ begin
   FEmptyStateTitle.Font.Color := LTheme.TextColor;
   FEmptyStateMessage.Font.Color := LTheme.InactiveText;
   FEmptyStateHint.Font.Color := LTheme.InactiveText;
+  UpdateEmptyStateFonts;
+end;
+
+procedure TFrmMain.UpdateEmptyStateFonts;
+begin
+  if FEmptyStateHint = nil then
+    Exit;
+  SetExplorerFont(FEmptyStateTitle, TExplorerTheme.FontName,
+    TExplorerTheme.FontSize + 4);
+  SetExplorerFont(FEmptyStateMessage, TExplorerTheme.FontName,
+    TExplorerTheme.FontSize);
+  SetExplorerFont(FEmptyStateHint, TExplorerTheme.FontName,
+    TExplorerTheme.FontSize);
+end;
+
+procedure TFrmMain.ScaleForPPI(NewPPI: Integer);
+begin
+  inherited;
+  UpdateEmptyStateFonts;
+end;
+
+procedure TFrmMain.DoAfterMonitorDpiChanged(OldDPI, NewDPI: Integer);
+begin
+  inherited;
+  UpdateEmptyStateFonts;
 end;
 
 procedure TFrmMain.CardsChanged(Sender: TObject; PrevCard, NextCard: TCard);
@@ -666,11 +694,9 @@ begin
   FEmptyStateTitle.Layout := tlCenter;
   FEmptyStateTitle.ParentFont := False;
   FEmptyStateTitle.StyleName := 'Windows';
-  FEmptyStateTitle.Font.Assign(Font);
-  FEmptyStateTitle.Font.Size := TExplorerTheme.FontSize + 4;
-  FEmptyStateTitle.Font.Style := [fsBold];
   FEmptyStateTitle.Caption := 'Drag && drop a report or binary';
   FEmptyStateLayout.ControlCollection.AddControl(FEmptyStateTitle, 0, 3);
+  FEmptyStateTitle.Font.Style := [fsBold];
 
   FEmptyStateMessage := TLabel.Create(Self);
   FEmptyStateMessage.Align := alClient;
@@ -679,8 +705,6 @@ begin
   FEmptyStateMessage.Layout := tlCenter;
   FEmptyStateMessage.ParentFont := False;
   FEmptyStateMessage.StyleName := 'Windows';
-  FEmptyStateMessage.Font.Assign(Font);
-  FEmptyStateMessage.Font.Size := TExplorerTheme.FontSize;
   FEmptyStateMessage.Caption :=
     'Open a .tdump report, DLL, EXE, BPL, or other supported binary to start exploring.';
   FEmptyStateLayout.ControlCollection.AddControl(FEmptyStateMessage, 0, 5);
@@ -692,8 +716,6 @@ begin
   FEmptyStateHint.Layout := tlCenter;
   FEmptyStateHint.ParentFont := False;
   FEmptyStateHint.StyleName := 'Windows';
-  FEmptyStateHint.Font.Assign(Font);
-  FEmptyStateHint.Font.Size := TExplorerTheme.FontSize;
   FEmptyStateHint.Caption := 'You can also use the + button to open a file.';
   FEmptyStateLayout.ControlCollection.AddControl(FEmptyStateHint, 0, 7);
 
@@ -796,26 +818,23 @@ begin
   end;
 end;
 
-procedure TFrmMain.InitializeExplorerPopupMenuImages;
+procedure TFrmMain.DrawExplorerMenuIcon(Sender: TObject; AIndex: Integer;
+  ACanvas: TCanvas; const ARect: TRect; AColor: TColor);
+var
+  LIconCode: Word;
 begin
-  if not Assigned(DataModule1) or not Assigned(FExplorerPopupImages) then
+  var LName := FExplorerPopupMenu.MenuItems.ItemImageName(AIndex);
+  if LName = 'gear' then
+    LIconCode := cPhGear
+  else if LName = 'moon' then
+    LIconCode := cPhMoon
+  else if LName = 'sun' then
+    LIconCode := cPhSun
+  else if LName = 'info' then
+    LIconCode := cPhInfo
+  else
     Exit;
-
-  FExplorerPopupImages.Clear;
-  FExplorerPopupImages.Width := ScaleValue(24);
-  FExplorerPopupImages.Height := ScaleValue(24);
-
-  FExplorerPopupImages.ImageCollection := DataModule1.ImageCollection1;
-  FExplorerPopupImages.Add('gear_dark', 'gear_dark');
-  FExplorerPopupImages.Add('gear_light', 'gear_light');
-
-  FExplorerPopupImages.Add('moon_dark', 'moon_dark');
-  FExplorerPopupImages.Add('moon_light', 'moon_light');
-  FExplorerPopupImages.Add('sun_dark', 'sun_dark');
-  FExplorerPopupImages.Add('sun_light', 'sun_light');
-
-  FExplorerPopupImages.Add('TDumpExplorer_dark', 'TDumpExplorer_dark');
-  FExplorerPopupImages.Add('TDumpExplorer_light', 'TDumpExplorer_light');
+  PhosphorFont.DrawIcon(ACanvas.Handle, LIconCode, ARect, AColor, pfwLight);
 end;
 
 procedure TFrmMain.PopulateExplorerPopupMenu;
@@ -823,22 +842,18 @@ begin
   if not Assigned(FExplorerPopupMenu) then
     Exit;
 
-  var LIconSuffix := '_dark';
-  if IsLightThemeActive then
-    LIconSuffix := '_light';
-
   var LMenuItems := FExplorerPopupMenu.MenuItems;
   LMenuItems.BeginUpdate;
   try
     LMenuItems.Clear;
-    LMenuItems.Add('Settings...', 'gear' + LIconSuffix);
+    LMenuItems.Add('Settings...', 'gear');
 
     if IsLightThemeActive  then
-      LMenuItems.Add('Toggle to Dark Theme', 'moon_light')
+      LMenuItems.Add('Toggle to Dark Theme', 'moon')
     else
-      LMenuItems.Add('Toggle to Light Theme', 'sun_dark');
+      LMenuItems.Add('Toggle to Light Theme', 'sun');
 
-    LMenuItems.Add('About TDump Explorer', 'TDumpExplorer' + LIconSuffix);
+    LMenuItems.Add('About TDump Explorer', 'info');
   finally
     LMenuItems.EndUpdate;
   end;
@@ -1057,9 +1072,8 @@ begin
   if FExplorerPopupMenu = nil then
   begin
     FExplorerPopupMenu := TExplorerPopupMenuForm.Create(Self);
-    FExplorerPopupImages := TVirtualImageList.Create(Self);
-    InitializeExplorerPopupMenuImages;
-    FExplorerPopupMenu.MenuItems.Images := FExplorerPopupImages;
+    FExplorerPopupMenu.MenuItems.OnDrawItemIcon := DrawExplorerMenuIcon;
+    FExplorerPopupMenu.MenuItems.CustomIconSize := 24;
     FExplorerPopupMenu.OnItemClick := ExplorerPopupMenuItemClick;
   end;
   ApplyExplorerPopupMenuTheme;
@@ -1095,7 +1109,7 @@ end;
 constructor TFrmMain.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
-  Splitter1.OnPaint := SplitterPaint;
+  TExplorerSplitterStyle.Create(Splitter1);
   FPendingFiles := TQueue<TAnalysisRequest>.Create;
   FPendingDocumentCards := TList<TCard>.Create;
   FRecentFilesPopupFiles := TStringList.Create;
@@ -1107,16 +1121,6 @@ begin
   CreateEmptyState;
   UpdateEmptyState;
   CompleteAnalysisProgress;
-end;
-
-procedure TFrmMain.SplitterPaint(Sender: TObject);
-begin
-  if not (Sender is TSplitter) then
-    Exit;
-
-  var LSplitter := TSplitter(Sender);
-  DrawExplorerSplitter(LSplitter.Canvas, LSplitter.ClientRect,
-    LSplitter.Align in [alLeft, alRight], ScaleFactor);
 end;
 
 procedure TFrmMain.CheckTDumpAvailability;
@@ -1390,29 +1394,29 @@ begin
   RestorePreviousSessionTabs;
 end;
 
-procedure TFrmMain.FormShow(Sender: TObject);
+procedure TFrmMain.CMShowingChanged(var AMessage: TMessage);
 begin
-  Font.Name := TExplorerTheme.FontName;
-  Font.Size := TExplorerTheme.FontSize;
-  Font.Height := MulDiv(Font.Height, CurrentPPI, Font.PixelsPerInch);
+  inherited;
+  if Showing and not FWindowPlacementRestored and
+    not (csDesigning in ComponentState) then
+  begin
+    FWindowPlacementRestored := True;
+    // VCL centers the first show before this point. Changing Position here
+    // would recreate the window and detach the custom title-bar control.
+    RestoreWindowPlacement;
+  end;
 end;
 
 procedure TFrmMain.RestoreWindowPlacement;
 var
-  LBounds: TRect;
   LIntersection: TRect;
-  LWorkArea: TRect;
-  LMonitor: TMonitor;
-  LWidth: Integer;
-  LHeight: Integer;
-  LIsVisible: Boolean;
 begin
   var LSettings := TSettings.Instance;
   if not LSettings.RememberWindowPlacement or not LSettings.HasWindowBounds then
     Exit;
 
-  LBounds := LSettings.WindowBounds;
-  LIsVisible := False;
+  var LBounds := LSettings.WindowBounds;
+  var LIsVisible := False;
   for var LMonitorIndex := 0 to Screen.MonitorCount - 1 do
     if IntersectRect(LIntersection, LBounds,
       Screen.Monitors[LMonitorIndex].WorkareaRect) and
@@ -1424,10 +1428,10 @@ begin
   if not LIsVisible then
     Exit;
 
-  LMonitor := Screen.MonitorFromRect(LBounds, mdNearest);
-  LWorkArea := LMonitor.WorkareaRect;
-  LWidth := Min(Max(LBounds.Width, Constraints.MinWidth), LWorkArea.Width);
-  LHeight := Min(Max(LBounds.Height, Constraints.MinHeight), LWorkArea.Height);
+  var LMonitor := Screen.MonitorFromRect(LBounds, mdNearest);
+  var LWorkArea := LMonitor.WorkareaRect;
+  var LWidth := Min(Max(LBounds.Width, Constraints.MinWidth), LWorkArea.Width);
+  var LHeight := Min(Max(LBounds.Height, Constraints.MinHeight), LWorkArea.Height);
   SetBounds(EnsureRange(LBounds.Left, LWorkArea.Left,
     LWorkArea.Right - LWidth), EnsureRange(LBounds.Top, LWorkArea.Top,
     LWorkArea.Bottom - LHeight), LWidth, LHeight);
@@ -1466,7 +1470,6 @@ end;
 procedure TFrmMain.CreateWnd;
 begin
   inherited CreateWnd;
-  RestoreWindowPlacement;
   DragAcceptFiles(Handle, True);
 end;
 
