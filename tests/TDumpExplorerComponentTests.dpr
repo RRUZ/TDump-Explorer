@@ -68,6 +68,7 @@ type
     procedure CheckMovedEvent(Sender: TObject);
     procedure RecordItemIcon(Sender: TObject; AIndex: Integer; ACanvas: TCanvas;
       const ARect: TRect; AColor: TColor);
+    function ItemTrailingText(AIndex: Integer): string;
   public
     [Test] procedure HighlightThemes;
     [Test] procedure TextFormatDrawing;
@@ -76,6 +77,7 @@ type
     [Test] procedure HighlighterSortGlyphPlacement;
     [Test] procedure DocumentIconClassification;
     [Test] procedure HighlighterCustomIcons;
+    [Test] procedure HighlighterTrailingText;
     [Test] procedure HighlighterFontDpi;
     [Test] procedure LogFontDpi;
     [Test] procedure DialogFontDpi;
@@ -725,6 +727,97 @@ begin
         'Without a renderer or image list, the icon gutter must remain empty.');
     finally
       LBitmap.Free;
+    end;
+  finally
+    LHost.Free;
+  end;
+end;
+
+function TExplorerComponentFixture.ItemTrailingText(AIndex: Integer): string;
+begin
+  if AIndex in [0, 1] then
+    Result := 'Alt+1'
+  else
+    Result := '';
+end;
+
+procedure TExplorerComponentFixture.HighlighterTrailingText;
+begin
+  var LHost := TComponentTestHostForm.Create(nil);
+  try
+    LHost.SetBounds(-32000, -32000, 640, 480);
+    LHost.Show;
+    var LControl := LHost.HighlighterControl;
+    LControl.UseColumnMode := False;
+    LControl.ShowLineNumbers := False;
+    LControl.Add(StringOfChar('W', 200));
+    LControl.Add('');
+    LControl.Add('No shortcut');
+    LControl.OnGetItemTrailingText := ItemTrailingText;
+    var LPathBitmap := TBitmap.Create;
+    try
+      var LEmptyBitmap := TBitmap.Create;
+      try
+        for var LPPI in TArray<Integer>.Create(96, 120, 144, 192) do
+        begin
+          LHost.ScaleForPPI(LPPI);
+          Application.ProcessMessages;
+          var LRowRect := Rect(0, 0, MulDiv(320, LPPI, 96), MulDiv(32, LPPI, 96));
+          LPathBitmap.SetSize(LRowRect.Width, LRowRect.Height);
+          LEmptyBitmap.SetSize(LRowRect.Width, LRowRect.Height);
+          LPathBitmap.Canvas.Font.Assign(LControl.Font);
+          var LTextWidth := LPathBitmap.Canvas.TextWidth('Alt+1');
+          Require(LControl.ItemTrailingTextWidth(0) = LTextWidth + MulDiv(24, LPPI, 96),
+            'Shortcut measurement must include its scaled font and gap.');
+          Require((LControl.ItemTrailingTextWidth(2) = 0) and
+            (LControl.ItemTrailingTextWidth(-1) = 0) and
+            (LControl.ItemTrailingTextWidth(3) = 0),
+            'Empty and invalid rows must not reserve shortcut space.');
+          for var LInactive in TArray<Boolean>.Create(False, True) do
+          begin
+            if LInactive then
+              LControl.SetInactiveItems([0, 1])
+            else
+              LControl.SetInactiveItems([]);
+            for var LSelected in TArray<Boolean>.Create(False, True) do
+            begin
+              for var LBitmap in TArray<TBitmap>.Create(LPathBitmap, LEmptyBitmap) do
+              begin
+                LBitmap.Canvas.Brush.Style := bsSolid;
+                LBitmap.Canvas.Brush.Color := TExplorerTheme.ActiveTheme.BackgroundColor;
+                LBitmap.Canvas.FillRect(LRowRect);
+              end;
+              var LState: TOwnerDrawState := [];
+              if LSelected then
+                Include(LState, odSelected);
+              LControl.ControlList1.OnBeforeDrawItem(0, LPathBitmap.Canvas, LRowRect, LState);
+              LControl.ControlList1.OnBeforeDrawItem(1, LEmptyBitmap.Canvas, LRowRect, LState);
+              var LTextLeft := LRowRect.Right - 8 - LTextWidth;
+              var LHasTextPixels := False;
+              for var LX := LTextLeft - MulDiv(12, LPPI, 96) to LRowRect.Right - 9 do
+                for var LY := 2 to LRowRect.Bottom - 3 do
+                begin
+                  Require(LPathBitmap.Canvas.Pixels[LX, LY] = LEmptyBitmap.Canvas.Pixels[LX, LY],
+                    'Long paths must not overlap or move the right-aligned shortcut.');
+                  if (LX >= LTextLeft) and (LPathBitmap.Canvas.Pixels[LX, LY] <>
+                    ColorToRGB(TExplorerTheme.ActiveTheme.BackgroundColor)) then
+                    LHasTextPixels := True;
+                end;
+              Require(LHasTextPixels, 'The right-aligned shortcut must be painted.');
+              Require((LPathBitmap.Canvas.Brush.Style = bsSolid) and
+                (LEmptyBitmap.Canvas.Brush.Style = bsSolid),
+                'Shortcut painting must restore the brush for all row states.');
+            end;
+          end;
+        end;
+        LControl.OnGetItemTrailingText := nil;
+        Require(LControl.ItemTrailingTextWidth(0) = 0,
+          'Existing highlighters without annotations must retain the full row width.');
+      finally
+        LEmptyBitmap.Free;
+      end;
+    finally
+      LPathBitmap.Free;
     end;
   finally
     LHost.Free;

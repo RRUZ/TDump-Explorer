@@ -46,6 +46,8 @@ type
   THighlighterDrawItemIconEvent = procedure(Sender: TObject; AIndex: Integer;
     ACanvas: TCanvas; const ARect: TRect; AColor: TColor) of object;
 
+  THighlighterItemTrailingTextEvent = function(AIndex: Integer): string of object;
+
   THighlighterControl = class(TFrame)
     ControlList1: TControlList;
     HeaderControl1: THeaderControl;
@@ -87,6 +89,7 @@ type
       FImages: TCustomImageList;
       FCustomIconSize: Integer;
       FOnDrawItemIcon: THighlighterDrawItemIconEvent;
+      FOnGetItemTrailingText: THighlighterItemTrailingTextEvent;
       FOnItemClick: TNotifyEvent;
       FSortIndexes: TList<Integer>;
       FColumnLayouts: TObjectDictionary<string, THighlighterColumnLayout>;
@@ -209,6 +212,8 @@ type
     procedure SetItemImageName(AItemIndex: Integer; const AImageName: string);
     function ItemImageName(AItemIndex: Integer): string;
     function ItemIconWidth(AItemIndex: Integer): Integer;
+    function ItemTrailingText(AItemIndex: Integer): string;
+    function ItemTrailingTextWidth(AItemIndex: Integer): Integer;
     procedure SetLineNumber(AItemIndex, ALineNumber: Integer);
     procedure SetFilterText(const AValue: string);
     procedure SetText(const AText: string);
@@ -227,6 +232,9 @@ type
     property CustomIconSize: Integer read FCustomIconSize write SetCustomIconSize;
     property OnDrawItemIcon: THighlighterDrawItemIconEvent
       read FOnDrawItemIcon write FOnDrawItemIcon;
+    // Optional right-aligned annotation, separate from the row's data text.
+    property OnGetItemTrailingText: THighlighterItemTrailingTextEvent
+      read FOnGetItemTrailingText write FOnGetItemTrailingText;
     property OnItemClick: TNotifyEvent read FOnItemClick write FOnItemClick;
     property AutoSizeColumns: Boolean read FAutoSizeColumns
       write SetAutoSizeColumns default True;
@@ -1245,6 +1253,23 @@ begin
     LTextRect.Left := Min(LTextRect.Right, LTextRect.Left + LIconWidth + CTextPadding);
   end;
 
+  var LTrailingText := ItemTrailingText(AIndex);
+  if LTrailingText <> '' then
+  begin
+    var LTrailingRect := LTextRect;
+    LTrailingRect.Left := Max(LTextRect.Left,
+      LTextRect.Right - ACanvas.TextWidth(LTrailingText));
+    if LSelected then
+      ACanvas.Font.Color := TExplorerTheme.ActiveTheme.SelectionColor
+    else
+      ACanvas.Font.Color := TExplorerTheme.ActiveTheme.InactiveText;
+    ACanvas.Brush.Style := bsClear;
+    ACanvas.TextRect(LTrailingRect, LTrailingText,
+      [tfRight, tfVerticalCenter, tfSingleLine, tfNoPrefix]);
+    LTextRect.Right := Max(LTextRect.Left, LTextRect.Right -
+      ItemTrailingTextWidth(AIndex));
+  end;
+
   if IsItemInactive(AIndex) and not LSelected then
   begin
     ACanvas.Font.Color := TExplorerTheme.ActiveTheme.InactiveText;
@@ -1267,6 +1292,7 @@ begin
       ACanvas.TextRect(LInactiveRect, LInactiveText, LInactiveFormat);
       LInactiveLeft := LInactiveRect.Right;
     end;
+    ACanvas.Brush.Style := LBrushStyle;
     Exit;
   end;
 
@@ -1703,6 +1729,23 @@ begin
     Result := ScaleValue(FCustomIconSize)
   else if (FImages <> nil) and (FImages.GetIndexByName(LImageName) >= 0) then
     Result := FImages.Width;
+end;
+
+function THighlighterControl.ItemTrailingText(AItemIndex: Integer): string;
+begin
+  Result := '';
+  if Assigned(FOnGetItemTrailingText) and (AItemIndex >= 0) and
+    (AItemIndex < ItemCount) then
+    Result := FOnGetItemTrailingText(AItemIndex);
+end;
+
+function THighlighterControl.ItemTrailingTextWidth(AItemIndex: Integer): Integer;
+begin
+  var LText := ItemTrailingText(AItemIndex);
+  if LText = '' then
+    Exit(0);
+  FMeasureBitmap.Canvas.Font.Assign(Font);
+  Result := FMeasureBitmap.Canvas.TextWidth(LText) + ScaleValue(24);
 end;
 
 procedure THighlighterControl.SetAutoSizeColumns(const AValue: Boolean);

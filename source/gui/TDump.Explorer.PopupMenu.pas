@@ -127,7 +127,8 @@ begin
     for var LIndex := 0 to MenuItemsControl.Count - 1 do
     begin
       var LItemWidth := LMeasureBitmap.Canvas.TextWidth(
-        MenuItemsControl.Items[LIndex]) + ScaleValue(16);
+        MenuItemsControl.Items[LIndex]) + ScaleValue(16) +
+        MenuItemsControl.ItemTrailingTextWidth(LIndex);
       var LIconWidth := MenuItemsControl.ItemIconWidth(LIndex);
       if LIconWidth > 0 then
         Inc(LItemWidth, LIconWidth + ScaleValue(8));

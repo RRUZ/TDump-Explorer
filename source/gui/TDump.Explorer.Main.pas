@@ -879,9 +879,7 @@ begin
           Continue;
         var LVisibleIndex := FRecentFilesPopupFiles.Count;
         FRecentFilesPopupFiles.Add(LFileName);
-        LMenuItems.Add(Format('%s  %s', [
-          RecentFileShortcutCaption(LVisibleIndex), LFileName]),
-          ExplorerDocumentIconName(LFileName));
+        LMenuItems.Add(LFileName, ExplorerDocumentIconName(LFileName));
         if not FileExists(LFileName) then
           LInactiveItems.Add(LVisibleIndex);
       end;
@@ -926,10 +924,12 @@ end;
 
 function TFrmMain.RecentFileShortcutCaption(AIndex: Integer): string;
 begin
+  if (AIndex < 0) or (AIndex >= FRecentFilesPopupFiles.Count) then
+    Exit('');
   if AIndex < 9 then
-    Exit((AIndex + 1).ToString);
+    Exit('Alt+' + (AIndex + 1).ToString);
   if AIndex < 35 then
-    Exit(Chr(Ord('A') + AIndex - 9));
+    Exit('Alt+' + Chr(Ord('A') + AIndex - 9));
   Result := '';
 end;
 
@@ -1087,6 +1087,7 @@ begin
   begin
     FRecentFilesPopupMenu := TExplorerPopupMenuForm.Create(Self);
     FRecentFilesPopupMenu.MenuItems.OnDrawItemIcon := DrawRecentFileIcon;
+    FRecentFilesPopupMenu.MenuItems.OnGetItemTrailingText := RecentFileShortcutCaption;
     FRecentFilesPopupMenu.MenuItems.CustomIconSize := 24;
     FRecentFilesPopupMenu.OnItemClick := RecentFilesPopupMenuItemClick;
     FRecentFilesPopupMenu.OnShortcut := RecentFilesPopupMenuShortcut;
