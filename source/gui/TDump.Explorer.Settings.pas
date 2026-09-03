@@ -51,6 +51,12 @@ type
     FShowLogPanel: Boolean;
     FShowRawPanel: Boolean;
     FFollowRawSelection: Boolean;
+    FRememberWindowPlacement: Boolean;
+    FRestorePreviousSession: Boolean;
+    FHasWindowBounds: Boolean;
+    FWindowBounds: TRect;
+    FLastSessionFiles: TStringList;
+    FLastSessionActiveIndex: Integer;
     procedure SetRecentItems(const AValue: Integer);
     procedure TrimRecentFiles;
     function SettingsFolder: string;
@@ -65,6 +71,12 @@ type
     procedure AddRecentItem(const AFileName: string);
     procedure RemoveRecentItem(const AFileName: string);
     procedure ClearRecentItems;
+    procedure ClearLastSessionFiles;
+    procedure AddLastSessionFile(const AFileName: string);
+    function LastSessionFileCount: Integer;
+    function LastSessionFile(AIndex: Integer): string;
+    procedure SetWindowBounds(const AValue: TRect);
+    procedure ClearWindowBounds;
     function RecentItemCount: Integer;
     function RecentItem(AIndex: Integer): string;
     property TDumpPath: string read FTDumpPath write FTDumpPath;
@@ -74,6 +86,14 @@ type
     property ShowRawPanel: Boolean read FShowRawPanel write FShowRawPanel;
     property FollowRawSelection: Boolean read FFollowRawSelection
       write FFollowRawSelection;
+    property RememberWindowPlacement: Boolean read FRememberWindowPlacement
+      write FRememberWindowPlacement;
+    property RestorePreviousSession: Boolean read FRestorePreviousSession
+      write FRestorePreviousSession;
+    property HasWindowBounds: Boolean read FHasWindowBounds;
+    property WindowBounds: TRect read FWindowBounds;
+    property LastSessionActiveIndex: Integer read FLastSessionActiveIndex
+      write FLastSessionActiveIndex;
   end;
 
   TFrmSettings = class(TForm)
@@ -102,8 +122,8 @@ type
     ControlList1: TControlList;
     pbCard: TPaintBox;
     pbInputBorders: TPaintBox;
-    CheckBox1: TCheckBox;
-    CheckBox2: TCheckBox;
+    cbRememberWindowPlacement: TCheckBox;
+    cbRestorePreviousSession: TCheckBox;
     procedure CardPaint(Sender: TObject);
     procedure InputBordersPaint(Sender: TObject);
     procedure InputFocusChanged(Sender: TObject);
@@ -180,6 +200,8 @@ const
   cSettingsRecentFilesSection = 'Recent Files';
   cSettingsAppearanceSection = 'Appearance';
   cSettingsWorkspaceSection = 'Workspace';
+  cSettingsWindowSection = 'Window';
+  cSettingsSessionSection = 'Session';
   cSettingsTDumpPathKey = 'TDumpPath';
   cSettingsRecentItemsKey = 'RecentItems';
   cSettingsRecentFileCountKey = 'Count';
@@ -188,6 +210,16 @@ const
   cSettingsShowLogPanelKey = 'ShowLogPanel';
   cSettingsShowRawPanelKey = 'ShowRawPanel';
   cSettingsFollowRawSelectionKey = 'FollowRawSelection';
+  cSettingsRememberWindowPlacementKey = 'RememberWindowPlacement';
+  cSettingsRestorePreviousSessionKey = 'RestorePreviousSession';
+  cSettingsWindowBoundsValidKey = 'BoundsValid';
+  cSettingsWindowLeftKey = 'Left';
+  cSettingsWindowTopKey = 'Top';
+  cSettingsWindowWidthKey = 'Width';
+  cSettingsWindowHeightKey = 'Height';
+  cSettingsSessionFileCountKey = 'FileCount';
+  cSettingsSessionFileKeyPrefix = 'File';
+  cSettingsSessionActiveIndexKey = 'ActiveIndex';
 
   cDefaultRecentItems = 10;
   cMinimumRecentItems = 1;
@@ -205,11 +237,16 @@ begin
   FShowLogPanel := True;
   FShowRawPanel := True;
   FFollowRawSelection := True;
+  FRememberWindowPlacement := True;
+  FRestorePreviousSession := True;
+  FLastSessionFiles := TStringList.Create;
+  FLastSessionActiveIndex := 0;
 end;
 
 destructor TSettings.Destroy;
 begin
   FRecentFiles.Free;
+  FLastSessionFiles.Free;
   inherited;
 end;
 
@@ -282,6 +319,48 @@ begin
   FRecentFiles.Clear;
 end;
 
+procedure TSettings.ClearLastSessionFiles;
+begin
+  FLastSessionFiles.Clear;
+  FLastSessionActiveIndex := 0;
+end;
+
+procedure TSettings.AddLastSessionFile(const AFileName: string);
+var
+  LFileName: string;
+begin
+  LFileName := Trim(AFileName);
+  if LFileName = '' then
+    Exit;
+  LFileName := ExpandFileName(LFileName);
+  for var LIndex := 0 to FLastSessionFiles.Count - 1 do
+    if SameText(FLastSessionFiles[LIndex], LFileName) then
+      Exit;
+  FLastSessionFiles.Add(LFileName);
+end;
+
+function TSettings.LastSessionFileCount: Integer;
+begin
+  Result := FLastSessionFiles.Count;
+end;
+
+function TSettings.LastSessionFile(AIndex: Integer): string;
+begin
+  Result := FLastSessionFiles[AIndex];
+end;
+
+procedure TSettings.SetWindowBounds(const AValue: TRect);
+begin
+  FWindowBounds := AValue;
+  FHasWindowBounds := (AValue.Width > 0) and (AValue.Height > 0);
+end;
+
+procedure TSettings.ClearWindowBounds;
+begin
+  FHasWindowBounds := False;
+  FWindowBounds := Rect(0, 0, 0, 0);
+end;
+
 function TSettings.RecentItemCount: Integer;
 begin
   Result := FRecentFiles.Count;
@@ -317,6 +396,25 @@ begin
       cSettingsShowRawPanelKey, FShowRawPanel);
     FFollowRawSelection := LIni.ReadBool(cSettingsWorkspaceSection,
       cSettingsFollowRawSelectionKey, FFollowRawSelection);
+    FRememberWindowPlacement := LIni.ReadBool(cSettingsWorkspaceSection,
+      cSettingsRememberWindowPlacementKey, FRememberWindowPlacement);
+    FRestorePreviousSession := LIni.ReadBool(cSettingsWorkspaceSection,
+      cSettingsRestorePreviousSessionKey, FRestorePreviousSession);
+    FHasWindowBounds := LIni.ReadBool(cSettingsWindowSection,
+      cSettingsWindowBoundsValidKey, False);
+    if FHasWindowBounds then
+    begin
+      FWindowBounds.Left := LIni.ReadInteger(cSettingsWindowSection,
+        cSettingsWindowLeftKey, 0);
+      FWindowBounds.Top := LIni.ReadInteger(cSettingsWindowSection,
+        cSettingsWindowTopKey, 0);
+      FWindowBounds.Width := LIni.ReadInteger(cSettingsWindowSection,
+        cSettingsWindowWidthKey, 0);
+      FWindowBounds.Height := LIni.ReadInteger(cSettingsWindowSection,
+        cSettingsWindowHeightKey, 0);
+      if (FWindowBounds.Width <= 0) or (FWindowBounds.Height <= 0) then
+        ClearWindowBounds;
+    end;
 
     var LRecentFileCount := EnsureRange(LIni.ReadInteger(
       cSettingsRecentFilesSection, cSettingsRecentFileCountKey, 0), 0,
@@ -329,6 +427,21 @@ begin
         FRecentFiles.Add(LRecentFileName);
     end;
     TrimRecentFiles;
+
+    FLastSessionFiles.Clear;
+    var LSessionFileCount := EnsureRange(LIni.ReadInteger(
+      cSettingsSessionSection, cSettingsSessionFileCountKey, 0), 0,
+      cMaximumRecentItems);
+    for var LIndex := 0 to LSessionFileCount - 1 do
+    begin
+      var LSessionFileName := LIni.ReadString(cSettingsSessionSection,
+        cSettingsSessionFileKeyPrefix + LIndex.ToString, '');
+      if LSessionFileName <> '' then
+        AddLastSessionFile(LSessionFileName);
+    end;
+    FLastSessionActiveIndex := EnsureRange(LIni.ReadInteger(
+      cSettingsSessionSection, cSettingsSessionActiveIndexKey, 0), 0,
+      Max(0, FLastSessionFiles.Count - 1));
   finally
     LIni.Free;
   end;
@@ -366,6 +479,36 @@ begin
       FShowRawPanel);
     LIni.WriteBool(cSettingsWorkspaceSection, cSettingsFollowRawSelectionKey,
       FFollowRawSelection);
+    LIni.WriteBool(cSettingsWorkspaceSection,
+      cSettingsRememberWindowPlacementKey, FRememberWindowPlacement);
+    LIni.WriteBool(cSettingsWorkspaceSection,
+      cSettingsRestorePreviousSessionKey, FRestorePreviousSession);
+    LIni.WriteBool(cSettingsWindowSection, cSettingsWindowBoundsValidKey,
+      FHasWindowBounds);
+    if FHasWindowBounds then
+    begin
+      LIni.WriteInteger(cSettingsWindowSection, cSettingsWindowLeftKey,
+        FWindowBounds.Left);
+      LIni.WriteInteger(cSettingsWindowSection, cSettingsWindowTopKey,
+        FWindowBounds.Top);
+      LIni.WriteInteger(cSettingsWindowSection, cSettingsWindowWidthKey,
+        FWindowBounds.Width);
+      LIni.WriteInteger(cSettingsWindowSection, cSettingsWindowHeightKey,
+        FWindowBounds.Height);
+    end;
+    LIni.EraseSection(cSettingsSessionSection);
+    if FLastSessionFiles.Count > 0 then
+    begin
+      LIni.WriteInteger(cSettingsSessionSection,
+        cSettingsSessionFileCountKey, FLastSessionFiles.Count);
+      for var LIndex := 0 to FLastSessionFiles.Count - 1 do
+        LIni.WriteString(cSettingsSessionSection,
+          cSettingsSessionFileKeyPrefix + LIndex.ToString,
+          FLastSessionFiles[LIndex]);
+      LIni.WriteInteger(cSettingsSessionSection,
+        cSettingsSessionActiveIndexKey, EnsureRange(FLastSessionActiveIndex,
+        0, FLastSessionFiles.Count - 1));
+    end;
   finally
     LIni.Free;
   end;
@@ -465,6 +608,10 @@ begin
   ApplyLabel(lblShowLogPanel, LTheme.TextColor);
   ApplyLabel(lblShowRawPanel, LTheme.TextColor);
   ApplyLabel(lblFollowRawSelection, LTheme.TextColor);
+  cbRememberWindowPlacement.StyleName := 'Windows';
+  cbRememberWindowPlacement.Font.Color := LTheme.TextColor;
+  cbRestorePreviousSession.StyleName := 'Windows';
+  cbRestorePreviousSession.Font.Color := LTheme.TextColor;
   ApplyLabel(lblInformation, LTheme.InactiveText);
   ApplyLabel(lblHint, LTheme.InactiveText);
 
@@ -589,6 +736,9 @@ begin
     tssOn
   else
     tssOff;
+  cbRememberWindowPlacement.Checked :=
+    TSettings.Instance.RememberWindowPlacement;
+  cbRestorePreviousSession.Checked := TSettings.Instance.RestorePreviousSession;
   ConfigureThemeOptions;
 end;
 
@@ -605,7 +755,9 @@ begin
     (LSettings.ShowLogPanel <> (swShowLogPanel.State = tssOn)) or
     (LSettings.ShowRawPanel <> (swShowRawPanel.State = tssOn)) or
     (LSettings.FollowRawSelection <>
-      (swFollowRawSelection.State = tssOn));
+      (swFollowRawSelection.State = tssOn)) or
+    (LSettings.RememberWindowPlacement <> cbRememberWindowPlacement.Checked) or
+    (LSettings.RestorePreviousSession <> cbRestorePreviousSession.Checked);
   if not Result then
     Exit;
 
@@ -616,6 +768,12 @@ begin
   LSettings.ShowRawPanel := swShowRawPanel.State = tssOn;
   LSettings.FollowRawSelection :=
     swFollowRawSelection.State = tssOn;
+  LSettings.RememberWindowPlacement := cbRememberWindowPlacement.Checked;
+  LSettings.RestorePreviousSession := cbRestorePreviousSession.Checked;
+  if not LSettings.RememberWindowPlacement then
+    LSettings.ClearWindowBounds;
+  if not LSettings.RestorePreviousSession then
+    LSettings.ClearLastSessionFiles;
   LSettings.Save;
 end;
 

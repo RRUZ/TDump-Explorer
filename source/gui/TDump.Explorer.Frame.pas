@@ -34,7 +34,6 @@ type
     pnTop: TPanel;
     Splitter2: TSplitter;
     frRawView: TRawViewFrame;
-    VirtualImage1: TVirtualImage;
     lblDocumentName: TLabel;
     lblSourcePath: TLabel;
     lblFormatCaption: TLabel;
@@ -48,6 +47,8 @@ type
     pnDocument: TPanel;
     gpHeader: TGridPanel;
     VirtualImageList1: TVirtualImageList;
+    PaintBox1: TPaintBox;
+    procedure PaintBox1Paint(Sender: TObject);
   private
     FDocument: TDumpDocument;
     FSummaryCard: TCard;
@@ -155,6 +156,7 @@ type
     procedure ApplyTheme;
     function DocumentIconName: string;
     procedure UpdateDocumentIcon;
+    procedure UpdateFontSize;
   protected
     procedure SetParent(AParent: TWinControl); override;
   public
@@ -170,7 +172,7 @@ implementation
 uses
   TDump.Explorer.UI, Vcl.GraphUtil, TDump.Explorer.Resources,
   TDump.Explorer.View.ELF, TDump.Explorer.View.Mach,
-  TDump.Explorer.View.OMF, TDump.Explorer.View.PE,
+  TDump.Explorer.View.OMF, TDump.Explorer.View.PE, TDump.Explorer.Phosphor.Font,
   TDump.Explorer.View.Borland, TDump.Explorer.View.Diagnostics;
 
 {$R *.dfm}
@@ -221,8 +223,7 @@ end;
 
 procedure TDumpDocumentFrame.UpdateDocumentIcon;
 begin
-  VirtualImage1.ImageName := DocumentIconName + '_' +
-    if IsLightThemeActive then 'light' else 'dark';
+  PaintBox1.Invalidate;
 end;
 
 procedure TDumpDocumentFrame.ApplyTreeTheme;
@@ -358,6 +359,33 @@ begin
   else
     Result := TDocumentTreeBuilder.FileKindCaption(FDocument.FileKind);
   end;
+end;
+
+procedure TDumpDocumentFrame.PaintBox1Paint(Sender: TObject);
+var
+  LPaintBox: TPaintBox;
+  LIconCode: Word;
+  LIconSize: Integer;
+  LIconRect: TRect;
+begin
+  if not (Sender is TPaintBox) then
+    Exit;
+
+  LPaintBox := TPaintBox(Sender);
+  LPaintBox.Canvas.Brush.Color := TExplorerTheme.ActiveTheme.BackgroundColor;
+  LPaintBox.Canvas.FillRect(LPaintBox.ClientRect);
+  LIconSize := Min(ScaleValue(32), Min(LPaintBox.ClientWidth,
+    LPaintBox.ClientHeight));
+  LIconRect := Rect((LPaintBox.ClientWidth - LIconSize) div 2,
+    (LPaintBox.ClientHeight - LIconSize) div 2,
+    (LPaintBox.ClientWidth + LIconSize) div 2,
+    (LPaintBox.ClientHeight + LIconSize) div 2);
+  if DocumentIconName = 'file-text' then
+    LIconCode := cPhFileText
+  else
+    LIconCode := cPhBinary;
+  PhosphorFont.DrawIcon(LPaintBox.Canvas.Handle, LIconCode, LIconRect,
+    TExplorerTheme.ActiveTheme.TextColor, pfwThin);
 end;
 
 procedure TDumpDocumentFrame.pnTopResize(Sender: TObject);
@@ -968,7 +996,7 @@ end;
 type
   TControlClass =  class(TControl);
 
-procedure TDumpDocumentFrame.SetParent(AParent: TWinControl);
+procedure TDumpDocumentFrame.UpdateFontSize;
 
  procedure FixFontForHighDPI(AControl: TControl);
  begin
@@ -978,25 +1006,28 @@ procedure TDumpDocumentFrame.SetParent(AParent: TWinControl);
  end;
 
 begin
+  Font.Name := TExplorerTheme.FontName;
+  Font.Size := TExplorerTheme.FontSize;
+  Font.Height := MulDiv(Font.Height, CurrentPPI, Font.PixelsPerInch);
+  FixFontForHighDPI(Tree);
+  FixFontForHighDPI(lblFormatCaption);
+  FixFontForHighDPI(lblFormatValue);
+  FixFontForHighDPI(lblArchitectureCaption);
+  FixFontForHighDPI(lblArchitectureValue);
+  FixFontForHighDPI(lblTimestampCaption);
+  FixFontForHighDPI(lblTimestampValue);
+
+  FixFontForHighDPI(lblSizeCaption);
+  FixFontForHighDPI(lblSizeValue);
+  FixFontForHighDPI(lblDocumentName);
+  FixFontForHighDPI(lblSourcePath);
+end;
+
+procedure TDumpDocumentFrame.SetParent(AParent: TWinControl);
+begin
   inherited;
   if Parent <> nil then
-  begin
-    Font.Name := TExplorerTheme.FontName;
-    Font.Size := TExplorerTheme.FontSize;
-    Font.Height := MulDiv(Font.Height, CurrentPPI, Font.PixelsPerInch);
-    FixFontForHighDPI(Tree);
-    FixFontForHighDPI(lblFormatCaption);
-    FixFontForHighDPI(lblFormatValue);
-    FixFontForHighDPI(lblArchitectureCaption);
-    FixFontForHighDPI(lblArchitectureValue);
-    FixFontForHighDPI(lblTimestampCaption);
-    FixFontForHighDPI(lblTimestampValue);
-
-    FixFontForHighDPI(lblSizeCaption);
-    FixFontForHighDPI(lblSizeValue);
-    FixFontForHighDPI(lblDocumentName);
-    FixFontForHighDPI(lblSourcePath);
-  end;
+    UpdateFontSize;
 end;
 
 procedure TDumpDocumentFrame.RestoreDetailItemIndex(ANode: PVirtualNode);

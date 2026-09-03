@@ -16,6 +16,7 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
+  System.Math,
   System.UITypes,
   System.Diagnostics, System.Generics.Collections, System.IOUtils, System.StrUtils,
   System.Threading,
@@ -87,6 +88,7 @@ type
     FProgressCompletedFiles: Integer;
     FCurrentFileProgress: Integer;
     FRestoreAlphaBlend: Boolean;
+    FRestoringPreviousSession: Boolean;
     procedure SyncActiveTheme;
     procedure ToggleActiveTheme;
     procedure ApplyTheme;
@@ -95,6 +97,9 @@ type
     procedure AddAnalysisProgressItem;
     procedure AddRecentFile(const AFileName: string);
     procedure AddOpenDocumentFilesToRecentItems;
+    procedure SaveApplicationSession;
+    procedure RestorePreviousSessionTabs;
+    procedure RestoreWindowPlacement;
     procedure AdvanceAnalysisProgress;
     procedure BeginAnalysis(ARequest: TAnalysisRequest);
     procedure CardsChanged(Sender: TObject; PrevCard, NextCard: TCard);
@@ -818,8 +823,8 @@ begin
   FExplorerPopupImages.Add('sun_dark', 'sun_dark');
   FExplorerPopupImages.Add('sun_light', 'sun_light');
 
-  FExplorerPopupImages.Add('file-dashed_dark', 'file-dashed_dark');
-  FExplorerPopupImages.Add('file-dashed_light', 'file-dashed_light');
+  FExplorerPopupImages.Add('TDumpExplorer_dark', 'TDumpExplorer_dark');
+  FExplorerPopupImages.Add('TDumpExplorer_light', 'TDumpExplorer_light');
 end;
 
 procedure TFrmMain.PopulateExplorerPopupMenu;
@@ -842,7 +847,7 @@ begin
     else
       LMenuItems.Add('Toggle to Light Theme', 'sun_dark');
 
-    LMenuItems.Add('About TDump Explorer', 'file-dashed' + LIconSuffix);
+    LMenuItems.Add('About TDump Explorer', 'TDumpExplorer' + LIconSuffix);
   finally
     LMenuItems.EndUpdate;
   end;
@@ -1359,6 +1364,7 @@ begin
   end;
   DrainAnalysisMessages;
   AddOpenDocumentFilesToRecentItems;
+  SaveApplicationSession;
   FActiveRequest.Free;
   while FPendingFiles.Count > 0 do
     FPendingFiles.Dequeue.Free;
@@ -1383,6 +1389,7 @@ begin
   TSettings.Instance.Load;
   SyncActiveTheme;
   CheckTDumpAvailability;
+  RestorePreviousSessionTabs;
 end;
 
 procedure TFrmMain.FormShow(Sender: TObject);
@@ -1392,9 +1399,76 @@ begin
   Font.Height := MulDiv(Font.Height, CurrentPPI, Font.PixelsPerInch);
 end;
 
+procedure TFrmMain.RestoreWindowPlacement;
+var
+  LBounds: TRect;
+  LIntersection: TRect;
+  LWorkArea: TRect;
+  LMonitor: TMonitor;
+  LWidth: Integer;
+  LHeight: Integer;
+  LIsVisible: Boolean;
+begin
+  var LSettings := TSettings.Instance;
+  if not LSettings.RememberWindowPlacement or not LSettings.HasWindowBounds then
+    Exit;
+
+  LBounds := LSettings.WindowBounds;
+  LIsVisible := False;
+  for var LMonitorIndex := 0 to Screen.MonitorCount - 1 do
+    if IntersectRect(LIntersection, LBounds,
+      Screen.Monitors[LMonitorIndex].WorkareaRect) and
+      (LIntersection.Width > 0) and (LIntersection.Height > 0) then
+    begin
+      LIsVisible := True;
+      Break;
+    end;
+  if not LIsVisible then
+    Exit;
+
+  LMonitor := Screen.MonitorFromRect(LBounds, mdNearest);
+  LWorkArea := LMonitor.WorkareaRect;
+  LWidth := Min(Max(LBounds.Width, Constraints.MinWidth), LWorkArea.Width);
+  LHeight := Min(Max(LBounds.Height, Constraints.MinHeight), LWorkArea.Height);
+  SetBounds(EnsureRange(LBounds.Left, LWorkArea.Left,
+    LWorkArea.Right - LWidth), EnsureRange(LBounds.Top, LWorkArea.Top,
+    LWorkArea.Bottom - LHeight), LWidth, LHeight);
+end;
+
+procedure TFrmMain.RestorePreviousSessionTabs;
+var
+  LPreferredFileName: string;
+  LRestoredAny: Boolean;
+begin
+  var LSettings := TSettings.Instance;
+  if not LSettings.RestorePreviousSession or
+    (LSettings.LastSessionFileCount = 0) then
+    Exit;
+
+  FRestoringPreviousSession := True;
+  LRestoredAny := False;
+  if (LSettings.LastSessionActiveIndex >= 0) and
+    (LSettings.LastSessionActiveIndex < LSettings.LastSessionFileCount) then
+    LPreferredFileName := LSettings.LastSessionFile(
+      LSettings.LastSessionActiveIndex);
+  for var LIndex := 0 to LSettings.LastSessionFileCount - 1 do
+  begin
+    var LFileName := LSettings.LastSessionFile(LIndex);
+    if not FileExists(LFileName) then
+      Continue;
+    if ProcessDroppedFile(LFileName,
+      SameText(LFileName, LPreferredFileName)) then
+      LRestoredAny := True;
+  end;
+  if not LRestoredAny then
+    FRestoringPreviousSession := False;
+  UpdateEmptyState;
+end;
+
 procedure TFrmMain.CreateWnd;
 begin
   inherited CreateWnd;
+  RestoreWindowPlacement;
   DragAcceptFiles(Handle, True);
 end;
 
@@ -1600,6 +1674,27 @@ begin
     TSettings.Instance.Save;
 end;
 
+procedure TFrmMain.SaveApplicationSession;
+var
+  LSettings: TSettings;
+begin
+  LSettings := TSettings.Instance;
+  if LSettings.RememberWindowPlacement and (WindowState = wsNormal) then
+    LSettings.SetWindowBounds(BoundsRect)
+  else if not LSettings.RememberWindowPlacement then
+    LSettings.ClearWindowBounds;
+
+  LSettings.ClearLastSessionFiles;
+  if LSettings.RestorePreviousSession then
+  begin
+    for var LIndex := 0 to CardPanel1.CardCount - 1 do
+      if CardPanel1.Cards[LIndex].Hint <> '' then
+        LSettings.AddLastSessionFile(CardPanel1.Cards[LIndex].Hint);
+    LSettings.LastSessionActiveIndex := Max(0, CardPanel1.ActiveCardIndex);
+  end;
+  LSettings.Save;
+end;
+
 procedure TFrmMain.AdvanceAnalysisProgress;
 begin
   if FProgressCompletedFiles < FProgressTotalFiles then
@@ -1635,10 +1730,16 @@ end;
 procedure TFrmMain.FinalizePendingDocumentTabs;
 begin
   if FPendingDocumentCards.Count = 0 then
+  begin
+    FRestoringPreviousSession := False;
     Exit;
+  end;
+  if FRestoringPreviousSession and (FPendingActivationCard = nil) then
+    FPendingActivationCard := FPendingDocumentCards.First;
   FDeferredDocumentCard := FPendingActivationCard;
   FPendingActivationCard := nil;
   AddPendingDocumentTabs;
+  FRestoringPreviousSession := False;
 end;
 
 procedure TFrmMain.CompleteAnalysisProgress;
@@ -1677,7 +1778,8 @@ begin
     Exit;
 
   LShowEmptyState := (CardPanel1.CardCount = 0) and
-    (FPendingDocumentCards.Count = 0);
+    (FPendingDocumentCards.Count = 0) and not Assigned(FActiveRequest) and
+    not HasPendingAnalysis;
   if FEmptyStateHost.Visible = LShowEmptyState then
     Exit;
 

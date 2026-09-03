@@ -53,6 +53,8 @@ type
     procedure ApplyTheme;
     procedure CreateButtons;
     procedure CreateLicenseBadge;
+    procedure FooterResize(Sender: TObject);
+    procedure LayoutFooterButtons;
     procedure ConfigureClientDragging;
     procedure ClientAreaMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
@@ -97,6 +99,11 @@ const
   cTitleBarHeight = 2;
   cContentHeight = 374;
   cButtonHeight = 25; // Match the Settings dialog's action buttons.
+  cFooterButtonTop = 12;
+  cFooterButtonGap = 6;
+  cFooterHorizontalMargin = 22;
+  cCopyButtonWidth = 104;
+  cCloseButtonWidth = 80;
   cDetailControlLeft = 184;
   cPhUser = $E4C2;
   cPhGitHub = $E576;
@@ -118,13 +125,13 @@ begin
 end;
 
 procedure TFrmAbout.CreateButtons;
-  function CreateButton(const AName, ACaption: string; ALeft, AWidth,
+  function CreateButton(const AName, ACaption: string; AWidth,
     ATabOrder: Integer): TSimpleUIButton;
   begin
     Result := TSimpleUIButton.Create(Self);
     Result.Name := AName;
     Result.Parent := pnFooter;
-    Result.SetBounds(ScaleValue(ALeft), ScaleValue(12), ScaleValue(AWidth),
+    Result.SetBounds(0, ScaleValue(cFooterButtonTop), ScaleValue(AWidth),
       ScaleValue(cButtonHeight));
     Result.Anchors := [akTop, akRight];
     Result.ParentFont := True;
@@ -146,20 +153,44 @@ procedure TFrmAbout.CreateButtons;
   end;
 begin
   FButtonImages := TImageList.Create(Self);
-  FCopyButton := CreateButton('btnCopyInfo', '&Copy info', 364, 104, 0);
+  FCopyButton := CreateButton('btnCopyInfo', '&Copy info', cCopyButtonWidth, 0);
   FCopyButton.Images := FButtonImages;
   FCopyButton.ImageIndex := 0;
   FCopyButton.OnClick := CopyInfoClick;
-  FCloseButton := CreateButton('btnClose', 'C&lose', 474, 80, 1);
+  FCloseButton := CreateButton('btnClose', 'C&lose', cCloseButtonWidth, 1);
   FCloseButton.Default := True;
   FCloseButton.Cancel := True;
   FCloseButton.ModalResult := mrClose;
+  pnFooter.OnResize := FooterResize;
+  LayoutFooterButtons;
   FRepositoryLink := CreateLink('btnRepositoryLink', cRepositoryCaption, 0,
     VisitRepositoryClick);
   FPhosphorLink := CreateLink('btnPhosphorLink', cPhosphorCaption, 1,
     VisitPhosphorClick);
   FVirtualTreeLink := CreateLink('btnVirtualTreeLink', cVirtualTreeCaption, 2,
     VisitVirtualTreeClick);
+end;
+
+procedure TFrmAbout.FooterResize(Sender: TObject);
+begin
+  LayoutFooterButtons;
+end;
+
+procedure TFrmAbout.LayoutFooterButtons;
+var
+  LRight: Integer;
+begin
+  if not Assigned(FCopyButton) or not Assigned(FCloseButton) then
+    Exit;
+
+  LRight := pnFooter.ClientWidth - ScaleValue(cFooterHorizontalMargin);
+  FCloseButton.SetBounds(LRight - ScaleValue(cCloseButtonWidth),
+    ScaleValue(cFooterButtonTop), ScaleValue(cCloseButtonWidth),
+    ScaleValue(cButtonHeight));
+  LRight := FCloseButton.Left - ScaleValue(cFooterButtonGap);
+  FCopyButton.SetBounds(LRight - ScaleValue(cCopyButtonWidth),
+    ScaleValue(cFooterButtonTop), ScaleValue(cCopyButtonWidth),
+    ScaleValue(cButtonHeight));
 end;
 
 procedure TFrmAbout.CreateLicenseBadge;
@@ -421,6 +452,7 @@ begin
   inherited;
   if Assigned(FCloseButton) then
   begin
+    LayoutFooterButtons;
     ApplyTheme;
   end;
 end;
@@ -431,14 +463,20 @@ begin
   // VCL's DPI path bypasses ChangeScale on the form. Measure links only
   // after the inherited font and child-control scaling has completed.
   if Assigned(FCloseButton) then
+  begin
+    LayoutFooterButtons;
     ApplyTheme;
+  end;
 end;
 
 procedure TFrmAbout.DoAfterMonitorDpiChanged(OldDPI, NewDPI: Integer);
 begin
   inherited;
   if Assigned(FCloseButton) then
+  begin
+    LayoutFooterButtons;
     ApplyTheme;
+  end;
 end;
 
 procedure TFrmAbout.DoShow;

@@ -303,20 +303,20 @@ object FrmSettings: TFrmSettings
         OnEnter = InputFocusChanged
         OnExit = InputFocusChanged
       end
-      object CheckBox1: TCheckBox
+      object cbRememberWindowPlacement: TCheckBox
         Left = 0
         Top = 152
-        Width = 97
+        Width = 245
         Height = 17
-        Caption = 'CheckBox1'
+        Caption = 'Remember window size and position'
         TabOrder = 2
       end
-      object CheckBox2: TCheckBox
+      object cbRestorePreviousSession: TCheckBox
         Left = 0
         Top = 175
-        Width = 97
+        Width = 245
         Height = 17
-        Caption = 'CheckBox2'
+        Caption = 'Restore tabs from previous session'
         TabOrder = 3
       end
     end

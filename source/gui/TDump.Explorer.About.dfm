@@ -4,8 +4,8 @@ object FrmAbout: TFrmAbout
   BorderIcons = [biSystemMenu]
   BorderStyle = bsDialog
   Caption = 'About TDump Explorer'
-  ClientHeight = 480
-  ClientWidth = 576
+  ClientHeight = 452
+  ClientWidth = 490
   Color = clWindow
   CustomTitleBar.Control = TitleBarPanel1
   CustomTitleBar.Enabled = True
@@ -40,20 +40,23 @@ object FrmAbout: TFrmAbout
   object TitleBarPanel1: TTitleBarPanel
     Left = 0
     Top = 0
-    Width = 576
+    Width = 490
     Height = 1
     CustomButtons = <>
+    ExplicitWidth = 576
   end
   object pnContent: TPanel
     Left = 0
     Top = 1
-    Width = 576
-    Height = 421
+    Width = 490
+    Height = 393
     Align = alClient
     BevelOuter = bvNone
     ParentBackground = False
     TabOrder = 1
     StyleElements = [seFont, seBorder]
+    ExplicitWidth = 576
+    ExplicitHeight = 421
     object lblProduct: TLabel
       Left = 100
       Top = 24
@@ -208,11 +211,13 @@ object FrmAbout: TFrmAbout
     object pbCard: TPaintBox
       Left = 0
       Top = 0
-      Width = 576
-      Height = 421
+      Width = 490
+      Height = 393
       Align = alClient
       OnPaint = CardPaint
       ExplicitTop = -6
+      ExplicitWidth = 576
+      ExplicitHeight = 421
     end
     object imgApplication: TVirtualImage
       Left = 24
@@ -228,14 +233,16 @@ object FrmAbout: TFrmAbout
   end
   object pnFooter: TPanel
     Left = 0
-    Top = 422
-    Width = 576
+    Top = 394
+    Width = 490
     Height = 58
     Align = alBottom
     BevelOuter = bvNone
     ParentBackground = False
     TabOrder = 2
     StyleElements = [seFont, seBorder]
+    ExplicitTop = 422
+    ExplicitWidth = 576
     object lblFeedback: TLabel
       Tag = 1
       Left = 22

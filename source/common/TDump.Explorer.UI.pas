@@ -26,7 +26,7 @@ type
 
   TExplorerTheme = record
     const FixedWidthFontName : string = 'Consolas';
-    const FixedWidthFontSize = 8;
+    const FixedWidthFontSize = 9;
     const FontName = 'Segoe UI';
     const FontSize = 9;
    public

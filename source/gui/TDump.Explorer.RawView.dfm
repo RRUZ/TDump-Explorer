@@ -49,8 +49,7 @@ object RawViewFrame: TRawViewFrame
       ParentFont = False
       Layout = tlCenter
       StyleName = 'Windows'
-      ExplicitLeft = 247
-      ExplicitTop = -2
+      ExplicitHeight = 15
     end
     object SearchFilterBox: TSearchBox
       AlignWithMargins = True

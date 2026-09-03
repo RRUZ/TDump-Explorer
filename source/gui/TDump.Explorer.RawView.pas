@@ -75,12 +75,15 @@ type
     procedure WMRawFilterItemDblClick(var AMessage: TMessage);
       message cWmRawFilterItemDblClick;
     procedure ApplyTheme;
+    procedure UpdateFontSize;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure Clear;
     procedure Populate(ADocument: TDumpDocument);
     procedure ShowLines(AStartLine, AEndLine: Integer);
+  protected
+    procedure SetParent(AParent: TWinControl); override;
   published
     property SyncWithSelectedNode: Boolean read FSyncWithSelectedNode
       write SetSyncWithSelectedNode default True;
@@ -123,8 +126,10 @@ begin
   FHighlighterControl.ShowLineNumbers := True;
   FHighlighterControl.UseEndEllipsis := False;
   FHighlighterControl.ParserMode := tpmTDumpValues;
+  {
   FHighlighterControl.Font.Name := TExplorerTheme.FixedWidthFontName;
   FHighlighterControl.Font.Size := TExplorerTheme.FixedWidthFontSize;
+  }
   FHighlighterControl.ControlList1.MultiSelect := True;
   FHighlighterControl.OnItemClick := HighlighterControlItemClick;
   FHighlighterControl.ControlList1.OnItemDblClick := HighlighterControlItemDblClick;
@@ -381,6 +386,17 @@ begin
       FormatFloat('#,##0', LTotalLines)]);
 end;
 
+procedure TRawViewFrame.UpdateFontSize;
+begin
+  Font.Name := TExplorerTheme.FontName;
+  Font.Size := TExplorerTheme.FontSize;
+  Font.Height := MulDiv(Font.Height, CurrentPPI, Font.PixelsPerInch);
+
+  FHighlighterControl.Font.Name := TExplorerTheme.FixedWidthFontName;
+  FHighlighterControl.Font.Size := TExplorerTheme.FixedWidthFontSize;
+  FHighlighterControl.Font.Height := MulDiv(FHighlighterControl.Font.Height, CurrentPPI, FHighlighterControl.Font.PixelsPerInch);
+end;
+
 procedure TRawViewFrame.cbFollowSelectionClick(Sender: TObject);
 begin
   SetSyncWithSelectedNode(cbFollowSelection.Checked);
@@ -442,6 +458,13 @@ begin
     FHighlighterControl.ControlList1.Perform(WM_KEYDOWN, Key, 0);
     Key := 0;
   end;
+end;
+
+procedure TRawViewFrame.SetParent(AParent: TWinControl);
+begin
+  inherited;
+  if Parent <> nil then
+    UpdateFontSize;
 end;
 
 procedure TRawViewFrame.SetSyncWithSelectedNode(const AValue: Boolean);

@@ -82,30 +82,25 @@ object DumpDocumentFrame: TDumpDocumentFrame
     BevelOuter = bvNone
     ParentBackground = False
     TabOrder = 3
-    object VirtualImage1: TVirtualImage
+    object PaintBox1: TPaintBox
       AlignWithMargins = True
       Left = 8
       Top = 8
-      Width = 32
+      Width = 36
       Height = 44
       Margins.Left = 8
       Margins.Top = 8
       Margins.Right = 0
       Margins.Bottom = 0
       Align = alLeft
-      ImageCollection = DataModule1.ImageCollection1
-      ImageWidth = 0
-      ImageHeight = 0
-      ImageIndex = 10
-      ImageName = 'binary_dark'
-      ExplicitTop = 3
-      ExplicitHeight = 32
+      OnPaint = PaintBox1Paint
+      ExplicitLeft = 0
     end
     object pnDocument: TPanel
       AlignWithMargins = True
-      Left = 44
+      Left = 48
       Top = 0
-      Width = 588
+      Width = 584
       Height = 52
       Margins.Left = 4
       Margins.Top = 0
@@ -117,10 +112,12 @@ object DumpDocumentFrame: TDumpDocumentFrame
       ParentBackground = False
       ParentDoubleBuffered = False
       TabOrder = 0
+      ExplicitLeft = 58
+      ExplicitWidth = 574
       object lblDocumentName: TLabel
         Left = 0
         Top = 0
-        Width = 588
+        Width = 584
         Height = 27
         Margins.Left = 0
         Margins.Top = 4
@@ -137,7 +134,7 @@ object DumpDocumentFrame: TDumpDocumentFrame
       object lblSourcePath: TLabel
         Left = 0
         Top = 27
-        Width = 588
+        Width = 584
         Height = 25
         Align = alBottom
         AutoSize = False
@@ -389,6 +386,7 @@ object DumpDocumentFrame: TDumpDocumentFrame
       inherited lblFilterMatches: TLabel
         Left = 666
         Height = 32
+        ExplicitLeft = 666
       end
       inherited SearchFilterBox: TSearchBox
         Left = 883

@@ -72,6 +72,7 @@ const
   cPhDatabase = $E1DE;
   cPhClockCounterClockwise = $E1A0;
   cPhFileMagnifyingGlass = $E238;
+  cPhFileText = $E23A;
   cPhMagnifyingGlass = $E30C;
   cPhTerminal = $E47E;
 

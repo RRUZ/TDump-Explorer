@@ -366,6 +366,13 @@ begin
     LSettings.ShowLogPanel := False;
     LSettings.ShowRawPanel := True;
     LSettings.FollowRawSelection := False;
+    LSettings.RememberWindowPlacement := True;
+    LSettings.RestorePreviousSession := True;
+    LSettings.SetWindowBounds(Rect(120, 80, 1320, 880));
+    LSettings.ClearLastSessionFiles;
+    LSettings.AddLastSessionFile(LFirstFile);
+    LSettings.AddLastSessionFile(LSecondFile);
+    LSettings.LastSessionActiveIndex := 1;
     LSettings.Save;
 
     LSettings.ClearRecentItems;
@@ -374,14 +381,26 @@ begin
     LSettings.ShowLogPanel := True;
     LSettings.ShowRawPanel := False;
     LSettings.FollowRawSelection := True;
+    LSettings.RememberWindowPlacement := False;
+    LSettings.RestorePreviousSession := False;
+    LSettings.ClearWindowBounds;
+    LSettings.ClearLastSessionFiles;
     LSettings.Load;
     Require((LSettings.RecentItemCount = 2) and
       SameText(LSettings.RecentItem(0), ExpandFileName(LFirstFile)) and
       SameText(LSettings.RecentItem(1), ExpandFileName(LSecondFile)) and
       SameText(LSettings.TDumpPath, TPath.Combine(LFolder, 'tdump.exe')) and
       (LSettings.ThemeOption = toDark) and not LSettings.ShowLogPanel and
-      LSettings.ShowRawPanel and not LSettings.FollowRawSelection,
-      'Settings must persist MRU ordering, TDUMP path, theme, and workspace options.');
+      LSettings.ShowRawPanel and not LSettings.FollowRawSelection and
+      LSettings.RememberWindowPlacement and LSettings.RestorePreviousSession and
+      LSettings.HasWindowBounds and (LSettings.WindowBounds.Left = 120) and
+      (LSettings.WindowBounds.Top = 80) and (LSettings.WindowBounds.Width = 1200) and
+      (LSettings.WindowBounds.Height = 800) and
+      (LSettings.LastSessionFileCount = 2) and
+      SameText(LSettings.LastSessionFile(0), ExpandFileName(LFirstFile)) and
+      SameText(LSettings.LastSessionFile(1), ExpandFileName(LSecondFile)) and
+      (LSettings.LastSessionActiveIndex = 1),
+      'Settings must persist MRU ordering, workspace options, window placement, and session tabs.');
   finally
     TSettings.SetSettingsFolderOverride('');
     TDirectory.Delete(LFolder, True);
