@@ -117,19 +117,34 @@ text report
 
         <div class="value-grid">
           <article class="value-card">
-            <span class="card-index" aria-hidden="true">01</span>
-            <h3>Navigate instead of search</h3>
-            <p>Browse headers, sections, imports, exports, resources, relocations, symbols, source modules, and diagnostics as structured views.</p>
+            <div class="value-card__preview">
+              <img src="./assets/previews/navigate-preview.png" alt="TDump Explorer Mach-O navigation tree beside a structured dynamic imports table" width="1537" height="1023" loading="lazy" decoding="async">
+            </div>
+            <div class="value-card__content">
+              <span class="card-index" aria-hidden="true">01</span>
+              <h3>Navigate instead of search</h3>
+              <p>Browse headers, sections, imports, exports, resources, relocations, symbols, source modules, and diagnostics as structured views.</p>
+            </div>
           </article>
           <article class="value-card">
-            <span class="card-index" aria-hidden="true">02</span>
-            <h3>Verify the interpretation</h3>
-            <p>Keep the original TDUMP report available and correlate structured selections with their source text when supported.</p>
+            <div class="value-card__preview">
+              <img src="./assets/previews/verify-preview.png" alt="A Borland symbol selected in structured data and on its matching RAW TDUMP line" width="1536" height="1024" loading="lazy" decoding="async">
+            </div>
+            <div class="value-card__content">
+              <span class="card-index" aria-hidden="true">02</span>
+              <h3>Verify the interpretation</h3>
+              <p>Keep the original TDUMP report available and correlate structured selections with their source text when supported.</p>
+            </div>
           </article>
           <article class="value-card">
-            <span class="card-index" aria-hidden="true">03</span>
-            <h3>Work with large reports</h3>
-            <p>The application is designed around mapped input, indexed lines, lazy decoding, virtualized rows, and background filtering.</p>
+            <div class="value-card__preview">
+              <img src="./assets/previews/large-report-preview.png" alt="TDump Explorer handling dense Mach-O binding data with large entry counts, RAW output, and profiling details" width="1536" height="1024" loading="lazy" decoding="async">
+            </div>
+            <div class="value-card__content">
+              <span class="card-index" aria-hidden="true">03</span>
+              <h3>Work with large reports</h3>
+              <p>The application is designed around mapped input, indexed lines, lazy decoding, virtualized rows, and background filtering.</p>
+            </div>
           </article>
         </div>
       </div>
@@ -143,35 +158,66 @@ text report
         </div>
 
         <div class="feature-grid">
-          <article class="feature-card">
-            <span class="feature-card__tag">NAV</span>
-            <h3>Structured navigation</h3>
-            <p>Move through complex dump data using trees and tables instead of manually scanning the source report.</p>
+          <article class="feature-card feature-card--nav">
+            <div class="feature-card__visual" aria-hidden="true">
+              <img src="./assets/screenshots/mach-o-symbols.png" alt="" width="1471" height="950" loading="lazy" decoding="async">
+            </div>
+            <div class="feature-card__content">
+              <span class="feature-card__tag">NAV</span>
+              <h3>Structured navigation</h3>
+              <p>Move through complex dump data using trees and tables instead of manually scanning the source report.</p>
+            </div>
           </article>
-          <article class="feature-card">
-            <span class="feature-card__tag">RAW</span>
-            <h3>RAW correlation</h3>
-            <p>Keep the original TDUMP text visible for verification and correlate structured data back to its source ranges where available.</p>
+          <article class="feature-card feature-card--raw">
+            <div class="feature-card__visual" aria-hidden="true">
+              <img src="./assets/screenshots/borland-debug.png" alt="" width="1471" height="950" loading="lazy" decoding="async">
+            </div>
+            <div class="feature-card__content">
+              <span class="feature-card__tag">RAW</span>
+              <h3>RAW correlation</h3>
+              <p>Keep the original TDUMP text visible for verification and correlate structured data back to its source ranges where available.</p>
+            </div>
           </article>
-          <article class="feature-card">
-            <span class="feature-card__tag">FMT</span>
-            <h3>Multi-format analysis</h3>
-            <p>Inspect output covering PE, ELF, Mach-O, OMF, archives, and Borland debug information.</p>
+          <article class="feature-card feature-card--formats">
+            <div class="feature-card__visual feature-card__visual--duo" aria-hidden="true">
+              <img src="./assets/screenshots/mach-o-bindings.png" alt="" width="1471" height="950" loading="lazy" decoding="async">
+              <img src="./assets/screenshots/elf-relocations.png" alt="" width="1490" height="964" loading="lazy" decoding="async">
+            </div>
+            <div class="feature-card__content">
+              <span class="feature-card__tag">FMT</span>
+              <h3>Multi-format analysis</h3>
+              <p>Inspect output covering PE, ELF, Mach-O, OMF, archives, and Borland debug information.</p>
+            </div>
           </article>
-          <article class="feature-card">
-            <span class="feature-card__tag">DIA</span>
-            <h3>Developer diagnostics</h3>
-            <p>Review imports, exports, sections, resources, loader metadata, source modules, symbols, and parser diagnostics.</p>
+          <article class="feature-card feature-card--diagnostics">
+            <div class="feature-card__visual" aria-hidden="true">
+              <img src="./assets/screenshots/mach-o-bindings.png" alt="" width="1471" height="950" loading="lazy" decoding="async">
+            </div>
+            <div class="feature-card__content">
+              <span class="feature-card__tag">DIA</span>
+              <h3>Developer diagnostics</h3>
+              <p>Review imports, exports, sections, resources, loader metadata, source modules, symbols, and parser diagnostics.</p>
+            </div>
           </article>
-          <article class="feature-card">
-            <span class="feature-card__tag">IDX</span>
-            <h3>Large-report workflow</h3>
-            <p>Filtering, virtualized views, indexed input, and background operations are designed for large TDUMP reports.</p>
+          <article class="feature-card feature-card--indexed">
+            <div class="feature-card__visual" aria-hidden="true">
+              <img src="./assets/screenshots/mach-o-symbols.png" alt="" width="1471" height="950" loading="lazy" decoding="async">
+            </div>
+            <div class="feature-card__content">
+              <span class="feature-card__tag">IDX</span>
+              <h3>Large-report workflow</h3>
+              <p>Filtering, virtualized views, indexed input, and background operations are designed for large TDUMP reports.</p>
+            </div>
           </article>
-          <article class="feature-card">
-            <span class="feature-card__tag">WIN</span>
-            <h3>Native Windows UI</h3>
-            <p>Drag and drop, multi-document tabs, recent files, system/light/dark application themes, and per-monitor DPI awareness.</p>
+          <article class="feature-card feature-card--windows">
+            <div class="feature-card__visual" aria-hidden="true">
+              <img src="./assets/screenshots/elf-relocations.png" alt="" width="1490" height="964" loading="lazy" decoding="async">
+            </div>
+            <div class="feature-card__content">
+              <span class="feature-card__tag">WIN</span>
+              <h3>Native Windows UI</h3>
+              <p>Drag and drop, multi-document tabs, recent files, system/light/dark application themes, and per-monitor DPI awareness.</p>
+            </div>
           </article>
         </div>
       </div>
