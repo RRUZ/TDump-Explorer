@@ -1,10 +1,434 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TDump Explorer</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TDump Explorer — Visual Explorer for TDUMP and TDUMP64 Reports</title>
+  <meta name="description" content="TDump Explorer is a native Windows tool that turns Embarcadero TDUMP and TDUMP64 reports into structured, navigable views for PE, ELF, Mach-O, OMF, archives, and Borland debug information.">
+  <meta name="theme-color" content="#090c10">
+  <link rel="canonical" href="https://rruz.github.io/TDump-Explorer/">
+  <link rel="icon" href="./favicon.ico" sizes="any">
+  <link rel="stylesheet" href="./styles.css">
+
+  <meta property="og:title" content="TDump Explorer — Visual Explorer for TDUMP and TDUMP64 Reports">
+  <meta property="og:description" content="Turn Embarcadero TDUMP and TDUMP64 output into structured, navigable views while keeping the original report available for verification.">
+  <meta property="og:image" content="https://rruz.github.io/TDump-Explorer/assets/social/banner.png">
+  <meta property="og:image:alt" content="TDump Explorer banner with the application mark and binary metadata motif">
+  <meta property="og:url" content="https://rruz.github.io/TDump-Explorer/">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="TDump Explorer — Visual Explorer for TDUMP and TDUMP64 Reports">
+  <meta name="twitter:description" content="A native Windows explorer for Embarcadero TDUMP and TDUMP64 reports.">
+  <meta name="twitter:image" content="https://rruz.github.io/TDump-Explorer/assets/social/banner.png">
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+
+  <header class="site-header">
+    <div class="container site-header__inner">
+      <a class="brand" href="#top" aria-label="TDump Explorer home">
+        <img class="brand__mark" src="./assets/brand/TDumpExplorer_dark.png" alt="" width="32" height="32">
+        <span class="brand__name">TDump Explorer</span>
+      </a>
+
+      <nav class="nav" aria-label="Primary navigation">
+        <div class="nav__sections">
+          <a href="#overview">Overview</a>
+          <a href="#features">Features</a>
+          <a href="#formats">Formats</a>
+          <a href="#quick-start">Quick Start</a>
+        </div>
+        <a class="nav__github" href="https://github.com/RRUZ/TDump-Explorer" target="_blank" rel="noopener noreferrer">
+          GitHub <span aria-hidden="true">↗</span>
+        </a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <section class="hero" id="top" aria-labelledby="hero-title">
+      <div class="container">
+        <div class="hero__copy">
+          <p class="eyebrow">TDUMP / TDUMP64 · NATIVE WINDOWS</p>
+          <h1 class="hero__title" id="hero-title">Explore TDUMP reports without searching through thousands of lines.</h1>
+          <p class="hero__description">TDump Explorer turns Embarcadero TDUMP and TDUMP64 output into structured trees and tables while keeping the original report available for verification.</p>
+
+          <div class="hero__actions">
+            <a class="button button--primary" href="https://github.com/RRUZ/TDump-Explorer" target="_blank" rel="noopener noreferrer">
+              View on GitHub <span aria-hidden="true">↗</span>
+            </a>
+            <a class="button button--secondary" href="https://github.com/RRUZ/TDump-Explorer/releases" target="_blank" rel="noopener noreferrer">Releases</a>
+          </div>
+
+          <ul class="meta-strip" aria-label="Project metadata">
+            <li>Native Windows</li>
+            <li>TDUMP / TDUMP64</li>
+            <li>MIT License</li>
+            <li>PE · ELF · Mach-O · OMF</li>
+          </ul>
+        </div>
+
+        <figure class="product-shot product-shot--hero">
+          <div class="product-shot__rail" aria-hidden="true">
+            <span>TDUMP EXPLORER</span>
+            <span>STRUCTURED VIEW + RAW SOURCE</span>
+          </div>
+          <img src="./assets/screenshots/borland-debug.png" alt="TDump Explorer displaying Borland debug symbols beside synchronized raw TDUMP output in the dark theme" width="1467" height="951" fetchpriority="high">
+        </figure>
+      </div>
+    </section>
+
+    <section class="section" id="overview" aria-labelledby="overview-title">
+      <div class="container">
+        <div class="section-heading section-heading--split">
+          <div>
+            <p class="eyebrow">OVERVIEW</p>
+            <h2 id="overview-title">What is TDump Explorer?</h2>
+          </div>
+          <p class="section-heading__lead">TDUMP exposes a large amount of binary and debug information as text. TDump Explorer parses that output and presents it as structured, navigable views while preserving access to the original report.</p>
+        </div>
+
+        <div class="overview-grid">
+          <div class="overview-copy">
+            <p>Open an existing report directly, or start from a supported binary and let the application run the appropriate TDUMP utility first. Each document keeps the structured interpretation and its source text together.</p>
+            <p class="technical-note">The result is an inspection workflow built around source-backed data—not a debugger, disassembler, or replacement for the TDUMP toolchain.</p>
+          </div>
+
+          <div class="flow-panel flow-panel--compact" role="img" aria-label="A binary file passes through TDUMP or TDUMP64 to produce a text report, which TDump Explorer organizes into headers, sections, imports, exports, symbols, resources, and a raw report view.">
+<pre><span class="flow-panel__muted">binary file</span>
+    │
+    ▼
+<span class="flow-panel__accent">TDUMP / TDUMP64</span>
+    │
+    ▼
+text report
+    │
+    ▼
+<span class="flow-panel__accent">TDump Explorer</span>
+    │
+    ├── headers
+    ├── sections
+    ├── imports / exports
+    ├── symbols
+    ├── resources
+    └── RAW report</pre>
+          </div>
+        </div>
+
+        <div class="value-grid">
+          <article class="value-card">
+            <span class="card-index" aria-hidden="true">01</span>
+            <h3>Navigate instead of search</h3>
+            <p>Browse headers, sections, imports, exports, resources, relocations, symbols, source modules, and diagnostics as structured views.</p>
+          </article>
+          <article class="value-card">
+            <span class="card-index" aria-hidden="true">02</span>
+            <h3>Verify the interpretation</h3>
+            <p>Keep the original TDUMP report available and correlate structured selections with their source text when supported.</p>
+          </article>
+          <article class="value-card">
+            <span class="card-index" aria-hidden="true">03</span>
+            <h3>Work with large reports</h3>
+            <p>The application is designed around mapped input, indexed lines, lazy decoding, virtualized rows, and background filtering.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--surface" id="features" aria-labelledby="features-title">
+      <div class="container">
+        <div class="section-heading">
+          <p class="eyebrow">CAPABILITIES</p>
+          <h2 id="features-title">Built around the information TDUMP already gives you.</h2>
+        </div>
+
+        <div class="feature-grid">
+          <article class="feature-card">
+            <span class="feature-card__tag">NAV</span>
+            <h3>Structured navigation</h3>
+            <p>Move through complex dump data using trees and tables instead of manually scanning the source report.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-card__tag">RAW</span>
+            <h3>RAW correlation</h3>
+            <p>Keep the original TDUMP text visible for verification and correlate structured data back to its source ranges where available.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-card__tag">FMT</span>
+            <h3>Multi-format analysis</h3>
+            <p>Inspect output covering PE, ELF, Mach-O, OMF, archives, and Borland debug information.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-card__tag">DIA</span>
+            <h3>Developer diagnostics</h3>
+            <p>Review imports, exports, sections, resources, loader metadata, source modules, symbols, and parser diagnostics.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-card__tag">IDX</span>
+            <h3>Large-report workflow</h3>
+            <p>Filtering, virtualized views, indexed input, and background operations are designed for large TDUMP reports.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-card__tag">WIN</span>
+            <h3>Native Windows UI</h3>
+            <p>Drag and drop, multi-document tabs, recent files, system/light/dark application themes, and per-monitor DPI awareness.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="formats" aria-labelledby="formats-title">
+      <div class="container">
+        <div class="section-heading section-heading--split">
+          <div>
+            <p class="eyebrow">ANALYSIS COVERAGE</p>
+            <h2 id="formats-title">One interface for multiple TDUMP report families.</h2>
+          </div>
+          <p class="section-heading__lead">Coverage follows the structures emitted by the selected TDUMP or TDUMP64 version. The application keeps useful diagnostics and source-backed fallback views when a normal projection is not available.</p>
+        </div>
+
+        <div class="coverage-grid">
+          <article class="coverage-card coverage-card--wide">
+            <div class="coverage-card__header">
+              <h3>PE</h3>
+              <span>PORTABLE EXECUTABLE</span>
+            </div>
+            <ul>
+              <li>DOS / PE headers</li>
+              <li>Data directories</li>
+              <li>Sections</li>
+              <li>Imports</li>
+              <li>Delayed imports</li>
+              <li>Exports</li>
+              <li>Resources</li>
+              <li>Base relocations</li>
+            </ul>
+          </article>
+
+          <article class="coverage-card">
+            <div class="coverage-card__header">
+              <h3>Borland Debug</h3>
+              <span>SYMBOL DATA</span>
+            </div>
+            <ul>
+              <li>Subsection directories</li>
+              <li>Source modules / files</li>
+              <li>Aligned symbols</li>
+              <li>Global symbols</li>
+              <li>Global types</li>
+            </ul>
+          </article>
+
+          <article class="coverage-card">
+            <div class="coverage-card__header">
+              <h3>ELF</h3>
+              <span>OBJECT FORMAT</span>
+            </div>
+            <ul>
+              <li>Headers</li>
+              <li>Sections</li>
+              <li>Program headers</li>
+              <li>Symbols</li>
+              <li>Dynamic entries</li>
+              <li>Relocations</li>
+            </ul>
+          </article>
+
+          <article class="coverage-card coverage-card--wide">
+            <div class="coverage-card__header">
+              <h3>Mach-O</h3>
+              <span>APPLE BINARY FORMAT</span>
+            </div>
+            <ul>
+              <li>Architectures</li>
+              <li>Load commands</li>
+              <li>Sections</li>
+              <li>Symbols</li>
+              <li>Dynamic-symbol metadata</li>
+              <li>Imports / bindings</li>
+              <li>Indirect symbols</li>
+            </ul>
+          </article>
+
+          <article class="coverage-card">
+            <div class="coverage-card__header">
+              <h3>OMF / AR</h3>
+              <span>OBJECTS + ARCHIVES</span>
+            </div>
+            <ul>
+              <li>Records</li>
+              <li>Members</li>
+              <li>Archive symbols</li>
+            </ul>
+          </article>
+        </div>
+
+        <aside class="diagnostics-strip">
+          <div>
+            <p class="eyebrow">DIAGNOSTICS + RAW REPORT</p>
+            <h3>Keep the source within reach.</h3>
+          </div>
+          <p>Parser diagnostics, syntax-highlighted source text, filtering, virtualized rows, and optional selection synchronization remain available alongside the structured document.</p>
+        </aside>
+
+        <p class="coverage-note">Actual coverage depends on the report emitted by the TDUMP or TDUMP64 version being used.</p>
+      </div>
+    </section>
+
+    <section class="section section--surface" id="workflow" aria-labelledby="workflow-title">
+      <div class="container">
+        <div class="section-heading">
+          <p class="eyebrow">HOW IT WORKS</p>
+          <h2 id="workflow-title">From binary to structured view.</h2>
+        </div>
+
+        <div class="flow-panel flow-panel--wide" role="img" aria-label="A binary is processed by TDUMP or TDUMP64 into a temporary report, while an existing tdump report can enter directly. Both continue through a mapped text source and parser into a document tab.">
+<pre>binary file ──&gt; <span class="flow-panel__accent">TDUMP / TDUMP64</span> ──&gt; temporary report ─┐
+                                                      ├─&gt; mapped text source ─&gt; parser ─&gt; <span class="flow-panel__accent">document tab</span>
+.tdump report ────────────────────────────────────────┘</pre>
+        </div>
+
+        <div class="workflow-notes">
+          <p>You can open an existing TDUMP report directly, or open a supported binary and let TDump Explorer invoke an installed TDUMP or TDUMP64 utility to generate the report first.</p>
+          <p class="important-note"><strong>TDUMP is optional for existing reports.</strong> Opening an existing <code>.tdump</code> or compatible text report does not require TDUMP to be installed.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="interface" aria-labelledby="interface-title">
+      <div class="container">
+        <div class="section-heading section-heading--split">
+          <div>
+            <p class="eyebrow">INTERFACE</p>
+            <h2 id="interface-title">Structured data and source report, side by side.</h2>
+          </div>
+          <p class="section-heading__lead">Real application captures show the same document model across different report families, with the original report available for correlation and filtering.</p>
+        </div>
+
+        <div class="screenshot-grid">
+          <figure class="screenshot-card screenshot-card--primary">
+            <div class="screenshot-card__image">
+              <img src="./assets/screenshots/mach-o-symbols.png" alt="TDump Explorer showing a Mach-O dynamic import table and the matching raw report in the dark theme" width="1472" height="951" loading="lazy">
+            </div>
+            <figcaption>
+              <span>MACH-O · DARK THEME</span>
+              Large Mach-O symbol and dynamic import tables with RAW output in view.
+            </figcaption>
+          </figure>
+
+          <figure class="screenshot-card">
+            <div class="screenshot-card__image">
+              <img src="./assets/screenshots/mach-o-bindings.png" alt="TDump Explorer showing Mach-O binding instructions and synchronized raw output in the dark theme" width="1470" height="939" loading="lazy">
+            </div>
+            <figcaption>
+              <span>MACH-O · BINDINGS</span>
+              Binding instructions remain navigable beside the corresponding source report.
+            </figcaption>
+          </figure>
+
+          <figure class="screenshot-card">
+            <div class="screenshot-card__image">
+              <img src="./assets/screenshots/elf-relocations.png" alt="TDump Explorer showing an ELF relocation table and raw report in the light application theme" width="1489" height="963" loading="lazy">
+            </div>
+            <figcaption>
+              <span>ELF · LIGHT THEME</span>
+              ELF relocation analysis demonstrates the desktop application's alternate theme.
+            </figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section--surface" id="quick-start" aria-labelledby="quick-start-title">
+      <div class="container">
+        <div class="section-heading">
+          <p class="eyebrow">QUICK START</p>
+          <h2 id="quick-start-title">Open a report or inspect a binary.</h2>
+        </div>
+
+        <ol class="quick-start">
+          <li class="step">
+            <span class="step__number" aria-hidden="true">01</span>
+            <div>
+              <h3>Open</h3>
+              <p>Open a generated <code>.tdump</code> report, drag it onto the application, or pass its path on the command line.</p>
+            </div>
+          </li>
+          <li class="step">
+            <span class="step__number" aria-hidden="true">02</span>
+            <div>
+              <h3>Generate when needed</h3>
+              <p>When opening a binary, TDump Explorer locates an installed <code>tdump.exe</code> or <code>tdump64.exe</code> and selects the appropriate tool.</p>
+            </div>
+          </li>
+          <li class="step">
+            <span class="step__number" aria-hidden="true">03</span>
+            <div>
+              <h3>Navigate</h3>
+              <p>Select nodes in the structured tree to populate their corresponding detail views.</p>
+            </div>
+          </li>
+          <li class="step">
+            <span class="step__number" aria-hidden="true">04</span>
+            <div>
+              <h3>Verify</h3>
+              <p>Use the RAW panel to filter the original report and, when useful, enable selection following.</p>
+            </div>
+          </li>
+        </ol>
+
+        <div class="extensions">
+          <span class="extensions__label">RECOGNIZED INPUT</span>
+          <p><code>.exe</code> · <code>.dll</code> · <code>.bpl</code> · <code>.dpl</code> · <code>.ocx</code> · <code>.cpl</code> · <code>.scr</code> · <code>.com</code> · <code>.sys</code> · <code>.obj</code> · <code>.o</code> · <code>.lib</code> · <code>.ar</code> · <code>.a</code> · <code>.elf</code> · <code>.so</code> · <code>.dylib</code> · <code>.bundle</code> · <code>.mach</code> · <code>.dcu</code> · <code>.tdump</code> · compatible text reports</p>
+          <p class="extensions__note">Recognizing an extension does not guarantee that every installed TDUMP version can produce the same structured report.</p>
+        </div>
+
+        <aside class="requirements" aria-labelledby="requirements-title">
+          <div>
+            <p class="eyebrow">REQUIREMENTS</p>
+            <h2 id="requirements-title">Bring TDUMP only when you need to generate.</h2>
+          </div>
+          <div class="requirements__copy">
+            <p>TDUMP or TDUMP64 from an installed Embarcadero RAD Studio or Delphi toolchain is required when generating reports from binaries.</p>
+            <p>Existing <code>.tdump</code> and compatible text reports can be opened without TDUMP installed.</p>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section final-cta" aria-labelledby="final-cta-title">
+      <div class="container final-cta__inner">
+        <div>
+          <p class="eyebrow">OPEN SOURCE · MIT</p>
+          <h2 id="final-cta-title">Make TDUMP output easier to inspect.</h2>
+          <p>Explore the source, follow development, or check available releases on GitHub.</p>
+        </div>
+        <div class="final-cta__actions">
+          <a class="button button--primary" href="https://github.com/RRUZ/TDump-Explorer" target="_blank" rel="noopener noreferrer">
+            View on GitHub <span aria-hidden="true">↗</span>
+          </a>
+          <a class="button button--secondary" href="https://github.com/RRUZ/TDump-Explorer/releases" target="_blank" rel="noopener noreferrer">Releases</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container site-footer__grid">
+      <div>
+        <a class="brand brand--footer" href="#top">
+          <img class="brand__mark" src="./assets/brand/TDumpExplorer_dark.png" alt="" width="32" height="32" loading="lazy">
+          <span class="brand__name">TDump Explorer</span>
+        </a>
+        <p>Native Windows explorer for Embarcadero TDUMP / TDUMP64 reports.</p>
+      </div>
+      <nav class="footer-links" aria-label="Project links">
+        <a href="https://github.com/RRUZ/TDump-Explorer" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="https://github.com/RRUZ/TDump-Explorer/releases" target="_blank" rel="noopener noreferrer">Releases</a>
+        <a href="https://github.com/RRUZ/TDump-Explorer/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>
+      </nav>
+      <p class="site-footer__copyright">© 2026 Rodrigo Ruz</p>
+    </div>
+  </footer>
 </body>
 </html>
