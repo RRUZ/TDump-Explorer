@@ -13,8 +13,9 @@
 </p>
 
 <p align="center">
+  <a href="https://rruz.github.io/TDump-Explorer/">Project page</a> ·
   <a href="https://github.com/RRUZ/TDump-Explorer/releases">Releases</a> ·
-  <a href="#quick-start">Quick start</a> ·
+  <a href="#quick-start">Quick start</a>
 </p>
 
 TDump Explorer turns textual dump output into navigable trees and tables while keeping the original report available for verification. Open a binary or an existing `.tdump` report and inspect PE, ELF, Mach-O, OMF, archive, and Borland debug metadata without searching through thousands of lines of text.
