@@ -1,480 +1,96 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>TDump Explorer — Visual Explorer for TDUMP and TDUMP64 Reports</title>
-  <meta name="description" content="TDump Explorer is a native Windows tool that turns Embarcadero TDUMP and TDUMP64 reports into structured, navigable views for PE, ELF, Mach-O, OMF, archives, and Borland debug information.">
-  <meta name="theme-color" content="#090c10">
-  <link rel="canonical" href="https://rruz.github.io/TDump-Explorer/">
-  <link rel="icon" href="./favicon.ico" sizes="any">
-  <link rel="stylesheet" href="./styles.css">
-
-  <meta property="og:title" content="TDump Explorer — Visual Explorer for TDUMP and TDUMP64 Reports">
-  <meta property="og:description" content="Turn Embarcadero TDUMP and TDUMP64 output into structured, navigable views while keeping the original report available for verification.">
-  <meta property="og:image" content="https://rruz.github.io/TDump-Explorer/assets/social/banner.png">
-  <meta property="og:image:alt" content="TDump Explorer banner with the application mark and binary metadata motif">
-  <meta property="og:url" content="https://rruz.github.io/TDump-Explorer/">
-  <meta property="og:type" content="website">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="TDump Explorer — Visual Explorer for TDUMP and TDUMP64 Reports">
-  <meta name="twitter:description" content="A native Windows explorer for Embarcadero TDUMP and TDUMP64 reports.">
-  <meta name="twitter:image" content="https://rruz.github.io/TDump-Explorer/assets/social/banner.png">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TDump Explorer — Your binaries, beyond the text dump</title>
+<meta name="description" content="Inspect Delphi packages, symbols, imports, and relocations in a native Windows workspace. A visual companion for Embarcadero TDUMP and TDUMP64.">
+<meta name="theme-color" content="#101417"><link rel="canonical" href="https://rruz.github.io/TDump-Explorer/">
+<link rel="icon" href="./favicon.ico" sizes="any"><link rel="stylesheet" href="./showcase.css"><script src="./showcase.js" defer></script>
+<meta property="og:title" content="TDump Explorer — Your binaries, beyond the text dump"><meta property="og:description" content="A native Windows workspace for inspecting TDUMP and TDUMP64 reports, with the original source always within reach."><meta property="og:image" content="https://rruz.github.io/TDump-Explorer/assets/social/banner.png"><meta property="og:image:alt" content="TDump Explorer banner with the application mark and binary metadata motif"><meta property="og:url" content="https://rruz.github.io/TDump-Explorer/"><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="TDump Explorer — Your binaries, beyond the text dump"><meta name="twitter:description" content="A native Windows explorer for Embarcadero TDUMP and TDUMP64 reports."><meta name="twitter:image" content="https://rruz.github.io/TDump-Explorer/assets/social/banner.png">
 </head>
 <body>
-  <a class="skip-link" href="#main-content">Skip to content</a>
-
-  <header class="site-header">
-    <div class="container site-header__inner">
-      <a class="brand" href="#top" aria-label="TDump Explorer home">
-        <img class="brand__mark" src="./assets/brand/TDumpExplorer_dark.png" alt="" width="32" height="32">
-        <span class="brand__name">TDump Explorer</span>
-      </a>
-
-      <nav class="nav" aria-label="Primary navigation">
-        <div class="nav__sections">
-          <a href="#overview">Overview</a>
-          <a href="#features">Features</a>
-          <a href="#formats">Formats</a>
-          <a href="#quick-start">Quick Start</a>
-        </div>
-        <a class="nav__github" href="https://github.com/RRUZ/TDump-Explorer" target="_blank" rel="noopener noreferrer">
-          GitHub <span aria-hidden="true">↗</span>
-        </a>
-      </nav>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header"><div class="wrap header-inner"><a class="brand" href="#top"><img src="./assets/brand/TDumpExplorer_dark.png" width="30" height="30" alt=""><span>TDump Explorer</span></a><nav aria-label="Primary"><a href="#inspection">Inspection</a><a href="#formats">Formats</a><a href="#engineering">Engineering</a><a href="#quick-start">Get started ↗</a></nav></div></header>
+<main id="main">
+<section class="hero wrap" id="top" aria-labelledby="hero-title">
+  <div class="hero-intro"><div><p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> NATIVE WINDOWS · DELPHI / C++BUILDER</p><h1 id="hero-title">Your binaries,<br><span>beyond the text dump.</span></h1></div><div class="hero-aside"><p>Inspect packages, symbols, imports, and relocations in a native workspace—with the original TDUMP report within reach.</p><div class="actions"><a class="button" href="https://github.com/RRUZ/TDump-Explorer">Explore the source ↗</a><a class="text-link" href="https://github.com/RRUZ/TDump-Explorer/releases">Releases ↗</a></div></div></div>
+  <div class="scene-picker" role="group" aria-label="Application screenshots">
+    <button type="button" data-scene="package" aria-pressed="true"><span class="scene-code">DBG</span> Delphi package</button>
+    <button type="button" data-scene="symbols" aria-pressed="false"><span class="scene-code">SYM</span> Dynamic imports</button>
+    <button type="button" data-scene="raw" aria-pressed="false"><span class="scene-code">RAW</span> Report view</button>
+    <button type="button" data-scene="mach" aria-pressed="false"><span class="scene-code">MACH</span> Bindings</button>
+    <button type="button" data-scene="elf" aria-pressed="false"><span class="scene-code">ELF</span> Relocations</button>
+    <button type="button" data-scene="sections" aria-pressed="false"><span class="scene-code">SEC</span> Section headers</button>
+  </div>
+  <figure class="application-stage"><a id="scene-link" href="./assets/screenshots/borland-debug.png" data-viewer data-treatment="darken" aria-label="Enlarge the complete Delphi package screenshot"><img id="scene-image" src="./assets/screenshots/borland-debug.png" width="1467" height="951" alt="A Delphi package with its Borland symbol tree, selected S_GDATA32 record fields, and corresponding highlighted RAW source" fetchpriority="high"></a><figcaption><span id="scene-caption" aria-live="polite">Delphi package <span class="caption-divider">/</span> A global symbol, its record fields, and the matching RAW report line.</span><a id="scene-original" href="./assets/screenshots/borland-debug.png" data-viewer>Inspect original ↗</a></figcaption></figure>
+  <div class="identity-line"><span>Built with Delphi + VCL</span><span>TDUMP / TDUMP64</span><span>Open source · MIT</span><span>Windows x64</span></div>
+</section>
+<section class="chapter wrap" id="inspection" aria-labelledby="inspection-title">
+  <div class="chapter-heading"><p class="eyebrow">INSIDE A DELPHI PACKAGE</p><h2 id="inspection-title">A symbol is more useful<br>when you can follow it.</h2><p>From the symbol table to the record fields to the exact report text. The interpretation and its evidence belong together.</p></div>
+  <div class="inspection-layout"><div class="inspection-narrative"><ol class="journey"><li><span class="step-marker">01</span><div><h3>Find the record</h3><p>Browse the Borland debug subsections, then select a global symbol.</p><code>sstGlobalSym → S_GDATA32</code></div></li><li><span class="step-marker">02</span><div><h3>Read its structure</h3><p>Inspect the record kind, name, segment, and address as individual fields.</p></div></li><li><span class="step-marker">03</span><div><h3>Check the source</h3><p>Enable Follow Selection to bring supported source ranges into view in the syntax-highlighted RAW panel.</p></div></li></ol><a class="text-link" href="./assets/screenshots/borland-debug.png" data-viewer>See this record in the application ↗</a></div>
+  <div class="evidence"><div class="evidence-heading"><span class="eyebrow">SELECTED SYMBOL</span><span class="file-label">Borland debug information</span></div><h3 class="symbol-name">@Sysinit@ModuleIsLib</h3><p class="evidence-note">Fields from the captured application view</p><dl class="record-fields"><div><dt>Record kind</dt><dd class="cyan">S_GDATA32</dd></div><div><dt>Record offset</dt><dd>040D3</dd></div><div><dt>Type</dt><dd>bool8</dd></div><div><dt>Name index</dt><dd>04D</dd></div><div><dt>Segment</dt><dd>0004</dd></div><div><dt>Address</dt><dd>00000</dd></div></dl><div class="raw-header"><span>Corresponding RAW text</span><span class="source-indicator">● Source-backed</span></div><pre class="raw-example" tabindex="0" aria-label="Matching TDUMP report excerpt"><code><span class="line-number">00000361:</span> <span class="cyan">040D3  S_GDATA32</span>  type: <span class="green">bool8</span>
+          <span class="green">0004:00000</span>  <span class="cyan">@Sysinit@ModuleIsLib</span> [04D]
+          Browser offset: 0000
+<span class="line-number">00000362:</span>     flags: 0000</code></pre><p class="source-footnote">Excerpt from the screenshot, wrapped for readability. This is an illustrated example, not a running browser version of TDump Explorer.</p></div></div>
+  <figure class="detail-strip"><a href="./assets/screenshots/borland-debug.png" data-viewer data-treatment="darken"><img src="./assets/screenshots/borland-record-detail.png" width="940" height="338" alt="Actual symbol detail panel showing S_GDATA32 and @Sysinit@ModuleIsLib" loading="lazy"></a><figcaption>THE ACTUAL INTERFACE <span>Native record rendering. No reconstructed UI.</span></figcaption></figure>
+</section>
+<section class="chapter format-section" id="formats" aria-labelledby="formats-title"><div class="wrap"><div class="chapter-heading compact"><p class="eyebrow">INSPECT YOUR BUILD ARTIFACTS</p><h2 id="formats-title">Different formats.<br>The same way in.</h2><p>Start with the question you need to answer. Navigate the structures that TDUMP exposes.</p></div><div class="format-layout"><div class="format-picker" role="group" aria-label="Analysis format"><button type="button" data-format="pe" aria-pressed="true"><span>PE</span><small>Executables &amp; packages</small><span aria-hidden="true">↗</span></button><button type="button" data-format="debug" aria-pressed="false"><span>Borland</span><small>Debug information</small><span aria-hidden="true">↗</span></button><button type="button" data-format="elf" aria-pressed="false"><span>ELF</span><small>Objects &amp; shared libraries</small><span aria-hidden="true">↗</span></button><button type="button" data-format="mach" aria-pressed="false"><span>Mach-O</span><small>Apple binary metadata</small><span aria-hidden="true">↗</span></button><button type="button" data-format="omf" aria-pressed="false"><span>OMF / AR</span><small>Records &amp; archives</small><span aria-hidden="true">↗</span></button></div><div class="format-detail" aria-live="polite"><p class="eyebrow" id="format-label">PE / PORTABLE EXECUTABLE</p><h3 id="format-question">What does this package import—and what does it expose?</h3><p id="format-description">Inspect Windows executables, DLLs, and Delphi packages through their headers, directories, and structured tables.</p><ul id="format-views"><li>DOS &amp; PE headers</li><li>Data directories</li><li>Sections</li><li>Imports &amp; delayed imports</li><li>Exports</li><li>Resources</li><li>Base relocations</li></ul><p class="technical-note">Coverage follows the selected TDUMP version. Unknown or unsupported content can remain available through diagnostics and source-backed fallback views.</p></div></div></div></section>
+<section class="chapter wrap" id="export" aria-labelledby="export-title"><div class="export-layout"><div class="chapter-heading compact"><p class="eyebrow">FROM INSPECTION TO YOUR WORKFLOW</p><h2 id="export-title">Keep the findings.<br>Lose the retyping.</h2><p>Copy selected rows as text, CSV, JSON, or Markdown. Bring a structured result into a script, a spreadsheet, or an issue report.</p><div class="export-selection"><span class="eyebrow">EXAMPLE SELECTION · ELF SYMBOL TABLE</span><strong>Five globals from zutil.o</strong><span>Functions and an object · .symtab<br>Values and sizes preserved in hexadecimal</span></div></div><div class="export-output"><div class="export-toolbar"><div role="group" aria-label="Export example format"><button type="button" data-export="json" aria-pressed="true">JSON</button><button type="button" data-export="csv" aria-pressed="false">CSV</button><button type="button" data-export="markdown" aria-pressed="false">Markdown</button></div><button id="copy-example" type="button" hidden>Copy</button></div>
+<div id="markdown-controls" hidden><div role="group" aria-label="Markdown display"><button type="button" data-markdown-view="source" aria-pressed="false" aria-controls="export-code">Source</button><button type="button" data-markdown-view="preview" aria-pressed="true" aria-controls="markdown-preview">Preview</button></div><span>Website preview · Copy keeps the Markdown source</span></div>
+<div id="markdown-preview" role="region" aria-label="Rendered Markdown table" tabindex="0" hidden></div>
+<pre id="export-code" tabindex="0" aria-label="Export formatting example">[
+  {"Name":"zError", "Value":"20", "Size":"29", "Type":"FUNC", "Binding":"GLOBAL"},
+  {"Name":"z_errmsg", "Value":"0", "Size":"50", "Type":"OBJECT", "Binding":"GLOBAL"},
+  {"Name":"zcalloc", "Value":"50", "Size":"11", "Type":"FUNC", "Binding":"GLOBAL"},
+  {"Name":"zcfree", "Value":"70", "Size":"D", "Type":"FUNC", "Binding":"GLOBAL"},
+  {"Name":"zlibCompileFlags", "Value":"10", "Size":"B", "Type":"FUNC", "Binding":"GLOBAL"}
+]</pre><p>Five rows from <code>ELF.Object.Win64.tdump</code>, used by the parser tests. <a href="./assets/examples/elf-object-win64.txt" target="_blank" rel="noopener">View fixture text ↗</a></p><span class="sr-only" id="copy-status" role="status"></span></div></div></section>
+<section class="chapter engineering" id="engineering" aria-labelledby="engineering-title"><div class="wrap">
+  <div class="chapter-heading"><p class="eyebrow">NATIVE BY DESIGN</p><h2 id="engineering-title">Keep your inspections<br>in one workspace.</h2><p>Open several binaries and reports in separate tabs. Each document keeps its structured data and original TDUMP report together.</p></div>
+  <div class="engineering-layout">
+    <figure class="light-detail"><a href="./assets/screenshots/mach-o-native.png" data-viewer data-treatment="darken"><img src="./assets/screenshots/native-tabs-detail.png" width="920" height="145" loading="lazy" alt="TDump Explorer’s native document tabs: ELF, a Delphi package, and the active Mach-O report, with new-document and recent-file controls" ></a><figcaption>DOCUMENT TABS <span>Three open inspections · view the full workspace ↗</span></figcaption></figure>
+    <div class="engineering-notes"><h3>A native Windows workflow.</h3><p>Drop files onto the window, reopen a recent report, or queue several inputs for analysis.</p><p>Per-monitor DPI awareness sizes controls for each display. Choose light, dark, or system themes.</p>
+      <figure class="light-detail workflow-shot"><a href="./assets/screenshots/native-drop-workflow.png" data-viewer data-treatment="darken"><img src="./assets/screenshots/native-drop-detail.png" width="650" height="290" loading="lazy" alt="TDump Explorer’s binary-file icon and Drag &amp; drop a report or binary instruction in the dark-theme drop zone"></a><figcaption>DRAG &amp; DROP <span>View the full application window ↗</span></figcaption></figure>
     </div>
-  </header>
-
-  <main id="main-content">
-    <section class="hero" id="top" aria-labelledby="hero-title">
-      <div class="container">
-        <div class="hero__copy">
-          <p class="eyebrow">TDUMP / TDUMP64 · NATIVE WINDOWS</p>
-          <h1 class="hero__title" id="hero-title">Explore TDUMP reports without searching through thousands of lines.</h1>
-          <p class="hero__description">TDump Explorer turns Embarcadero TDUMP and TDUMP64 output into structured trees and tables while keeping the original report available for verification.</p>
-
-          <div class="hero__actions">
-            <a class="button button--primary" href="https://github.com/RRUZ/TDump-Explorer" target="_blank" rel="noopener noreferrer">
-              View on GitHub <span aria-hidden="true">↗</span>
-            </a>
-            <a class="button button--secondary" href="https://github.com/RRUZ/TDump-Explorer/releases" target="_blank" rel="noopener noreferrer">Releases</a>
-          </div>
-
-          <ul class="meta-strip" aria-label="Project metadata">
-            <li>Native Windows</li>
-            <li>TDUMP / TDUMP64</li>
-            <li>MIT License</li>
-            <li>PE · ELF · Mach-O · OMF</li>
-          </ul>
-        </div>
-
-        <figure class="product-shot product-shot--hero">
-          <div class="product-shot__rail" aria-hidden="true">
-            <span>TDUMP EXPLORER</span>
-            <span>STRUCTURED VIEW + RAW SOURCE</span>
-          </div>
-          <img src="./assets/screenshots/borland-debug.png" alt="TDump Explorer displaying Borland debug symbols beside synchronized raw TDUMP output in the dark theme" width="1467" height="951" fetchpriority="high">
-        </figure>
-      </div>
-    </section>
-
-    <section class="section" id="overview" aria-labelledby="overview-title">
-      <div class="container">
-        <div class="section-heading section-heading--split">
-          <div>
-            <p class="eyebrow">OVERVIEW</p>
-            <h2 id="overview-title">What is TDump Explorer?</h2>
-          </div>
-          <p class="section-heading__lead">TDUMP exposes a large amount of binary and debug information as text. TDump Explorer parses that output and presents it as structured, navigable views while preserving access to the original report.</p>
-        </div>
-
-        <div class="overview-grid">
-          <div class="overview-copy">
-            <p>Open an existing report directly, or start from a supported binary and let the application run the appropriate TDUMP utility first. Each document keeps the structured interpretation and its source text together.</p>
-            <p class="technical-note">The result is an inspection workflow built around source-backed data—not a debugger, disassembler, or replacement for the TDUMP toolchain.</p>
-          </div>
-
-          <div class="flow-panel flow-panel--compact" role="img" aria-label="A binary file passes through TDUMP or TDUMP64 to produce a text report, which TDump Explorer organizes into headers, sections, imports, exports, symbols, resources, and a raw report view.">
-<pre><span class="flow-panel__muted">binary file</span>
-    │
-    ▼
-<span class="flow-panel__accent">TDUMP / TDUMP64</span>
-    │
-    ▼
-text report
-    │
-    ▼
-<span class="flow-panel__accent">TDump Explorer</span>
-    │
-    ├── headers
-    ├── sections
-    ├── imports / exports
-    ├── symbols
-    ├── resources
-    └── RAW report</pre>
-          </div>
-        </div>
-
-        <div class="value-grid">
-          <article class="value-card">
-            <div class="value-card__preview">
-              <img src="./assets/previews/navigate-preview.png" alt="TDump Explorer Mach-O navigation tree beside a structured dynamic imports table" width="1537" height="1023" loading="lazy" decoding="async">
-            </div>
-            <div class="value-card__content">
-              <span class="card-index" aria-hidden="true">01</span>
-              <h3>Navigate instead of search</h3>
-              <p>Browse headers, sections, imports, exports, resources, relocations, symbols, source modules, and diagnostics as structured views.</p>
-            </div>
-          </article>
-          <article class="value-card">
-            <div class="value-card__preview">
-              <img src="./assets/previews/verify-preview.png" alt="A Borland symbol selected in structured data and on its matching RAW TDUMP line" width="1536" height="1024" loading="lazy" decoding="async">
-            </div>
-            <div class="value-card__content">
-              <span class="card-index" aria-hidden="true">02</span>
-              <h3>Verify the interpretation</h3>
-              <p>Keep the original TDUMP report available and correlate structured selections with their source text when supported.</p>
-            </div>
-          </article>
-          <article class="value-card">
-            <div class="value-card__preview">
-              <img src="./assets/previews/large-report-preview.png" alt="TDump Explorer handling dense Mach-O binding data with large entry counts, RAW output, and profiling details" width="1536" height="1024" loading="lazy" decoding="async">
-            </div>
-            <div class="value-card__content">
-              <span class="card-index" aria-hidden="true">03</span>
-              <h3>Work with large reports</h3>
-              <p>The application is designed around mapped input, indexed lines, lazy decoding, virtualized rows, and background filtering.</p>
-            </div>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="section section--surface" id="features" aria-labelledby="features-title">
-      <div class="container">
-        <div class="section-heading">
-          <p class="eyebrow">CAPABILITIES</p>
-          <h2 id="features-title">Built around the information TDUMP already gives you.</h2>
-        </div>
-
-        <div class="feature-grid">
-          <article class="feature-card feature-card--nav">
-            <div class="feature-card__visual" aria-hidden="true">
-              <img src="./assets/screenshots/mach-o-symbols.png" alt="" width="1471" height="950" loading="lazy" decoding="async">
-            </div>
-            <div class="feature-card__content">
-              <span class="feature-card__tag">NAV</span>
-              <h3>Structured navigation</h3>
-              <p>Move through complex dump data using trees and tables instead of manually scanning the source report.</p>
-            </div>
-          </article>
-          <article class="feature-card feature-card--raw">
-            <div class="feature-card__visual" aria-hidden="true">
-              <img src="./assets/screenshots/borland-debug.png" alt="" width="1471" height="950" loading="lazy" decoding="async">
-            </div>
-            <div class="feature-card__content">
-              <span class="feature-card__tag">RAW</span>
-              <h3>RAW correlation</h3>
-              <p>Keep the original TDUMP text visible for verification and correlate structured data back to its source ranges where available.</p>
-            </div>
-          </article>
-          <article class="feature-card feature-card--formats">
-            <div class="feature-card__visual feature-card__visual--duo" aria-hidden="true">
-              <img src="./assets/screenshots/mach-o-bindings.png" alt="" width="1471" height="950" loading="lazy" decoding="async">
-              <img src="./assets/screenshots/elf-relocations.png" alt="" width="1490" height="964" loading="lazy" decoding="async">
-            </div>
-            <div class="feature-card__content">
-              <span class="feature-card__tag">FMT</span>
-              <h3>Multi-format analysis</h3>
-              <p>Inspect output covering PE, ELF, Mach-O, OMF, archives, and Borland debug information.</p>
-            </div>
-          </article>
-          <article class="feature-card feature-card--diagnostics">
-            <div class="feature-card__visual" aria-hidden="true">
-              <img src="./assets/screenshots/mach-o-bindings.png" alt="" width="1471" height="950" loading="lazy" decoding="async">
-            </div>
-            <div class="feature-card__content">
-              <span class="feature-card__tag">DIA</span>
-              <h3>Developer diagnostics</h3>
-              <p>Review imports, exports, sections, resources, loader metadata, source modules, symbols, and parser diagnostics.</p>
-            </div>
-          </article>
-          <article class="feature-card feature-card--indexed">
-            <div class="feature-card__visual" aria-hidden="true">
-              <img src="./assets/screenshots/mach-o-symbols.png" alt="" width="1471" height="950" loading="lazy" decoding="async">
-            </div>
-            <div class="feature-card__content">
-              <span class="feature-card__tag">IDX</span>
-              <h3>Large-report workflow</h3>
-              <p>Filtering, virtualized views, indexed input, and background operations are designed for large TDUMP reports.</p>
-            </div>
-          </article>
-          <article class="feature-card feature-card--windows">
-            <div class="feature-card__visual" aria-hidden="true">
-              <img src="./assets/screenshots/elf-relocations.png" alt="" width="1490" height="964" loading="lazy" decoding="async">
-            </div>
-            <div class="feature-card__content">
-              <span class="feature-card__tag">WIN</span>
-              <h3>Native Windows UI</h3>
-              <p>Drag and drop, multi-document tabs, recent files, system/light/dark application themes, and per-monitor DPI awareness.</p>
-            </div>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="section" id="formats" aria-labelledby="formats-title">
-      <div class="container">
-        <div class="section-heading section-heading--split">
-          <div>
-            <p class="eyebrow">ANALYSIS COVERAGE</p>
-            <h2 id="formats-title">One interface for multiple TDUMP report families.</h2>
-          </div>
-          <p class="section-heading__lead">Coverage follows the structures emitted by the selected TDUMP or TDUMP64 version. The application keeps useful diagnostics and source-backed fallback views when a normal projection is not available.</p>
-        </div>
-
-        <div class="coverage-grid">
-          <article class="coverage-card coverage-card--wide">
-            <div class="coverage-card__header">
-              <h3>PE</h3>
-              <span>PORTABLE EXECUTABLE</span>
-            </div>
-            <ul>
-              <li>DOS / PE headers</li>
-              <li>Data directories</li>
-              <li>Sections</li>
-              <li>Imports</li>
-              <li>Delayed imports</li>
-              <li>Exports</li>
-              <li>Resources</li>
-              <li>Base relocations</li>
-            </ul>
-          </article>
-
-          <article class="coverage-card">
-            <div class="coverage-card__header">
-              <h3>Borland Debug</h3>
-              <span>SYMBOL DATA</span>
-            </div>
-            <ul>
-              <li>Subsection directories</li>
-              <li>Source modules / files</li>
-              <li>Aligned symbols</li>
-              <li>Global symbols</li>
-              <li>Global types</li>
-            </ul>
-          </article>
-
-          <article class="coverage-card">
-            <div class="coverage-card__header">
-              <h3>ELF</h3>
-              <span>OBJECT FORMAT</span>
-            </div>
-            <ul>
-              <li>Headers</li>
-              <li>Sections</li>
-              <li>Program headers</li>
-              <li>Symbols</li>
-              <li>Dynamic entries</li>
-              <li>Relocations</li>
-            </ul>
-          </article>
-
-          <article class="coverage-card coverage-card--wide">
-            <div class="coverage-card__header">
-              <h3>Mach-O</h3>
-              <span>APPLE BINARY FORMAT</span>
-            </div>
-            <ul>
-              <li>Architectures</li>
-              <li>Load commands</li>
-              <li>Sections</li>
-              <li>Symbols</li>
-              <li>Dynamic-symbol metadata</li>
-              <li>Imports / bindings</li>
-              <li>Indirect symbols</li>
-            </ul>
-          </article>
-
-          <article class="coverage-card">
-            <div class="coverage-card__header">
-              <h3>OMF / AR</h3>
-              <span>OBJECTS + ARCHIVES</span>
-            </div>
-            <ul>
-              <li>Records</li>
-              <li>Members</li>
-              <li>Archive symbols</li>
-            </ul>
-          </article>
-        </div>
-
-        <aside class="diagnostics-strip">
-          <div>
-            <p class="eyebrow">DIAGNOSTICS + RAW REPORT</p>
-            <h3>Keep the source within reach.</h3>
-          </div>
-          <p>Parser diagnostics, syntax-highlighted source text, filtering, virtualized rows, and optional selection synchronization remain available alongside the structured document.</p>
-        </aside>
-
-        <p class="coverage-note">Actual coverage depends on the report emitted by the TDUMP or TDUMP64 version being used.</p>
-      </div>
-    </section>
-
-    <section class="section section--surface" id="workflow" aria-labelledby="workflow-title">
-      <div class="container">
-        <div class="section-heading">
-          <p class="eyebrow">HOW IT WORKS</p>
-          <h2 id="workflow-title">From binary to structured view.</h2>
-        </div>
-
-        <div class="flow-panel flow-panel--wide" role="img" aria-label="A binary is processed by TDUMP or TDUMP64 into a temporary report, while an existing tdump report can enter directly. Both continue through a mapped text source and parser into a document tab.">
-<pre>binary file ──&gt; <span class="flow-panel__accent">TDUMP / TDUMP64</span> ──&gt; temporary report ─┐
-                                                      ├─&gt; mapped text source ─&gt; parser ─&gt; <span class="flow-panel__accent">document tab</span>
-.tdump report ────────────────────────────────────────┘</pre>
-        </div>
-
-        <div class="workflow-notes">
-          <p>You can open an existing TDUMP report directly, or open a supported binary and let TDump Explorer invoke an installed TDUMP or TDUMP64 utility to generate the report first.</p>
-          <p class="important-note"><strong>TDUMP is optional for existing reports.</strong> Opening an existing <code>.tdump</code> or compatible text report does not require TDUMP to be installed.</p>
-        </div>
-      </div>
-    </section>
-
-    <section class="section" id="interface" aria-labelledby="interface-title">
-      <div class="container">
-        <div class="section-heading section-heading--split">
-          <div>
-            <p class="eyebrow">INTERFACE</p>
-            <h2 id="interface-title">Structured data and source report, side by side.</h2>
-          </div>
-          <p class="section-heading__lead">Real application captures show the same document model across different report families, with the original report available for correlation and filtering.</p>
-        </div>
-
-        <div class="screenshot-grid">
-          <figure class="screenshot-card screenshot-card--primary">
-            <div class="screenshot-card__image">
-              <img src="./assets/screenshots/mach-o-symbols.png" alt="TDump Explorer showing a Mach-O dynamic import table and the matching raw report in the dark theme" width="1472" height="951" loading="lazy">
-            </div>
-            <figcaption>
-              <span>MACH-O · DARK THEME</span>
-              Large Mach-O symbol and dynamic import tables with RAW output in view.
-            </figcaption>
-          </figure>
-
-          <figure class="screenshot-card">
-            <div class="screenshot-card__image">
-              <img src="./assets/screenshots/mach-o-bindings.png" alt="TDump Explorer showing Mach-O binding instructions and synchronized raw output in the dark theme" width="1470" height="939" loading="lazy">
-            </div>
-            <figcaption>
-              <span>MACH-O · BINDINGS</span>
-              Binding instructions remain navigable beside the corresponding source report.
-            </figcaption>
-          </figure>
-
-          <figure class="screenshot-card">
-            <div class="screenshot-card__image">
-              <img src="./assets/screenshots/elf-relocations.png" alt="TDump Explorer showing an ELF relocation table and raw report in the light application theme" width="1489" height="963" loading="lazy">
-            </div>
-            <figcaption>
-              <span>ELF · LIGHT THEME</span>
-              ELF relocation analysis demonstrates the desktop application's alternate theme.
-            </figcaption>
-          </figure>
-        </div>
-      </div>
-    </section>
-
-    <section class="section section--surface" id="quick-start" aria-labelledby="quick-start-title">
-      <div class="container">
-        <div class="section-heading">
-          <p class="eyebrow">QUICK START</p>
-          <h2 id="quick-start-title">Open a report or inspect a binary.</h2>
-        </div>
-
-        <ol class="quick-start">
-          <li class="step">
-            <span class="step__number" aria-hidden="true">01</span>
-            <div>
-              <h3>Open</h3>
-              <p>Open a generated <code>.tdump</code> report, drag it onto the application, or pass its path on the command line.</p>
-            </div>
-          </li>
-          <li class="step">
-            <span class="step__number" aria-hidden="true">02</span>
-            <div>
-              <h3>Generate when needed</h3>
-              <p>When opening a binary, TDump Explorer locates an installed <code>tdump.exe</code> or <code>tdump64.exe</code> and selects the appropriate tool.</p>
-            </div>
-          </li>
-          <li class="step">
-            <span class="step__number" aria-hidden="true">03</span>
-            <div>
-              <h3>Navigate</h3>
-              <p>Select nodes in the structured tree to populate their corresponding detail views.</p>
-            </div>
-          </li>
-          <li class="step">
-            <span class="step__number" aria-hidden="true">04</span>
-            <div>
-              <h3>Verify</h3>
-              <p>Use the RAW panel to filter the original report and, when useful, enable selection following.</p>
-            </div>
-          </li>
-        </ol>
-
-        <div class="extensions">
-          <span class="extensions__label">RECOGNIZED INPUT</span>
-          <p><code>.exe</code> · <code>.dll</code> · <code>.bpl</code> · <code>.dpl</code> · <code>.ocx</code> · <code>.cpl</code> · <code>.scr</code> · <code>.com</code> · <code>.sys</code> · <code>.obj</code> · <code>.o</code> · <code>.lib</code> · <code>.ar</code> · <code>.a</code> · <code>.elf</code> · <code>.so</code> · <code>.dylib</code> · <code>.bundle</code> · <code>.mach</code> · <code>.dcu</code> · <code>.tdump</code> · compatible text reports</p>
-          <p class="extensions__note">Recognizing an extension does not guarantee that every installed TDUMP version can produce the same structured report.</p>
-        </div>
-
-        <aside class="requirements" aria-labelledby="requirements-title">
-          <div>
-            <p class="eyebrow">REQUIREMENTS</p>
-            <h2 id="requirements-title">Bring TDUMP only when you need to generate.</h2>
-          </div>
-          <div class="requirements__copy">
-            <p>TDUMP or TDUMP64 from an installed Embarcadero RAD Studio or Delphi toolchain is required when generating reports from binaries.</p>
-            <p>Existing <code>.tdump</code> and compatible text reports can be opened without TDUMP installed.</p>
-          </div>
-        </aside>
-      </div>
-    </section>
-
-    <section class="section final-cta" aria-labelledby="final-cta-title">
-      <div class="container final-cta__inner">
-        <div>
-          <p class="eyebrow">OPEN SOURCE · MIT</p>
-          <h2 id="final-cta-title">Make TDUMP output easier to inspect.</h2>
-          <p>Explore the source, follow development, or check available releases on GitHub.</p>
-        </div>
-        <div class="final-cta__actions">
-          <a class="button button--primary" href="https://github.com/RRUZ/TDump-Explorer" target="_blank" rel="noopener noreferrer">
-            View on GitHub <span aria-hidden="true">↗</span>
-          </a>
-          <a class="button button--secondary" href="https://github.com/RRUZ/TDump-Explorer/releases" target="_blank" rel="noopener noreferrer">Releases</a>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <footer class="site-footer">
-    <div class="container site-footer__grid">
-      <div>
-        <a class="brand brand--footer" href="#top">
-          <img class="brand__mark" src="./assets/brand/TDumpExplorer_dark.png" alt="" width="32" height="32" loading="lazy">
-          <span class="brand__name">TDump Explorer</span>
-        </a>
-        <p>Native Windows explorer for Embarcadero TDUMP / TDUMP64 reports.</p>
-      </div>
-      <nav class="footer-links" aria-label="Project links">
-        <a href="https://github.com/RRUZ/TDump-Explorer" target="_blank" rel="noopener noreferrer">GitHub</a>
-        <a href="https://github.com/RRUZ/TDump-Explorer/releases" target="_blank" rel="noopener noreferrer">Releases</a>
-        <a href="https://github.com/RRUZ/TDump-Explorer/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>
-      </nav>
-      <p class="site-footer__copyright">© 2026 Rodrigo Ruz</p>
+  </div>
+  <div class="architecture"><div class="architecture-title"><p class="eyebrow">THE LARGE-REPORT PATH</p><h3>Read what you need.<br>Render what you see.</h3></div><ol><li><strong>Memory-mapped input</strong><span>Access the report without first duplicating it as one complete string.</span></li><li><strong>Indexed lines &amp; lazy decoding</strong><span>Locate source ranges and decode their text when requested.</span></li><li><strong>Virtualized views</strong><span>Keep large tables and filtered RAW results navigable.</span></li></ol></div><div class="engineering-footnote"><span>Documented regression fixture: <strong>1,052,806 lines</strong></span><span>Current report-size limit: <strong>100 MiB</strong></span><span>Not a debugger or disassembler.</span></div>
+</div></section>
+<section class="chapter wrap start" id="quick-start" aria-labelledby="start-title">
+  <div class="chapter-heading"><p class="eyebrow">START WITH WHAT YOU HAVE</p><h2 id="start-title">Open a report.<br>Or start from the binary.</h2></div>
+  <div class="start-paths"><article><span class="path-label">.tdump / compatible text</span><h3>You already have the report.</h3><p>Open it, drop it onto the application, or pass its path on the command line. Navigate the structured tree and keep RAW output beside it.</p><p class="requirement">No TDUMP installation required.</p></article><article><span class="path-label">.exe / .dll / .bpl / and more</span><h3>You have a build artifact.</h3><p>Open the supported binary. TDump Explorer locates TDUMP or TDUMP64, generates a report, and opens the result in a document tab.</p><p class="requirement">Requires TDUMP from a Delphi / RAD Studio installation.</p></article></div>
+  <details class="input-reference"><summary>Recognized inputs and coverage notes</summary>
+    <div class="input-table-wrap" tabindex="0" role="region" aria-label="Recognized input formats">
+      <table class="input-table"><caption class="sr-only">Recognized file extensions and inspection coverage</caption>
+        <thead><tr><th scope="col">Input family</th><th scope="col">Recognized files</th><th scope="col">Coverage notes</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Windows binaries</th><td><code>.exe</code> <code>.dll</code> <code>.bpl</code> <code>.dpl</code> <code>.ocx</code> <code>.cpl</code> <code>.scr</code> <code>.com</code> <code>.sys</code></td><td>PE headers, sections, imports, exports, resources, and relocations where emitted by TDUMP.</td></tr>
+          <tr><th scope="row">Objects &amp; libraries</th><td><code>.obj</code> <code>.o</code> <code>.lib</code> <code>.ar</code> <code>.a</code></td><td>Object records and archive members. COFF input may use diagnostic or fallback views.</td></tr>
+          <tr><th scope="row">ELF</th><td><code>.elf</code> <code>.so</code></td><td>Headers, sections, program headers, symbols, dynamic entries, and relocations.</td></tr>
+          <tr><th scope="row">Mach-O</th><td><code>.dylib</code> <code>.bundle</code> <code>.mach</code></td><td>Architectures, load commands, sections, symbols, imports, and binding information.</td></tr>
+          <tr><th scope="row">Delphi units</th><td><code>.dcu</code></td><td>Diagnostic or fallback views when TDUMP cannot emit a normal structured report.</td></tr>
+          <tr><th scope="row">Existing reports</th><td><code>.tdump</code> and compatible text reports</td><td>Open directly. No TDUMP installation required.</td></tr>
+        </tbody>
+      </table>
     </div>
-  </footer>
-</body>
-</html>
+    <p class="input-coverage-note">Binary inputs require TDUMP or TDUMP64. Extension recognition does not guarantee full coverage; results depend on the report emitted by the installed tool. Some format-specific payloads remain generic or source-backed.</p>
+  </details>
+  <div class="closing"><div><p>Source available under the MIT license. Packaged builds, when published, are listed on Releases.</p></div><div class="actions"><a class="button" href="https://github.com/RRUZ/TDump-Explorer">View on GitHub ↗</a><a class="text-link" href="https://github.com/RRUZ/TDump-Explorer/releases">Releases ↗</a></div></div>
+</section>
+</main>
+<footer class="wrap"><span>TDump Explorer <span class="muted">/ A visual companion for TDUMP</span></span><a href="https://github.com/RRUZ/TDump-Explorer/blob/main/LICENSE">MIT License</a><span class="muted">© 2026 Rodrigo Ruz</span></footer>
+<dialog id="image-viewer" aria-labelledby="viewer-title">
+  <div class="viewer-toolbar">
+    <h2 id="viewer-title">Application capture</h2>
+    <div class="viewer-modes" role="group" aria-label="Screenshot scale">
+      <button id="viewer-fit" type="button" aria-pressed="true">Fit image</button>
+      <button id="viewer-pixels" type="button" aria-pressed="false">Original pixels</button>
+    </div>
+    <a id="viewer-file" href="./assets/screenshots/package-exports-dark.png" target="_blank" rel="noopener">Open PNG ↗</a>
+    <button id="viewer-close" type="button" aria-label="Close screenshot viewer">Close ×</button>
+  </div>
+  <p id="viewer-status" role="status">Complete image · fit without upscaling</p>
+  <div class="viewer-scroll" tabindex="0" aria-label="Complete screenshot. Use original pixels to inspect by dragging or scrolling.">
+    <div class="viewer-canvas"><img id="viewer-image" alt="" draggable="false"></div>
+  </div>
+</dialog>
+</body></html>

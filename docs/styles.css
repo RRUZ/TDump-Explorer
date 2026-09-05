@@ -487,38 +487,18 @@ code {
   background: var(--bg-code);
 }
 
-.value-card__preview::after {
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(180deg, transparent 45%, rgba(15, 20, 26, 0.22) 68%, var(--bg-elevated) 100%),
-    linear-gradient(90deg, rgba(9, 12, 16, 0.12), transparent 20%, transparent 80%, rgba(9, 12, 16, 0.12));
-  content: "";
-  pointer-events: none;
-}
-
 .value-card__preview img {
+  display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  transform: scale(1.015);
-  filter: saturate(0.92) contrast(1.035);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%);
-  transition: transform 280ms ease, filter 280ms ease;
-}
-
-.value-card:hover .value-card__preview img {
-  transform: scale(1.045);
-  filter: saturate(1) contrast(1.04) brightness(1.025);
+  object-fit: contain;
 }
 
 .value-card__content {
   position: relative;
   z-index: 1;
   flex: 1;
-  margin-top: -38px;
-  padding: 0 24px 24px;
+  padding: 24px;
 }
 
 .value-card p,
@@ -549,37 +529,19 @@ code {
 }
 
 .feature-card__visual {
-  position: absolute;
-  inset: 0 0 auto;
+  position: relative;
+  flex: 0 0 210px;
   height: 210px;
   overflow: hidden;
+  border-bottom: 1px solid var(--border);
   background: var(--bg-code);
 }
 
-.feature-card__visual::after {
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(180deg, rgba(9, 12, 16, 0.05) 0%, rgba(15, 20, 26, 0.12) 48%, var(--bg-elevated) 100%),
-    linear-gradient(90deg, rgba(9, 12, 16, 0.28), transparent 24%, transparent 76%, rgba(9, 12, 16, 0.2));
-  content: "";
-  pointer-events: none;
-}
-
 .feature-card__visual img {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transform: scale(1.12);
-  filter: saturate(0.8) contrast(1.06) brightness(0.74);
-  opacity: 0.9;
-  transition: transform 300ms ease, filter 300ms ease, opacity 300ms ease;
-}
-
-.feature-card:hover .feature-card__visual img {
-  transform: scale(1.16);
-  filter: saturate(0.96) contrast(1.06) brightness(0.86);
-  opacity: 1;
 }
 
 .feature-card__visual--duo {
@@ -619,14 +581,13 @@ code {
 
 .feature-card--windows .feature-card__visual img {
   object-position: 50% 7%;
-  filter: saturate(0.72) contrast(1.04) brightness(0.76);
 }
 
 .feature-card__content {
   position: relative;
   z-index: 1;
-  margin-top: auto;
-  padding: 148px 28px 28px;
+  flex: 1;
+  padding: 28px;
 }
 
 .feature-card__tag {
@@ -1061,10 +1022,6 @@ code {
     grid-column: 1 / -1;
   }
 
-  .value-card:last-child .value-card__preview {
-    aspect-ratio: 2.35 / 1;
-  }
-
   .coverage-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1264,11 +1221,11 @@ code {
   }
 
   .feature-card__content {
-    padding: 146px 22px 22px;
+    padding: 22px;
   }
 
   .value-card__content {
-    padding: 0 22px 22px;
+    padding: 22px;
   }
 
   .step {
