@@ -100,7 +100,7 @@ Recognizing an extension does not guarantee that every installed TDUMP version c
 
 ## How it works
 
-![TDump Explorer workflow](images/howitworks.png)
+![TDump Explorer workflow](images/howitworks.svg)
 
 ## Requirements
 

@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="836" height="471" viewBox="0 0 836 471" role="img" aria-labelledby="svg-title svg-desc" shape-rendering="geometricPrecision" text-rendering="geometricPrecision">
+  <title id="svg-title">How TDump Explorer works</title>
+  <desc id="svg-desc">Binary files are processed by TDUMP or TDUMP64 into a temporary report. Existing TDUMP reports bypass that stage. Both routes merge into a mapped text source, parser and document tab.</desc>
+
+  <defs>
+    <linearGradient id="shell" x1="418" y1="24" x2="418" y2="438" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#172027"/>
+      <stop offset="0.58" stop-color="#121A1F"/>
+      <stop offset="1" stop-color="#10171B"/>
+    </linearGradient>
+    <linearGradient id="titlebar" x1="418" y1="24" x2="418" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#192229"/>
+      <stop offset="1" stop-color="#131B20"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#182127"/>
+      <stop offset="1" stop-color="#151D22"/>
+    </linearGradient>
+    <linearGradient id="selection" x1="648" y1="237" x2="724" y2="237" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#12304D"/>
+      <stop offset="1" stop-color="#123B5C"/>
+    </linearGradient>
+    <pattern id="grip-dots" width="9" height="9" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.15" fill="#526168"/>
+    </pattern>
+    <marker id="arrow" viewBox="0 0 7 7" refX="6" refY="3.5" markerWidth="7" markerHeight="7" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M0 0L7 3.5L0 7Z" fill="#44E3ED"/>
+    </marker>
+    <clipPath id="shell-clip">
+      <rect x="13" y="24" width="810" height="414" rx="9"/>
+    </clipPath>
+    <style>
+      .font { font-family: "Arial Narrow", "Roboto Condensed", "Segoe UI", Arial, sans-serif; font-stretch: condensed; }
+      .title-copy { fill: #E8EDF2; font-size: 8px; font-weight: 700; letter-spacing: .12px; }
+      .section-copy { fill: #EDF1F2; font-size: 8px; font-weight: 700; letter-spacing: .18px; }
+      .stage-copy { fill: #E7EBED; font-size: 7px; font-weight: 700; }
+      .chip-copy { fill: #EEF2F3; font-size: 6.7px; font-weight: 700; }
+      .outline { fill: none; stroke: #B9C0C4; stroke-width: 1.35; stroke-linecap: round; stroke-linejoin: round; }
+      .outline-soft { fill: none; stroke: #66747B; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
+      .panel { fill: #151D22; fill-opacity: .64; stroke: #505A60; stroke-width: 1; }
+      .card { fill: url(#card); stroke: #545E64; stroke-width: 1; }
+      .flow { fill: none; stroke: #44E3ED; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+      .cyan-line { fill: none; stroke: #44E3ED; stroke-width: 1.35; stroke-linecap: round; stroke-linejoin: round; }
+      .data-line { fill: none; stroke: #AEB7BC; stroke-width: 1.4; stroke-linecap: round; }
+    </style>
+  </defs>
+
+  <!-- Transparent canvas; only the application surface is painted. -->
+  <g clip-path="url(#shell-clip)">
+    <rect x="13" y="24" width="810" height="414" fill="url(#shell)"/>
+    <rect x="13" y="24" width="810" height="32" fill="url(#titlebar)"/>
+    <path d="M13 55.5H823" stroke="#29343A" stroke-width="1"/>
+  </g>
+  <rect x="13.5" y="24.5" width="809" height="413" rx="8.5" fill="none" stroke="#59646A"/>
+
+  <!-- Title bar -->
+  <rect x="28.5" y="34.5" width="8" height="8" rx="1" fill="none" stroke="#718087"/>
+  <rect x="31" y="37" width="3" height="3" rx=".35" fill="#7C8A91"/>
+  <text x="53" y="42" class="font title-copy">FROM INPUT TO INSPECTION</text>
+  <path d="M742.5 39H750.5" stroke="#B8C0C4" stroke-linecap="round"/>
+  <rect x="772.5" y="35.5" width="7" height="7" rx="1" fill="none" stroke="#C2C9CC"/>
+  <path d="M802 35.5L808.5 42M808.5 35.5L802 42" stroke="#C2C9CC" stroke-linecap="round"/>
+
+  <!-- Input region -->
+  <rect x="25" y="73" width="281" height="323" rx="5" class="panel"/>
+  <text x="38" y="92.5" class="font section-copy">INPUT</text>
+
+  <!-- Binary file -->
+  <rect x="36" y="116" width="68" height="100" rx="6" class="card"/>
+  <path d="M53 133.5H77.5L89 145V181H53Z" class="outline"/>
+  <path d="M77.5 133.5V145H89" class="outline"/>
+  <rect x="67" y="156" width="21" height="22" rx="2" fill="#11181C" stroke="#B9C0C4"/>
+  <text x="77.5" y="165" text-anchor="middle" class="font chip-copy">010</text>
+  <text x="77.5" y="173" text-anchor="middle" class="font chip-copy">101</text>
+  <text x="70" y="202" text-anchor="middle" class="font stage-copy">BINARY FILE</text>
+
+  <!-- TDUMP action -->
+  <rect x="123" y="153.5" width="95" height="25" rx="5" fill="#122229" stroke="#44E3ED"/>
+  <g transform="translate(125.9 159.4) scale(.55)" fill="none" stroke="#44E3ED" stroke-width="2.05" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12.22 2H11.78A2 2 0 0 0 9.78 4V4.18A2 2 0 0 1 8.78 5.91L8.35 6.16A2 2 0 0 1 6.35 6.16L6.2 6.08A2 2 0 0 0 3.47 6.81L3.25 7.19A2 2 0 0 0 3.98 9.92L4.13 10.02A2 2 0 0 1 5.13 11.74V12.25A2 2 0 0 1 4.13 13.99L3.98 14.08A2 2 0 0 0 3.25 16.81L3.47 17.19A2 2 0 0 0 6.2 17.92L6.35 17.84A2 2 0 0 1 8.35 17.84L8.78 18.09A2 2 0 0 1 9.78 19.82V20A2 2 0 0 0 11.78 22H12.22A2 2 0 0 0 14.22 20V19.82A2 2 0 0 1 15.22 18.09L15.65 17.84A2 2 0 0 1 17.65 17.84L17.8 17.92A2 2 0 0 0 20.53 17.19L20.75 16.81A2 2 0 0 0 20.02 14.08L19.87 13.99A2 2 0 0 1 18.87 12.25V11.74A2 2 0 0 1 19.87 10L20.02 9.91A2 2 0 0 0 20.75 7.18L20.53 6.8A2 2 0 0 0 17.8 6.07L17.65 6.15A2 2 0 0 1 15.65 6.15L15.22 5.9A2 2 0 0 1 14.22 4.17V4A2 2 0 0 0 12.22 2Z"/>
+    <circle cx="12" cy="12" r="3"/>
+  </g>
+  <text x="176" y="168.5" text-anchor="middle" class="font chip-copy">TDUMP / TDUMP64</text>
+
+  <!-- Temporary report -->
+  <rect x="236" y="126" width="56" height="99" rx="6" class="card"/>
+  <path d="M251 140.5H269L279 150.5V191H251Z" class="outline"/>
+  <path d="M269 140.5V150.5H279" class="outline"/>
+  <path d="M257 160H273M257 168H273M257 176H273" class="cyan-line"/>
+  <text x="264" y="206.5" text-anchor="middle" class="font stage-copy">TEMPORARY</text>
+  <text x="264" y="215" text-anchor="middle" class="font stage-copy">REPORT</text>
+
+  <!-- Existing report -->
+  <rect x="36" y="269" width="68" height="99" rx="6" class="card"/>
+  <path d="M53 285.5H77.5L89 297V338H53Z" class="outline"/>
+  <path d="M77.5 285.5V297H89" class="outline"/>
+  <rect x="50" y="315" width="41" height="18" rx="4" fill="#10272D" stroke="#44E3ED"/>
+  <text x="70.5" y="327.3" text-anchor="middle" class="font chip-copy" fill="#44E3ED">.TDUMP</text>
+  <text x="70" y="353" text-anchor="middle" class="font stage-copy">.TDUMP REPORT</text>
+
+  <!-- Input routes -->
+  <path d="M104 166H120" class="flow" marker-end="url(#arrow)"/>
+  <path d="M218 166H232" class="flow" marker-end="url(#arrow)"/>
+  <path d="M292 166H309C318 166 324 172 324 181V222C324 231 331 237 340 237H347" class="flow" marker-end="url(#arrow)"/>
+  <path d="M104 314H309C318 314 324 308 324 299V252C324 243 331 237 340 237H347" class="flow" marker-end="url(#arrow)"/>
+
+  <!-- Mapping divider and merge -->
+  <rect x="334" y="92" width="44" height="284" rx="6" fill="#131A1F" stroke="#5B686E"/>
+  <rect x="342" y="101" width="28" height="63" fill="url(#grip-dots)"/>
+  <rect x="342" y="314" width="28" height="54" fill="url(#grip-dots)"/>
+  <path d="M345 200L355 211L365 200" class="cyan-line"/>
+  <circle cx="355" cy="237" r="7.5" fill="#15242A" stroke="#44E3ED" stroke-width="1.8"/>
+  <circle cx="355" cy="237" r="3.3" fill="#44E3ED"/>
+  <path d="M362.5 237H402" class="flow" marker-end="url(#arrow)"/>
+
+  <!-- Mapped text source -->
+  <rect x="405" y="118" width="116" height="247" rx="5" class="card"/>
+  <text x="463" y="140" text-anchor="middle" class="font stage-copy">MAPPED TEXT SOURCE</text>
+  <path d="M419 178.5H475L501 204.5V300H419Z" fill="#151D22" stroke="#B9C0C4" stroke-width="1.35" stroke-linejoin="round"/>
+  <path d="M475 178.5V204.5H501" class="outline"/>
+  <rect x="419" y="178.5" width="15" height="121.5" fill="#11181D" fill-opacity=".78"/>
+  <path d="M434 178.5V300" stroke="#65737A"/>
+  <rect x="423" y="195" width="7" height="7" rx="1" fill="#69B7FF"/>
+  <rect x="423" y="211" width="7" height="7" rx="1" fill="#6D777C"/>
+  <rect x="423" y="227" width="7" height="7" rx="1" fill="#6D777C"/>
+  <rect x="423" y="243" width="7" height="7" rx="1" fill="#6D777C"/>
+  <rect x="423" y="259" width="7" height="7" rx="1" fill="#6D777C"/>
+  <rect x="423" y="275" width="7" height="7" rx="1" fill="#6D777C"/>
+  <path d="M444 211H473M444 225H487M444 239H479M444 253H491M444 267H481M444 281H469" class="data-line"/>
+  <path d="M444 225H478M444 239H486M444 253H475" class="cyan-line"/>
+
+  <!-- Parser -->
+  <path d="M521 237H530" class="flow" marker-end="url(#arrow)"/>
+  <rect x="533" y="118" width="98" height="247" rx="5" class="card"/>
+  <text x="582" y="140" text-anchor="middle" class="font stage-copy">PARSER</text>
+  <rect x="570" y="181" width="24" height="24" rx="3" fill="#171F24" stroke="#B9C0C4" stroke-width="1.35"/>
+  <path d="M582 205V217.5" class="outline"/>
+  <path d="M582 217.5L593 229L582 240.5L571 229Z" fill="#142C43" stroke="#5FAEFF" stroke-width="1.2"/>
+  <path d="M582 240.5V249M558 249H606M558 249V264M606 249V264" class="outline"/>
+  <rect x="546" y="264" width="24" height="24" rx="3" fill="#171F24" stroke="#B9C0C4" stroke-width="1.35"/>
+  <rect x="594" y="264" width="24" height="24" rx="3" fill="#171F24" stroke="#B9C0C4" stroke-width="1.35"/>
+
+  <!-- Document tab -->
+  <path d="M631 237H641" class="flow" marker-end="url(#arrow)"/>
+  <rect x="644" y="118" width="164" height="247" rx="5" class="card"/>
+  <text x="726" y="140" text-anchor="middle" class="font stage-copy">DOCUMENT TAB</text>
+  <path d="M648 153H686V177H648Z" fill="#10283A" stroke="#279FDF"/>
+  <path d="M686 153H724V177H686Z" fill="#151D22" stroke="#39454B"/>
+  <path d="M724 153H764V177H724Z" fill="#151D22" stroke="#39454B"/>
+  <path d="M648 177H804" stroke="#627077"/>
+  <path d="M648 177V361M724 177V361" stroke="#536168"/>
+
+  <!-- Tab icons -->
+  <path d="M664 160H669L672 163V170H664ZM669 160V163H672" class="outline" stroke-width=".9"/>
+  <path d="M696 162L701 159.5L706 162L701 164.5ZM696 165.5L701 168L706 165.5M696 162V165.5M706 162V165.5" class="outline-soft"/>
+  <path d="M741 161L748 168M748 161L741 168" class="outline-soft"/>
+
+  <!-- Tree pane -->
+  <rect x="649" y="226" width="75" height="21" fill="url(#selection)"/>
+  <g class="outline-soft">
+    <path d="M658 188L663 194L668 188Z"/>
+    <path d="M671 187H681L684 190V197H671Z"/>
+    <path d="M665 201L670 207L675 201Z"/>
+    <path d="M678 200H688L691 203V211H678Z"/>
+    <path d="M675 215L680 221L685 215Z"/>
+    <path d="M688 215H696L699 218V225H688Z"/>
+    <path d="M664 251L669 257L674 251Z"/>
+    <path d="M677 250H687L690 253V261H677Z"/>
+    <path d="M674 265L679 271L684 265Z"/>
+    <path d="M687 264H697L700 267V275H687Z"/>
+    <path d="M683 279L688 285L693 279Z"/>
+    <path d="M696 278H706L709 281V289H696Z"/>
+    <path d="M664 194V201M671 207V215M678 221V226M664 257V302M671 271V294M678 285V302"/>
+  </g>
+  <path d="M670 231H675L678 234V241H670ZM675 231V234H678" class="outline" stroke-width=".9"/>
+
+  <!-- Raw-text pane -->
+  <path d="M736 195H786M736 209H775M736 223H790M736 237H780M736 251H793M736 265H784M736 279H772" class="outline-soft" stroke-width="2.4"/>
+  <path d="M736 305H790M736 319H775M736 333H786M736 347H768" class="outline-soft" stroke-width="2.4"/>
+</svg>
