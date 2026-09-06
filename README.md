@@ -102,10 +102,6 @@ Recognizing an extension does not guarantee that every installed TDUMP version c
 
 ![TDump Explorer workflow](images/howitworks.png)
 
-<p align="center">
-  <img src="images/howitworks.png" alt="howitworks" width="100%"/>
-</p>
-
 ## Requirements
 
 - An installed Embarcadero RAD Studio or Delphi toolchain providing `tdump.exe` or `tdump64.exe` when analyzing binaries.
